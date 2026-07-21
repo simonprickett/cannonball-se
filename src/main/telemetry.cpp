@@ -257,6 +257,10 @@ void TelemetryManager::start_game_session(const std::string& game_mode, int musi
             impl_->game_session_span->SetAttribute("game_mode", game_mode);
             impl_->game_session_span->SetAttribute("music_selection", music_selection);
             impl_->game_session_span->SetAttribute("player_initials", player_initials);
+            // Also a span attribute (not just a log attribute) so Tempo can enumerate it as a
+            // searchable tag. Time-sortable, so a Tempo label_values variable sorted descending
+            // surfaces the newest game first; the Loki panels then filter by this same value.
+            impl_->game_session_span->SetAttribute("session_label", impl_->current_session_label);
         }
     } catch (const std::exception& e) {
         std::cerr << "TelemetryManager: Error starting game session: " << e.what() << std::endl;
