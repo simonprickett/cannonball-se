@@ -1,32 +1,40 @@
 # Cannonball-SE Grafana Dashboards
 
-Three importable Grafana 13 dashboards built on the structured logs described in
-[`ADD_LOGS.md`](ADD_LOGS.md). All panels query **Loki** with LogQL; on import you are
-prompted for the Loki data source (`DS_LOKI`).
+Importable Grafana 13 dashboards built on the structured logs described in
+[`../ADD_LOGS.md`](../ADD_LOGS.md). Panels query **Loki** with LogQL; the game picker on the
+Recent Games board queries **Tempo**. On import you're prompted for the data source(s).
 
 | File | UID | Purpose |
 |------|-----|---------|
-| `last_game_dashboard.json` | `cannonball-last-game` | Deep dive on the most recent game (in progress or just finished) |
+| `live_game_dashboard.json` | `cannonball-now-playing` | **Now Playing** — hands-off, auto-follows the current/most-recent game (no picker). Identity/state/stage/screenshots are exact at any range; aggregations are a rolling time-window (keep the range short). |
+| `recent_games_dashboard.json` | `cannonball-recent-games` | **Recent Games** — pick any recent game from the Game dropdown (Tempo, newest first). Every panel is session-scoped, so exact at any range. Does NOT auto-follow. |
 | `aggregate_dashboard.json` | `cannonball-aggregate` | Aggregate stats across all games in the selected time range |
 | `leaderboards_dashboard.json` | `cannonball-leaderboards` | Per-run "Hall of Fame" leaderboards |
+
+**`recent_games_dashboard.json` is generated, not hand-edited.** `live_game_dashboard.json` is the
+source of truth; `python3 generate.py` derives the Recent Games board from it (same layout/panels/viz,
+with session-scoped queries + the Tempo `Game` picker). Edit the live board, then regenerate.
 
 ## Required panel plugins
 
 Both must be installed (declared in each dashboard's `__requires`):
 
-- **`grafana-graphviz-panel`** — renders the OutRun route map (last-game + aggregate).
-- **`dalvany-image-panel`** — renders the base64 screenshots (last-game only).
+- **`grafana-graphviz-panel`** — renders the OutRun route map (Now Playing, Recent Games, aggregate).
+- **`dalvany-image-panel`** — renders the base64 screenshots (Now Playing, Recent Games).
 
 ## Core conventions
 
 - **A session == one `trace_id`.** It is emitted on every in-game log and doubles as the
   session id. `player_initials` is attached to every in-game log too.
-- **The last-game dashboard is driven by a `$session` picker that defaults to the newest game.**
-  The picker is a **Tempo** query variable — `label_values(session_label)` sorted descending — so
-  the time-sortable `session_label` puts the latest game first and selects it by default. Every
-  Loki panel then filters `| session_label="$session"`, so it's exact at any time range. (Why
-  Tempo: Loki can't enumerate structured metadata in a variable, but Tempo enumerates the
-  `session_label` **span** attribute — see the caveats.)
+- **Two ways to scope to one game:** the **Now Playing** board auto-follows the latest game via
+  `last_over_time`/newest + an `start_epoch_ms > end_epoch_ms` state check (no variable, so it
+  can't be pinned and always tracks the current game — but its *aggregation* panels are a rolling
+  window, not session-scoped). The **Recent Games** board uses a `$session` picker — a **Tempo**
+  query variable `label_values(session_label)` sorted descending (newest first, default), and every
+  Loki panel filters `| session_label="$session"`, exact at any range. (Why Tempo: Loki can't
+  enumerate structured metadata in a variable; Tempo enumerates the `session_label` **span**
+  attribute. And a query variable keeps its selection across refreshes, which is why the picker
+  board can't auto-follow — hence the separate Now Playing board.)
 - **`game.session.end` is logged *before* the session span is closed** (`outrun.cpp`), so it
   retains `trace_id`. Every per-session query depends on this.
 - **No `| json` in queries.** The log *body* is just the event name; all attributes

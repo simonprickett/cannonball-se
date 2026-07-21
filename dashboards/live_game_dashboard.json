@@ -98,8 +98,8 @@
     },
     {
       "type": "stat",
-      "title": "Session state",
-      "description": "Latest start_epoch_ms > latest end_epoch_ms -> IN PROGRESS, else FINISHED. Compares the single most-recent start vs end, so it's correct at any range and with multiple games.",
+      "title": "Game state",
+      "description": "Is a game being played right now? Latest start newer than latest end = IN PROGRESS; otherwise the cabinet is in ATTRACT MODE. The last game's outcome (Completed / Timed Out) is on the Session result and Final score panels.",
       "datasource": {
         "type": "loki",
         "uid": "${DS_LOKI}"
@@ -115,37 +115,17 @@
         "defaults": {
           "mappings": [
             {
-              "type": "special",
+              "type": "value",
               "options": {
-                "match": "null",
-                "result": {
-                  "text": "\u2014 NO GAME \u2014",
-                  "color": "text",
-                  "index": 0
-                }
-              }
-            },
-            {
-              "type": "range",
-              "options": {
-                "from": 1,
-                "to": 100000,
-                "result": {
+                "1": {
                   "text": "IN PROGRESS",
-                  "color": "yellow",
-                  "index": 1
-                }
-              }
-            },
-            {
-              "type": "range",
-              "options": {
-                "from": -100000,
-                "to": 0,
-                "result": {
-                  "text": "FINISHED",
                   "color": "green",
-                  "index": 2
+                  "index": 0
+                },
+                "0": {
+                  "text": "ATTRACT MODE",
+                  "color": "blue",
+                  "index": 1
                 }
               }
             }
@@ -194,7 +174,7 @@
       "gridPos": {
         "h": 4,
         "w": 4,
-        "x": 4,
+        "x": 8,
         "y": 5
       },
       "id": 14,
@@ -243,8 +223,8 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 8,
+        "w": 3,
+        "x": 12,
         "y": 5
       },
       "id": 4,
@@ -285,7 +265,7 @@
     },
     {
       "type": "stat",
-      "title": "Avg speed (kph)",
+      "title": "Avg speed",
       "description": "Mean speed_kph across this session's events. NOTE: speed_kph is only logged on crash / off-road / stage-start / route / overtake events, so this is a sampled average weighted toward eventful moments, not a true whole-lap mean.",
       "datasource": {
         "type": "loki",
@@ -293,8 +273,8 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 12,
+        "w": 3,
+        "x": 15,
         "y": 5
       },
       "id": 15,
@@ -336,7 +316,7 @@
     },
     {
       "type": "stat",
-      "title": "Top speed (kph)",
+      "title": "Top speed",
       "description": "Highest speed_kph seen across any event in this session.",
       "datasource": {
         "type": "loki",
@@ -344,8 +324,8 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 16,
+        "w": 3,
+        "x": 18,
         "y": 5
       },
       "id": 6,
@@ -394,8 +374,8 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 20,
+        "w": 3,
+        "x": 21,
         "y": 5
       },
       "id": 7,
@@ -493,8 +473,8 @@
     },
     {
       "type": "barchart",
-      "title": "Overtakes by vehicle type",
-      "description": "Overtake count grouped by vehicle_type for the selected session.",
+      "title": "Overtakes by vehicle",
+      "description": "Overtake count grouped by vehicle (porsche, corvette, bmw, beetle, pickup, truck).",
       "datasource": {
         "type": "loki",
         "uid": "${DS_LOKI}"
@@ -543,64 +523,22 @@
           },
           "editorMode": "code",
           "queryType": "instant",
-          "legendFormat": "{{vehicle_type}}",
-          "expr": "sum by (vehicle_type) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.vehicle_overtake\" [$__range]))"
+          "legendFormat": "{{vehicle}}",
+          "expr": "sum by (vehicle) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.vehicle_overtake\" [$__range]))"
         }
-      ]
-    },
-    {
-      "type": "timeseries",
-      "title": "Score progression (per stage)",
-      "description": "score_end recorded at each game.stage.end for this session.",
-      "datasource": {
-        "type": "loki",
-        "uid": "${DS_LOKI}"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 9
-      },
-      "id": 9,
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "stepAfter",
-            "fillOpacity": 10,
-            "showPoints": "always",
-            "pointSize": 6
-          },
-          "unit": "short",
-          "color": {
-            "mode": "palette-classic"
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": false
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
+      ],
+      "transformations": [
         {
-          "refId": "A",
-          "datasource": {
-            "type": "loki",
-            "uid": "${DS_LOKI}"
-          },
-          "editorMode": "code",
-          "queryType": "range",
-          "legendFormat": "score",
-          "expr": "max_over_time({service_name=\"cannonball-se\"} | event=\"game.stage.end\" | unwrap score_end [$__auto])"
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "Value #A",
+                "desc": true
+              }
+            ]
+          }
         }
       ]
     },
@@ -898,6 +836,144 @@
         }
       ],
       "transformations": []
+    },
+    {
+      "type": "stat",
+      "title": "Player",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 5
+      },
+      "id": 16,
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "Player",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "range",
+          "expr": "{service_name=\"cannonball-se\"} | event=\"game.session.start\" | line_format \"{{.player_initials}}\"",
+          "maxLines": 1
+        }
+      ],
+      "description": "player_initials of the most recently started game.",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "tsNs": true,
+              "id": true,
+              "labels": true,
+              "labelTypes": true
+            },
+            "renameByName": {
+              "Line": "Player"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "barchart",
+      "title": "Overtakes by color",
+      "description": "Overtake count grouped by the overtaken vehicle's color.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 9
+      },
+      "id": 17,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 80
+          },
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xTickLabelRotation": 0,
+        "showValue": "auto",
+        "stacking": "none",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "legendFormat": "{{color}}",
+          "expr": "sum by (color) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.vehicle_overtake\" [$__range]))"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "Value #A",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ]
     }
   ],
   "refresh": "10s",
