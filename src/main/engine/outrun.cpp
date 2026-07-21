@@ -704,6 +704,9 @@ void Outrun::main_switch()
                 int64_t final_score = TelemetryManager::bcd_score_to_decimal(ostats.score);
                 int final_stage = ostats.cur_stage + 1;
                 std::string completion = (ostats.game_completed & BIT_0) ? "completed" : "timeout";
+                // Numeric form of completion so dashboards can unwrap/last_over_time it
+                // (1 = completed, 2 = timed out). Drives the 3-state Session panel.
+                int64_t completion_code = (ostats.game_completed & BIT_0) ? 1 : 2;
                 
                 oinitengine.init(cannonball_mode == MODE_TTRIAL ? ttrial.level : 0);
                 //ROM:0000B716                 bclr    #0,(byte_260550).l
@@ -726,7 +729,8 @@ void Outrun::main_switch()
                         {"longest_clean_seconds", TelemetryManager::instance().get_longest_clean_seconds()},
                         // End time (epoch ms) so the dashboard can tell IN PROGRESS from FINISHED
                         // by comparing the latest start vs latest end, at any time range.
-                        {"end_epoch_ms", TelemetryManager::now_epoch_ms()}
+                        {"end_epoch_ms", TelemetryManager::now_epoch_ms()},
+                        {"completion_code", completion_code}
                     }
                 );
                 TelemetryManager::instance().end_game_session(final_score, completion, final_stage);
