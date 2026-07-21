@@ -79,7 +79,11 @@ public:
     
     // Helper to convert BCD score to decimal
     static int64_t bcd_score_to_decimal(uint32_t bcd_score);
-    
+
+    // Current wall-clock time in epoch milliseconds. Logged on game.session.start
+    // so dashboards can rank sessions by recency (topk) to auto-pick the latest game.
+    static int64_t now_epoch_ms();
+
 private:
     TelemetryManager();
     ~TelemetryManager();

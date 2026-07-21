@@ -277,6 +277,11 @@ int64_t TelemetryManager::get_longest_clean_seconds() const {
     return std::max(impl_->longest_clean_seconds, tail);
 }
 
+int64_t TelemetryManager::now_epoch_ms() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+}
+
 void TelemetryManager::start_stage_span(int stage_num, int64_t score_start) {
     if (!initialized_ || !impl_->tracer || !impl_->game_session_span) return;
 

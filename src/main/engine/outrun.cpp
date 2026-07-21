@@ -489,7 +489,10 @@ void Outrun::main_switch()
                         {"player_initials", oname.get_initials()}
                     },
                     {
-                        {"music_selection", (int64_t)omusic.get_music_selected()}
+                        {"music_selection", (int64_t)omusic.get_music_selected()},
+                        // Epoch-ms start time so dashboards can topk() the newest session
+                        // and auto-scope every panel to the latest game's trace_id.
+                        {"start_epoch_ms", TelemetryManager::now_epoch_ms()}
                     }
                 );
 
