@@ -11,6 +11,7 @@
 #include <iomanip>
 #include <chrono>
 #include <algorithm>
+#include <ctime>
 
 #include "opentelemetry/sdk/trace/tracer_provider.h"
 #include "opentelemetry/sdk/trace/batch_span_processor.h"
@@ -36,6 +37,9 @@ struct TelemetryImpl {
     opentelemetry::nostd::shared_ptr<opentelemetry::sdk::logs::LoggerProvider> log_provider;
     opentelemetry::nostd::shared_ptr<opentelemetry::logs::Logger> logger;
     std::string current_player_initials;
+    // Human-readable, time-sortable session id ("YYYY-MM-DD HH:MM:SS.mmm INITIALS MODE").
+    // Attached to every in-session log so dashboards can offer a newest-first session dropdown.
+    std::string current_session_label;
     // Clean-driving streak tracking (wall-clock). Reset at session start, updated on each
     // crash/off-road, folded with the tail when read at session end.
     std::chrono::steady_clock::time_point last_incident_time{};
@@ -226,6 +230,21 @@ void TelemetryManager::start_game_session(const std::string& game_mode, int musi
 
         // Store player initials for attaching to all in-session logs
         impl_->current_player_initials = player_initials;
+
+        // Build a readable, time-sortable session label for the dashboard session picker.
+        {
+            auto now = std::chrono::system_clock::now();
+            std::time_t tt = std::chrono::system_clock::to_time_t(now);
+            int ms = (int)(std::chrono::duration_cast<std::chrono::milliseconds>(
+                        now.time_since_epoch()).count() % 1000);
+            std::tm tmv{};
+            localtime_r(&tt, &tmv);
+            std::ostringstream lbl;
+            lbl << std::put_time(&tmv, "%Y-%m-%d %H:%M:%S")
+                << '.' << std::setfill('0') << std::setw(3) << ms
+                << ' ' << player_initials << ' ' << game_mode;
+            impl_->current_session_label = lbl.str();
+        }
 
         // Reset clean-driving streak tracking for the new session
         impl_->last_incident_time = std::chrono::steady_clock::now();
@@ -499,6 +518,10 @@ void TelemetryManager::log_game_event(
 
         if (!impl_->current_player_initials.empty()) {
             log_record->SetAttribute("player_initials", impl_->current_player_initials);
+        }
+
+        if (!impl_->current_session_label.empty()) {
+            log_record->SetAttribute("session_label", impl_->current_session_label);
         }
 
         for (const auto& kv : string_attrs) {
