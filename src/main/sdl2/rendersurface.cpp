@@ -19,7 +19,14 @@
 #include <iterator>
 #include <iostream>
 #include <mutex>
+#include <chrono>
+#include <vector>
+#include <string>
+#include <cstring>
 #include "rendersurface.hpp"
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "../stb_image_write.h"
 #include "frontend/config.hpp"
 // Aligned Memory Allocation (standard C++17)
 #include <new>        // std::align_val_t, ::operator new/delete
@@ -36,6 +43,36 @@
 #ifndef CB_PIXEL_ALIGNMENT
 #define CB_PIXEL_ALIGNMENT 64
 #endif
+
+// ---------------------------------------------------------------------------
+// Screenshot helpers
+// ---------------------------------------------------------------------------
+
+static void stbi_write_to_vector(void* ctx, void* data, int sz)
+{
+    auto* v = static_cast<std::vector<uint8_t>*>(ctx);
+    v->insert(v->end(), static_cast<uint8_t*>(data),
+              static_cast<uint8_t*>(data) + sz);
+}
+
+static const char B64_TABLE[] =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+static std::string base64_encode_bytes(const std::vector<uint8_t>& in)
+{
+    std::string out;
+    out.reserve(((in.size() + 2) / 3) * 4);
+    for (size_t i = 0; i < in.size(); i += 3) {
+        uint32_t b = (uint32_t)in[i] << 16;
+        if (i + 1 < in.size()) b |= (uint32_t)in[i + 1] << 8;
+        if (i + 2 < in.size()) b |= (uint32_t)in[i + 2];
+        out += B64_TABLE[(b >> 18) & 63];
+        out += B64_TABLE[(b >> 12) & 63];
+        out += (i + 1 < in.size()) ? B64_TABLE[(b >> 6) & 63] : '=';
+        out += (i + 2 < in.size()) ? B64_TABLE[b & 63] : '=';
+    }
+    return out;
+}
 
 RenderSurface::RenderSurface()
 {
@@ -795,6 +832,58 @@ bool RenderSurface::finalize_frame()
     glb::draw( /*useOffscreen=*/(offscreen_rendering==1),
                /*drawOverlay=*/((config.video.crt_shape != 0)||(config.video.shadow_mask==1)) );
 
+    // Deferred screenshot: capture post-shader pixels before the buffer swap
+    if (screenshot_pending_.load(std::memory_order_acquire)) {
+        screenshot_pending_.store(false, std::memory_order_release);
+        int win_w = 0, win_h = 0;
+        SDL_GL_GetDrawableSize(window, &win_w, &win_h);
+        std::vector<uint8_t> raw(win_w * win_h * 4);
+        glReadPixels(0, 0, win_w, win_h, GL_RGBA, GL_UNSIGNED_BYTE, raw.data());
+        // OpenGL origin is bottom-left; flip vertically and strip alpha
+        std::vector<uint8_t> rgb(win_w * win_h * 3);
+        for (int y = 0; y < win_h; y++) {
+            const uint8_t* src_row = raw.data() + (win_h - 1 - y) * win_w * 4;
+            uint8_t*       dst_row = rgb.data()  + y * win_w * 3;
+            for (int x = 0; x < win_w; x++) {
+                dst_row[x*3+0] = src_row[x*4+0];
+                dst_row[x*3+1] = src_row[x*4+1];
+                dst_row[x*3+2] = src_row[x*4+2];
+            }
+        }
+        // Scale down to fit within 640px wide so the base64 stays under Loki's
+        // 64 KB structured-metadata limit.
+        const int MAX_SCREENSHOT_W = 640;
+        std::vector<uint8_t> scaled;
+        const uint8_t* encode_pixels = rgb.data();
+        int encode_w = win_w, encode_h = win_h;
+        if (win_w > MAX_SCREENSHOT_W) {
+            encode_w = MAX_SCREENSHOT_W;
+            encode_h = (win_h * MAX_SCREENSHOT_W) / win_w;
+            scaled.resize(encode_w * encode_h * 3);
+            for (int y = 0; y < encode_h; y++) {
+                int src_y = (y * win_h) / encode_h;
+                const uint8_t* src_row = rgb.data() + src_y * win_w * 3;
+                uint8_t*       dst_row = scaled.data() + y * encode_w * 3;
+                for (int x = 0; x < encode_w; x++) {
+                    int src_x = (x * win_w) / encode_w;
+                    dst_row[x*3+0] = src_row[src_x*3+0];
+                    dst_row[x*3+1] = src_row[src_x*3+1];
+                    dst_row[x*3+2] = src_row[src_x*3+2];
+                }
+            }
+            encode_pixels = scaled.data();
+        }
+
+        std::vector<uint8_t> jpeg;
+        stbi_write_jpg_to_func(stbi_write_to_vector, &jpeg, encode_w, encode_h, 3, encode_pixels, screenshot_quality_pending_);
+        {
+            std::lock_guard<std::mutex> lk(screenshot_result_mutex_);
+            screenshot_result_ = base64_encode_bytes(jpeg);
+            screenshot_result_ready_ = true;
+        }
+        screenshot_result_cv_.notify_one();
+    }
+
     glb::present();
 
     // notify disable() that we're done
@@ -1210,4 +1299,27 @@ void RenderSurface::draw_frame(uint16_t* pixels, int fastpass)
     activity_counter.fetch_sub(1, std::memory_order_acq_rel);
     std::unique_lock<std::mutex> lock(mtx);
     cv.notify_all();  // In case disable() is waiting
+}
+
+// ---------------------------------------------------------------------------
+// Screenshot: capture the last completed frame as base64-encoded JPEG
+// ---------------------------------------------------------------------------
+
+std::string RenderSurface::capture_screenshot_base64(int quality)
+{
+    // Reset ready flag and request a capture from the render thread.
+    {
+        std::lock_guard<std::mutex> lk(screenshot_result_mutex_);
+        screenshot_result_ready_ = false;
+        screenshot_result_.clear();
+    }
+    screenshot_quality_pending_ = quality;
+    screenshot_pending_.store(true, std::memory_order_release);
+
+    // Wait for finalize_frame() to perform glReadPixels and signal us.
+    std::unique_lock<std::mutex> lk(screenshot_result_mutex_);
+    bool ok = screenshot_result_cv_.wait_for(lk, std::chrono::seconds(2),
+        [this] { return screenshot_result_ready_ || shutting_down.load(); });
+
+    return (ok && screenshot_result_ready_) ? screenshot_result_ : "";
 }

@@ -37,6 +37,7 @@ public:
     bool start_frame() {return true;};
     bool finalize_frame();
     void draw_frame(uint16_t* pixels, int fastpass);
+    std::string capture_screenshot_base64(int quality = 40) override;
 
 private:
     // SDL2 window
@@ -119,4 +120,12 @@ private:
     // keep track of UI settings changes
     int last_blargg_config = 0;
     long last_config = 0;
+
+    // Deferred screenshot capture (must execute on the render thread via finalize_frame)
+    std::atomic<bool>        screenshot_pending_{false};
+    int                      screenshot_quality_pending_ = 40;
+    std::mutex               screenshot_result_mutex_;
+    std::condition_variable  screenshot_result_cv_;
+    std::string              screenshot_result_;
+    bool                     screenshot_result_ready_ = false;
 };

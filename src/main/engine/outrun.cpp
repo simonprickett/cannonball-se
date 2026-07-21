@@ -59,6 +59,8 @@ Outrun outrun;
 Outrun::Outrun()
 {
     outputs = new OOutputs();
+    gameover_screenshot_delay = 0;
+    map_screenshot_taken = false;
 }
 
 Outrun::~Outrun()
@@ -493,6 +495,19 @@ void Outrun::main_switch()
 
                 // Start stage 1 span (cur_stage is 0, displayed as stage 1)
                 TelemetryManager::instance().start_stage_span(ostats.cur_stage + 1, TelemetryManager::bcd_score_to_decimal(ostats.score));
+                // Emit a stage.start for the opening section too, so every stage (1-5) is
+                // logged uniformly and the route map's first node (Coconut Beach) is populated.
+                // stage_id = stage_lookup_off (0 for a normal start; honours Time Trial stage-select).
+                TelemetryManager::instance().log_game_event("game.stage.start",
+                    TelemetryManager::SEV_INFO,
+                    {},
+                    {
+                        {"stage_number", (int64_t)(ostats.cur_stage + 1)},
+                        {"score_start", TelemetryManager::bcd_score_to_decimal(ostats.score)},
+                        {"speed_kph", (int64_t)0},
+                        {"stage_id", (int64_t)oroad.stage_lookup_off}
+                    }
+                );
             }
             break;
 
@@ -553,10 +568,16 @@ void Outrun::main_switch()
                 ohud.blit_text_new(31, 18, Utils::to_string((int) ttrial.crashes).c_str(), OHud::GREEN);
             }
             osoundint.queue_sound(sound::NEW_COMMAND);
+            gameover_screenshot_delay = 2;  // wait for GAME OVER text to render
             game_state = GS_GAMEOVER;
             [[fallthrough]];
 
         case GS_GAMEOVER:
+            // Capture game-over screenshot after text has had time to render
+            if (gameover_screenshot_delay > 0) {
+                if (--gameover_screenshot_delay == 0)
+                    gameover_screenshot_b64 = video.capture_screenshot_base64();
+            }
             if (cannonball_mode == MODE_ORIGINAL)
             {
                 if (decrement_timers())
@@ -585,10 +606,20 @@ void Outrun::main_switch()
         case GS_INIT_MAP:
             omap.init();
             ohud.blit_text2(TEXT2_COURSEMAP);
+            map_screenshot_taken = false;
             game_state = GS_MAP;
             [[fallthrough]];
 
         case GS_MAP:
+            // Take screenshot when minicar reaches endpoint (MAP_DISPLAY state)
+            if (!map_screenshot_taken && omap.map_state == OMap::MAP_DISPLAY) {
+                map_screenshot_taken = true;
+                map_screenshot_b64 = video.capture_screenshot_base64();
+                TelemetryManager::instance().log_game_event("game.map_screen",
+                    TelemetryManager::SEV_INFO,
+                    {{"screenshot_jpg", map_screenshot_b64}}
+                );
+            }
             break;
 
         // ----------------------------------------------------------------------------------------
@@ -677,17 +708,23 @@ void Outrun::main_switch()
                 // End post-game span and game session
                 TelemetryManager::instance().end_post_game_span();
                 TelemetryManager::instance().log_game_event("game.post_game.end", TelemetryManager::SEV_INFO);
-                TelemetryManager::instance().end_game_session(final_score, completion, final_stage);
+                // Log session.end BEFORE ending the session span, so the record still carries
+                // trace_id/span_id (every per-session dashboard query relies on it).
                 TelemetryManager::instance().log_game_event("game.session.end",
                     TelemetryManager::SEV_INFO,
                     {
-                        {"completion_status", completion}
+                        {"completion_status", completion},
+                        {"screenshot_jpg", gameover_screenshot_b64}
                     },
                     {
                         {"final_score", final_score},
-                        {"final_stage", (int64_t)final_stage}
+                        {"final_stage", (int64_t)final_stage},
+                        // Longest continuous clean-driving stretch (wall-clock seconds).
+                        {"longest_clean_seconds", TelemetryManager::instance().get_longest_clean_seconds()}
                     }
                 );
+                TelemetryManager::instance().end_game_session(final_score, completion, final_stage);
+                gameover_screenshot_b64.clear();
                 
                 game_state = GS_REINIT;          // Reinit game to attract mode
             }
