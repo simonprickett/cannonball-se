@@ -145,7 +145,7 @@ Each event below should be logged with structured attributes:
 - `trace_id` (hex string from span context - **also serves as session_id**)
 - `span_id` (hex string from span context)
 - `player_initials` (stored at session start, attached to all in-game logs)
-- `session_label` (readable, time-sortable `YYYY-MM-DD HH:MM:SS.mmm INITIALS MODE`; attached to all in-game logs; used as the dashboard session picker key)
+- `session_label` (readable, time-sortable `YYYY-MM-DD HH:MM:SS.mmm INITIALS`; set as BOTH a log attribute (so Loki panels can filter by it) AND a `game_session` span attribute (so Tempo can enumerate it); drives the dashboard's Tempo-backed, newest-first Session picker)
 - `service.name` = `"cannonball-se"` (from resource)
 - `host.name` (from resource)
 - `timestamp` (automatic from OTel)
