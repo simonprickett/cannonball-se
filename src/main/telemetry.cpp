@@ -261,6 +261,19 @@ void TelemetryManager::start_game_session(const std::string& game_mode, int musi
             // searchable tag. Time-sortable, so a Tempo label_values variable sorted descending
             // surfaces the newest game first; the Loki panels then filter by this same value.
             impl_->game_session_span->SetAttribute("session_label", impl_->current_session_label);
+
+            // The game_session span stays open until game-over, so it isn't exported to Tempo
+            // during play — which would stop the in-progress game appearing in the session
+            // picker. Emit a short-lived child marker span that carries session_label and ends
+            // immediately, so it exports within the batch interval (~5s) and the live game
+            // becomes selectable almost right away.
+            opentelemetry::trace::StartSpanOptions marker_opts;
+            marker_opts.parent = impl_->game_session_span->GetContext();
+            auto marker = impl_->tracer->StartSpan("session_marker", marker_opts);
+            if (marker) {
+                marker->SetAttribute("session_label", impl_->current_session_label);
+                marker->End();
+            }
         }
     } catch (const std::exception& e) {
         std::cerr << "TelemetryManager: Error starting game session: " << e.what() << std::endl;
