@@ -7,14 +7,6 @@
       "type": "datasource",
       "pluginId": "loki",
       "pluginName": "Loki"
-    },
-    {
-      "name": "DS_TEMPO",
-      "label": "Tempo",
-      "description": "Tempo data source holding cannonball-se game traces (drives the Session picker)",
-      "type": "datasource",
-      "pluginId": "tempo",
-      "pluginName": "Tempo"
     }
   ],
   "__requires": [
@@ -41,12 +33,6 @@
       "id": "dalvany-image-panel",
       "name": "Dynamic image",
       "version": ""
-    },
-    {
-      "type": "datasource",
-      "id": "tempo",
-      "name": "Tempo",
-      "version": "1.0.0"
     }
   ],
   "annotations": {
@@ -65,7 +51,7 @@
       }
     ]
   },
-  "description": "Detailed view of one Cannonball-SE game. The Session picker is powered by Tempo (label_values on the session_label span attribute, sorted newest-first, defaults to the latest game); the Loki panels filter by that same session_label, so it is exact at ANY time range. Import prompts for both a Loki and a Tempo data source. Requires community plugins grafana-graphviz-panel and dalvany-image-panel.",
+  "description": "Hands-off live view that always follows the current/most-recent Cannonball-SE game \u2014 no session picker. Identity, session state, stage reached and the game-over/map screenshots use last_over_time / newest and are correct at any range. The aggregation panels (counts, by-type charts, route map, timeline, stage strip, top/avg speed) are time-window scoped, so keep the range short (default now-15m) so it holds one game. For exact/historical selection use the 'Last Game' dashboard instead. Requires grafana-graphviz-panel and dalvany-image-panel.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
@@ -75,7 +61,7 @@
     {
       "type": "logs",
       "title": "Latest game",
-      "description": "The selected game. Pick a run from the Session dropdown (top) \u2014 it's sorted newest-first, so the latest game is the top entry and is selected by default.",
+      "description": "The most recently started game \u2014 this board always follows it, no picker.",
       "datasource": {
         "type": "loki",
         "uid": "${DS_LOKI}"
@@ -106,14 +92,14 @@
           "editorMode": "code",
           "queryType": "range",
           "maxLines": 1,
-          "expr": "{service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.session.start\" | line_format \"{{.player_initials}}  mode={{.game_mode}}  music={{.music_selection}}  trace_id={{.trace_id}}\""
+          "expr": "{service_name=\"cannonball-se\"} | event=\"game.session.start\" | line_format \"{{.session_label}}  mode={{.game_mode}}\""
         }
       ]
     },
     {
       "type": "stat",
       "title": "Session state",
-      "description": "For the selected (newest) session: starts \u2212 ends. 1 = IN PROGRESS (started, no end yet), 0 = FINISHED. Per-session, so multiple games in range no longer confuse it.",
+      "description": "Latest start_epoch_ms > latest end_epoch_ms -> IN PROGRESS, else FINISHED. Compares the single most-recent start vs end, so it's correct at any range and with multiple games.",
       "datasource": {
         "type": "loki",
         "uid": "${DS_LOKI}"
@@ -193,7 +179,7 @@
           },
           "editorMode": "code",
           "queryType": "instant",
-          "expr": "(sum(count_over_time({service_name=\"cannonball-se\"} | event=\"game.session.start\" | session_label=\"$session\" [$__range])) or vector(0)) - (sum(count_over_time({service_name=\"cannonball-se\"} | event=\"game.session.end\" | session_label=\"$session\" [$__range])) or vector(0))"
+          "expr": "(max(last_over_time({service_name=\"cannonball-se\"} | event=\"game.session.start\" | unwrap start_epoch_ms [$__range])) or vector(0)) > bool (max(last_over_time({service_name=\"cannonball-se\"} | event=\"game.session.end\" | unwrap end_epoch_ms [$__range])) or vector(0))"
         }
       ]
     },
@@ -244,7 +230,7 @@
           },
           "editorMode": "code",
           "queryType": "instant",
-          "expr": "max(max_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | unwrap stage_number [$__range]))"
+          "expr": "max(last_over_time({service_name=\"cannonball-se\"} | event=\"game.stage.start\" | unwrap stage_number [$__range]))"
         }
       ]
     },
@@ -293,7 +279,7 @@
           },
           "editorMode": "code",
           "queryType": "instant",
-          "expr": "sum(count_over_time({service_name=\"cannonball-se\"} | event=\"game.off_road\" | session_label=\"$session\" [$__range]))"
+          "expr": "sum(count_over_time({service_name=\"cannonball-se\"} | event=\"game.off_road\" [$__range]))"
         }
       ]
     },
@@ -344,7 +330,7 @@
           },
           "editorMode": "code",
           "queryType": "instant",
-          "expr": "avg(avg_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | unwrap speed_kph [$__range]))"
+          "expr": "avg(avg_over_time({service_name=\"cannonball-se\"} | unwrap speed_kph [$__range]))"
         }
       ]
     },
@@ -394,14 +380,14 @@
           },
           "editorMode": "code",
           "queryType": "instant",
-          "expr": "max(max_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | unwrap speed_kph [$__range]))"
+          "expr": "max(max_over_time({service_name=\"cannonball-se\"} | unwrap speed_kph [$__range]))"
         }
       ]
     },
     {
       "type": "stat",
       "title": "Final score",
-      "description": "final_score from game.session.end (empty while the game is still in progress).",
+      "description": "final_score of the latest COMPLETED game (last_over_time). During an in-progress game this still shows the previous game's score until this one ends.",
       "datasource": {
         "type": "loki",
         "uid": "${DS_LOKI}"
@@ -444,7 +430,7 @@
           },
           "editorMode": "code",
           "queryType": "instant",
-          "expr": "max(max_over_time({service_name=\"cannonball-se\"} | event=\"game.session.end\" | session_label=\"$session\" | unwrap final_score [$__range]))"
+          "expr": "max(last_over_time({service_name=\"cannonball-se\"} | event=\"game.session.end\" | unwrap final_score [$__range]))"
         }
       ]
     },
@@ -501,7 +487,7 @@
           "editorMode": "code",
           "queryType": "instant",
           "legendFormat": "{{crash_type}}",
-          "expr": "sum by (crash_type) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.crash\" | session_label=\"$session\" [$__range]))"
+          "expr": "sum by (crash_type) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.crash\" [$__range]))"
         }
       ]
     },
@@ -558,7 +544,7 @@
           "editorMode": "code",
           "queryType": "instant",
           "legendFormat": "{{vehicle_type}}",
-          "expr": "sum by (vehicle_type) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.vehicle_overtake\" | session_label=\"$session\" [$__range]))"
+          "expr": "sum by (vehicle_type) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.vehicle_overtake\" [$__range]))"
         }
       ]
     },
@@ -614,7 +600,7 @@
           "editorMode": "code",
           "queryType": "range",
           "legendFormat": "score",
-          "expr": "max_over_time({service_name=\"cannonball-se\"} | event=\"game.stage.end\" | session_label=\"$session\" | unwrap score_end [$__auto])"
+          "expr": "max_over_time({service_name=\"cannonball-se\"} | event=\"game.stage.end\" | unwrap score_end [$__auto])"
         }
       ]
     },
@@ -652,7 +638,7 @@
           "editorMode": "code",
           "queryType": "range",
           "maxLines": 1,
-          "expr": "{service_name=\"cannonball-se\"} | event=\"game.session.end\" | session_label=\"$session\" | line_format \"result={{.completion_status}}  final_score={{.final_score}}  final_stage={{.final_stage}}  clean={{.longest_clean_seconds}}s\""
+          "expr": "{service_name=\"cannonball-se\"} | event=\"game.session.end\" | line_format \"result={{.completion_status}}  final_score={{.final_score}}  final_stage={{.final_stage}}  clean={{.longest_clean_seconds}}s\""
         }
       ]
     },
@@ -689,7 +675,7 @@
           },
           "editorMode": "code",
           "queryType": "range",
-          "expr": "{service_name=\"cannonball-se\"} | event=\"game.crash\" | session_label=\"$session\" | line_format \"Stage {{.stage_number}}: {{.crash_type}} @ {{.speed_kph}}kph (score {{.score}})\""
+          "expr": "{service_name=\"cannonball-se\"} | event=\"game.crash\" | line_format \"Stage {{.stage_number}}: {{.crash_type}} @ {{.speed_kph}}kph (score {{.score}})\""
         }
       ]
     },
@@ -726,7 +712,7 @@
           },
           "editorMode": "code",
           "queryType": "range",
-          "expr": "{service_name=\"cannonball-se\"} | session_label=\"$session\" | line_format \"{{.event}}  stage={{.stage_number}}  speed={{.speed_kph}}  score={{.score}}\""
+          "expr": "{service_name=\"cannonball-se\"} | line_format \"{{.event}}  stage={{.stage_number}}  speed={{.speed_kph}}  score={{.score}}\""
         }
       ]
     },
@@ -764,7 +750,7 @@
           },
           "editorMode": "code",
           "queryType": "instant",
-          "expr": "sum by (stage_id) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.stage.start\" | session_label=\"$session\" [$__range]))"
+          "expr": "sum by (stage_id) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.stage.start\" [$__range]))"
         }
       ],
       "transformations": [
@@ -818,7 +804,7 @@
           },
           "editorMode": "code",
           "queryType": "range",
-          "expr": "{service_name=\"cannonball-se\"} | event=\"game.session.end\" | session_label=\"$session\" | screenshot_jpg != \"\"",
+          "expr": "{service_name=\"cannonball-se\"} | event=\"game.session.end\" | screenshot_jpg != \"\"",
           "maxLines": 1
         }
       ],
@@ -863,7 +849,7 @@
           },
           "editorMode": "code",
           "queryType": "range",
-          "expr": "{service_name=\"cannonball-se\"} | event=\"game.map_screen\" | session_label=\"$session\" | screenshot_jpg != \"\"",
+          "expr": "{service_name=\"cannonball-se\"} | event=\"game.map_screen\" | screenshot_jpg != \"\"",
           "maxLines": 1
         }
       ],
@@ -908,7 +894,7 @@
           },
           "editorMode": "code",
           "queryType": "range",
-          "expr": "{service_name=\"cannonball-se\"} | event=\"game.stage.end\" | session_label=\"$session\" | screenshot_jpg != \"\""
+          "expr": "{service_name=\"cannonball-se\"} | event=\"game.stage.end\" | screenshot_jpg != \"\""
         }
       ],
       "transformations": []
@@ -919,7 +905,8 @@
   "tags": [
     "cannonball-se",
     "loki",
-    "game"
+    "game",
+    "live"
   ],
   "templating": {
     "list": [
@@ -932,52 +919,17 @@
         "hide": 2,
         "refresh": 1,
         "regex": ""
-      },
-      {
-        "name": "DS_TEMPO",
-        "label": "Tempo data source",
-        "type": "datasource",
-        "query": "tempo",
-        "current": {},
-        "hide": 2,
-        "refresh": 1,
-        "regex": ""
-      },
-      {
-        "name": "session",
-        "label": "Session",
-        "type": "query",
-        "datasource": {
-          "type": "tempo",
-          "uid": "${DS_TEMPO}"
-        },
-        "query": {
-          "label": "session_label",
-          "refId": "TempoDatasourceVariableQueryEditor-VariableQuery",
-          "type": 1
-        },
-        "refresh": 2,
-        "sort": 2,
-        "regex": "",
-        "regexApplyTo": "value",
-        "hide": 0,
-        "includeAll": false,
-        "multi": false,
-        "allowCustomValue": true,
-        "current": {},
-        "options": [],
-        "skipUrlSync": true
       }
     ]
   },
   "time": {
-    "from": "now-6h",
+    "from": "now-15m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
-  "title": "Cannonball-SE \u2014 Last Game",
-  "uid": "cannonball-last-game",
+  "title": "Cannonball-SE \u2014 Now Playing",
+  "uid": "cannonball-now-playing",
   "version": 2,
   "weekStart": ""
 }
