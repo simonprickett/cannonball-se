@@ -1,0 +1,915 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_LOKI",
+      "label": "Loki",
+      "description": "Loki data source holding cannonball-se game event logs",
+      "type": "datasource",
+      "pluginId": "loki",
+      "pluginName": "Loki"
+    }
+  ],
+  "__requires": [
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "13.0.0"
+    },
+    {
+      "type": "datasource",
+      "id": "loki",
+      "name": "Loki",
+      "version": "1.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "grafana-graphviz-panel",
+      "name": "Graphviz",
+      "version": ""
+    }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Aggregate gameplay statistics across ALL Cannonball-SE games in the selected time range. Every query uses $__range / $__auto so the numbers follow the time picker. Optional Player and Game mode variables filter the whole board. Note: score percentile/average panels assume all logs share one stream (service_name + host_name); with multiple cabinets, add 'sum by ()' or aggregate across host_name as noted per panel.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Games played",
+      "description": "Count of game.session.start in range.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "sum(count_over_time({service_name=\"cannonball-se\"} | event=\"game.session.start\" | player_initials=~\"$player\" | game_mode=~\"$game_mode\" [$__range]))"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Games completed",
+      "description": "game.session.end with completion_status = completed.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 0
+      },
+      "id": 2,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "green"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "sum(count_over_time({service_name=\"cannonball-se\"} | event=\"game.session.end\" | player_initials=~\"$player\" | completion_status=\"completed\" [$__range]))"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Completion rate",
+      "description": "completed sessions / started sessions * 100.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 0
+      },
+      "id": 3,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 25
+              },
+              {
+                "color": "green",
+                "value": 60
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "sum(count_over_time({service_name=\"cannonball-se\"} | event=\"game.session.end\" | player_initials=~\"$player\" | completion_status=\"completed\" [$__range])) / sum(count_over_time({service_name=\"cannonball-se\"} | event=\"game.session.start\" | player_initials=~\"$player\" | game_mode=~\"$game_mode\" [$__range])) * 100"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Total crashes",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 0
+      },
+      "id": 4,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "red"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "sum(count_over_time({service_name=\"cannonball-se\"} | event=\"game.crash\" | player_initials=~\"$player\" [$__range]))"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Avg final score",
+      "description": "Mean final_score over completed/ended sessions in range.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 0
+      },
+      "id": 5,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "purple"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "avg(avg_over_time({service_name=\"cannonball-se\"} | event=\"game.session.end\" | player_initials=~\"$player\" | unwrap final_score [$__range]))"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "P90 final score",
+      "description": "90th percentile final_score in range.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 0
+      },
+      "id": 6,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "super-light-purple"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "max(quantile_over_time(0.9, {service_name=\"cannonball-se\"} | event=\"game.session.end\" | player_initials=~\"$player\" | unwrap final_score [$__range]))"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Games started over time",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
+      "id": 7,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "lineWidth": 1
+          },
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "range",
+          "legendFormat": "games started",
+          "expr": "sum(count_over_time({service_name=\"cannonball-se\"} | event=\"game.session.start\" | player_initials=~\"$player\" | game_mode=~\"$game_mode\" [$__auto]))"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Crash rate over time",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "id": 8,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 15,
+            "lineWidth": 2
+          },
+          "unit": "cps",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "red"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "range",
+          "legendFormat": "crashes/sec",
+          "expr": "sum(rate({service_name=\"cannonball-se\"} | event=\"game.crash\" | player_initials=~\"$player\" [$__auto]))"
+        }
+      ]
+    },
+    {
+      "type": "barchart",
+      "title": "Crashes by stage",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 12
+      },
+      "id": 9,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 80
+          },
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "auto",
+        "xTickLabelRotation": 0,
+        "showValue": "auto",
+        "stacking": "none",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "legendFormat": "stage {{stage_number}}",
+          "expr": "sum by (stage_number) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.crash\" | player_initials=~\"$player\" [$__range]))"
+        }
+      ]
+    },
+    {
+      "type": "piechart",
+      "title": "Crashes by type",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 12
+      },
+      "id": 10,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "pieType": "donut",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true,
+          "values": [
+            "value"
+          ]
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "legendFormat": "{{crash_type}}",
+          "expr": "sum by (crash_type) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.crash\" | player_initials=~\"$player\" [$__range]))"
+        }
+      ]
+    },
+    {
+      "type": "barchart",
+      "title": "Route choices (fork direction)",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 12
+      },
+      "id": 11,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 80
+          },
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xTickLabelRotation": 0,
+        "showValue": "auto",
+        "stacking": "none",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "legendFormat": "{{direction}}",
+          "expr": "sum by (direction) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.route_chosen\" | player_initials=~\"$player\" [$__range]))"
+        }
+      ]
+    },
+    {
+      "type": "barchart",
+      "title": "Overtakes by vehicle type",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 20
+      },
+      "id": 12,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 80
+          },
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xTickLabelRotation": 0,
+        "showValue": "auto",
+        "stacking": "none",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "legendFormat": "{{vehicle_type}}",
+          "expr": "sum by (vehicle_type) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.vehicle_overtake\" | player_initials=~\"$player\" [$__range]))"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "Leaderboard \u2014 high scores",
+      "description": "game.high_score events in range. Position, initials and score are parsed from the JSON body.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 20
+      },
+      "id": 13,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "range",
+          "expr": "{service_name=\"cannonball-se\"} | event=\"game.high_score\" | player_initials=~\"$player\""
+        }
+      ],
+      "transformations": [
+        {
+          "id": "extractFields",
+          "options": {
+            "source": "Line",
+            "format": "json",
+            "replace": false
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "id": true,
+              "tsNs": true,
+              "labels": true,
+              "Line": true,
+              "labelTypes": true
+            },
+            "renameByName": {}
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "score",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "type": "grafana-graphviz-panel",
+      "title": "Route map \u2014 visits by section",
+      "description": "Every OutRun section with the number of times it was played in the selected range (node id = stage_id, injected as ${visits}). Coconut Beach (stage_id 0) = total games, since every game emits a game.stage.start for the opening section.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "h": 16,
+        "w": 24,
+        "x": 0,
+        "y": 28
+      },
+      "id": 20,
+      "options": {
+        "inputMode": "code",
+        "dotDiagram": "digraph OutRun {\n  rankdir=LR;\n  bgcolor=\"transparent\";\n  node [shape=box, style=\"rounded,filled\", fontname=\"Helvetica\", fontsize=11, color=\"#33333322\", penwidth=1.5];\n  edge [arrowsize=0.7, color=\"#9e9e9e\", penwidth=1.2];\n\n  // Stage 1\n  \"0\"  [label=\"Coconut Beach\\n${visits}\",   fillcolor=\"#e53935\", fontcolor=\"white\"];\n\n  // Stage 2  (top = most-left = higher id)\n  \"9\"  [label=\"Gateway\\n${visits}\",         fillcolor=\"#fb8c00\", fontcolor=\"white\"];\n  \"8\"  [label=\"Devil's Canyon\\n${visits}\",  fillcolor=\"#fb8c00\", fontcolor=\"white\"];\n\n  // Stage 3\n  \"18\" [label=\"Desert\\n${visits}\",          fillcolor=\"#fdd835\", fontcolor=\"black\"];\n  \"17\" [label=\"Alps\\n${visits}\",            fillcolor=\"#fdd835\", fontcolor=\"black\"];\n  \"16\" [label=\"Cloudy Mountain\\n${visits}\", fillcolor=\"#fdd835\", fontcolor=\"black\"];\n\n  // Stage 4\n  \"27\" [label=\"Wilderness\\n${visits}\",      fillcolor=\"#7cb342\", fontcolor=\"white\"];\n  \"26\" [label=\"Old Capital\\n${visits}\",     fillcolor=\"#7cb342\", fontcolor=\"white\"];\n  \"25\" [label=\"Wheat Field\\n${visits}\",     fillcolor=\"#7cb342\", fontcolor=\"white\"];\n  \"24\" [label=\"Seaside Town\\n${visits}\",    fillcolor=\"#7cb342\", fontcolor=\"white\"];\n\n  // Stage 5 (goals)\n  \"36\" [label=\"Vineyard\\n${visits}\",        fillcolor=\"#1e88e5\", fontcolor=\"white\"];\n  \"35\" [label=\"Death Valley\\n${visits}\",    fillcolor=\"#1e88e5\", fontcolor=\"white\"];\n  \"34\" [label=\"Desolation Hill\\n${visits}\", fillcolor=\"#1e88e5\", fontcolor=\"white\"];\n  \"33\" [label=\"Autobahn\\n${visits}\",        fillcolor=\"#1e88e5\", fontcolor=\"white\"];\n  \"32\" [label=\"Lakeside\\n${visits}\",        fillcolor=\"#1e88e5\", fontcolor=\"white\"];\n\n  // Keep each stage in its own column\n  { rank=same; \"9\"; \"8\"; }\n  { rank=same; \"18\"; \"17\"; \"16\"; }\n  { rank=same; \"27\"; \"26\"; \"25\"; \"24\"; }\n  { rank=same; \"36\"; \"35\"; \"34\"; \"33\"; \"32\"; }\n\n  // Pin vertical order within a column: top = higher id (= more left turns)\n  \"9\"  -> \"8\"  [style=invis];\n  \"18\" -> \"17\" -> \"16\" [style=invis];\n  \"27\" -> \"26\" -> \"25\" -> \"24\" [style=invis];\n  \"36\" -> \"35\" -> \"34\" -> \"33\" -> \"32\" [style=invis];\n\n  // Route edges: down/right keeps position, up/left = position+1 (higher id)\n  \"0\"  -> \"8\";  \"0\"  -> \"9\";\n  \"8\"  -> \"16\"; \"8\"  -> \"17\";\n  \"9\"  -> \"17\"; \"9\"  -> \"18\";\n  \"16\" -> \"24\"; \"16\" -> \"25\";\n  \"17\" -> \"25\"; \"17\" -> \"26\";\n  \"18\" -> \"26\"; \"18\" -> \"27\";\n  \"24\" -> \"32\"; \"24\" -> \"33\";\n  \"25\" -> \"33\"; \"25\" -> \"34\";\n  \"26\" -> \"34\"; \"26\" -> \"35\";\n  \"27\" -> \"35\"; \"27\" -> \"36\";\n}",
+        "layoutEngine": "dot",
+        "rankDirection": "LR",
+        "splineType": "true",
+        "nodeOverrides": [],
+        "edgeOverrides": [],
+        "namedThresholds": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "sum by (stage_id) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.stage.start\" | player_initials=~\"$player\" | game_mode=~\"$game_mode\" [$__range]))"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "stage_id": "id",
+              "Value": "visits"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": [
+    "cannonball-se",
+    "loki",
+    "game",
+    "aggregate"
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "DS_LOKI",
+        "label": "Loki data source",
+        "type": "datasource",
+        "query": "loki",
+        "current": {},
+        "hide": 2,
+        "refresh": 1,
+        "regex": ""
+      },
+      {
+        "name": "player",
+        "label": "Player initials",
+        "description": "Regex over player_initials. Leave as .* for all players.",
+        "type": "textbox",
+        "query": ".*",
+        "current": {
+          "text": ".*",
+          "value": ".*"
+        },
+        "hide": 0
+      },
+      {
+        "name": "game_mode",
+        "label": "Game mode",
+        "type": "custom",
+        "query": ".* : All, original : Original, continuous : Continuous",
+        "current": {
+          "text": "All",
+          "value": ".*"
+        },
+        "options": [
+          {
+            "text": "All",
+            "value": ".*",
+            "selected": true
+          },
+          {
+            "text": "Original",
+            "value": "original",
+            "selected": false
+          },
+          {
+            "text": "Continuous",
+            "value": "continuous",
+            "selected": false
+          }
+        ],
+        "includeAll": false,
+        "multi": false,
+        "hide": 0
+      }
+    ]
+  },
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Cannonball-SE \u2014 Aggregate Stats",
+  "uid": "cannonball-aggregate",
+  "version": 1,
+  "weekStart": ""
+}
