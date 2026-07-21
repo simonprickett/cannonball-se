@@ -242,7 +242,7 @@ void TelemetryManager::start_game_session(const std::string& game_mode, int musi
             std::ostringstream lbl;
             lbl << std::put_time(&tmv, "%Y-%m-%d %H:%M:%S")
                 << '.' << std::setfill('0') << std::setw(3) << ms
-                << ' ' << player_initials << ' ' << game_mode;
+                << ' ' << player_initials;
             impl_->current_session_label = lbl.str();
         }
 

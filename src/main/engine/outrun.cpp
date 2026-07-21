@@ -723,7 +723,10 @@ void Outrun::main_switch()
                         {"final_score", final_score},
                         {"final_stage", (int64_t)final_stage},
                         // Longest continuous clean-driving stretch (wall-clock seconds).
-                        {"longest_clean_seconds", TelemetryManager::instance().get_longest_clean_seconds()}
+                        {"longest_clean_seconds", TelemetryManager::instance().get_longest_clean_seconds()},
+                        // End time (epoch ms) so the dashboard can tell IN PROGRESS from FINISHED
+                        // by comparing the latest start vs latest end, at any time range.
+                        {"end_epoch_ms", TelemetryManager::now_epoch_ms()}
                     }
                 );
                 TelemetryManager::instance().end_game_session(final_score, completion, final_stage);
