@@ -20,7 +20,7 @@ with session-scoped queries + the Tempo `Game` picker). Edit the live board, the
 Both must be installed (declared in each dashboard's `__requires`):
 
 - **`grafana-graphviz-panel`** — renders the OutRun route map (Now Playing, Recent Games, aggregate).
-- **`dalvany-image-panel`** — renders the base64 screenshots (Now Playing, Recent Games).
+- **`marcusolsson-dynamictext-panel`** (Business/Dynamic Text) — renders the base64 screenshots (Now Playing, Recent Games).
 
 ## Core conventions
 
@@ -80,9 +80,18 @@ override in the panel keyed on the injected value.
 
 ## Screenshots
 
-Screenshots are base64 JPEG in the `screenshot_jpg` attribute. The Dynamic Image panel builds a
-data URL by concatenation: **Base URL** `data:image/jpeg;base64,` + **field** `screenshot_jpg`.
-Watch Loki's max line size (default 256 KB) if `capture_screenshot_base64()` ever grabs
+Screenshots are base64 JPEG in the `screenshot_jpg` **structured-metadata** attribute. Since
+structured metadata isn't a table column, each screenshot panel surfaces it into a field:
+`… | line_format "{{.screenshot_jpg}}"` → then `organize` renames `Line` → `screenshot_jpg` and
+`filterFieldsByName` keeps only it. A **Dynamic Text** panel (`everyRow: true`) then renders it:
+```
+<img src="data:image/jpeg;base64,{{{screenshot_jpg}}}" style="width:100%"/>
+```
+Note the **triple braces** — `{{{ }}}` outputs raw HTML so the base64 `=` padding isn't
+HTML-escaped (double braces corrupt it). (We tried `dalvany-image-panel` first — it sanitizes the
+`src` and rejects `data:` URLs, dumping the base64 into `alt`; and the native table Image cell
+renders but caps images to a tiny row height. Dynamic Text is the only one that renders at full
+size.) Watch Loki's max line size (default 256 KB) if `capture_screenshot_base64()` ever grabs
 full-resolution frames.
 
 ## Known caveats

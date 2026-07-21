@@ -30,8 +30,8 @@
     },
     {
       "type": "panel",
-      "id": "dalvany-image-panel",
-      "name": "Dynamic image",
+      "id": "marcusolsson-dynamictext-panel",
+      "name": "Dynamic Text",
       "version": ""
     }
   ],
@@ -704,7 +704,7 @@
       ]
     },
     {
-      "type": "dalvany-image-panel",
+      "type": "marcusolsson-dynamictext-panel",
       "title": "Final frame (game over)",
       "description": "The game.session.end screenshot for the selected session. Caption shows completion status.",
       "datasource": {
@@ -719,19 +719,9 @@
       },
       "id": 21,
       "options": {
-        "baseUrl": "data:image/jpeg;base64,",
-        "icon_field": "screenshot_jpg",
-        "suffix": "",
-        "alt_field": "event",
-        "autofit": true,
-        "singleFill": true,
-        "width": "220",
-        "height": "165",
-        "underline": {
-          "field": "completion_status",
-          "text_size": 12,
-          "text_align": "center"
-        }
+        "content": "<img src=\"data:image/jpeg;base64,{{{screenshot_jpg}}}\" style=\"width:100%;border-radius:4px\"/>",
+        "defaultContent": "No screenshot for this game.",
+        "everyRow": true
       },
       "targets": [
         {
@@ -742,14 +732,37 @@
           },
           "editorMode": "code",
           "queryType": "range",
-          "expr": "{service_name=\"cannonball-se\"} | event=\"game.session.end\" | screenshot_jpg != \"\"",
+          "expr": "{service_name=\"cannonball-se\"} | event=\"game.session.end\" | screenshot_jpg != \"\" | line_format \"{{.screenshot_jpg}}\"",
           "maxLines": 1
         }
       ],
-      "transformations": []
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Line": "screenshot_jpg"
+            }
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "screenshot_jpg"
+              ]
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
     },
     {
-      "type": "dalvany-image-panel",
+      "type": "marcusolsson-dynamictext-panel",
       "title": "Course map",
       "description": "The game.map_screen capture for the selected session (route overview).",
       "datasource": {
@@ -764,19 +777,9 @@
       },
       "id": 22,
       "options": {
-        "baseUrl": "data:image/jpeg;base64,",
-        "icon_field": "screenshot_jpg",
-        "suffix": "",
-        "alt_field": "event",
-        "autofit": true,
-        "singleFill": true,
-        "width": "220",
-        "height": "165",
-        "underline": {
-          "field": "event",
-          "text_size": 12,
-          "text_align": "center"
-        }
+        "content": "<img src=\"data:image/jpeg;base64,{{{screenshot_jpg}}}\" style=\"width:100%;border-radius:4px\"/>",
+        "defaultContent": "No screenshot for this game.",
+        "everyRow": true
       },
       "targets": [
         {
@@ -787,14 +790,37 @@
           },
           "editorMode": "code",
           "queryType": "range",
-          "expr": "{service_name=\"cannonball-se\"} | event=\"game.map_screen\" | screenshot_jpg != \"\"",
+          "expr": "{service_name=\"cannonball-se\"} | event=\"game.map_screen\" | screenshot_jpg != \"\" | line_format \"{{.screenshot_jpg}}\"",
           "maxLines": 1
         }
       ],
-      "transformations": []
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Line": "screenshot_jpg"
+            }
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "screenshot_jpg"
+              ]
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
     },
     {
-      "type": "dalvany-image-panel",
+      "type": "marcusolsson-dynamictext-panel",
       "title": "Stage-by-stage (checkpoints)",
       "description": "One screenshot per game.stage.end for the selected session, in play order. Caption = stage number.",
       "datasource": {
@@ -809,19 +835,9 @@
       },
       "id": 23,
       "options": {
-        "baseUrl": "data:image/jpeg;base64,",
-        "icon_field": "screenshot_jpg",
-        "suffix": "",
-        "alt_field": "event",
-        "autofit": false,
-        "singleFill": false,
-        "width": "220",
-        "height": "165",
-        "underline": {
-          "field": "stage_number",
-          "text_size": 12,
-          "text_align": "center"
-        }
+        "content": "<img src=\"data:image/jpeg;base64,{{{screenshot_jpg}}}\" style=\"height:160px;margin:4px;border-radius:4px\"/>",
+        "defaultContent": "No screenshot for this game.",
+        "everyRow": true
       },
       "targets": [
         {
@@ -832,10 +848,33 @@
           },
           "editorMode": "code",
           "queryType": "range",
-          "expr": "{service_name=\"cannonball-se\"} | event=\"game.stage.end\" | screenshot_jpg != \"\""
+          "expr": "{service_name=\"cannonball-se\"} | event=\"game.stage.end\" | screenshot_jpg != \"\" | line_format \"{{.screenshot_jpg}}\""
         }
       ],
-      "transformations": []
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Line": "screenshot_jpg"
+            }
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "screenshot_jpg"
+              ]
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
     },
     {
       "type": "stat",
