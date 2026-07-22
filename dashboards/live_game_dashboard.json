@@ -67,10 +67,10 @@
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "h": 5,
-        "w": 24,
         "x": 0,
-        "y": 0
+        "y": 0,
+        "w": 24,
+        "h": 5
       },
       "id": 1,
       "options": {
@@ -105,10 +105,10 @@
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "h": 4,
-        "w": 4,
         "x": 0,
-        "y": 5
+        "y": 5,
+        "w": 4,
+        "h": 4
       },
       "id": 2,
       "fieldConfig": {
@@ -172,10 +172,10 @@
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "h": 4,
-        "w": 4,
         "x": 8,
-        "y": 5
+        "y": 5,
+        "w": 8,
+        "h": 4
       },
       "id": 14,
       "fieldConfig": {
@@ -222,10 +222,10 @@
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "h": 4,
-        "w": 3,
-        "x": 12,
-        "y": 5
+        "x": 16,
+        "y": 5,
+        "w": 8,
+        "h": 4
       },
       "id": 4,
       "fieldConfig": {
@@ -264,7 +264,7 @@
       ]
     },
     {
-      "type": "stat",
+      "type": "gauge",
       "title": "Avg speed",
       "description": "Mean speed_kph across this session's events. NOTE: speed_kph is only logged on crash / off-road / stage-start / route / overtake events, so this is a sampled average weighted toward eventful moments, not a true whole-lap mean.",
       "datasource": {
@@ -272,26 +272,46 @@
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "h": 4,
-        "w": 3,
-        "x": 15,
-        "y": 5
+        "x": 8,
+        "y": 9,
+        "w": 8,
+        "h": 6
       },
       "id": 15,
       "fieldConfig": {
         "defaults": {
           "unit": "velocitykmh",
+          "min": 0,
+          "max": 300,
           "decimals": 0,
           "color": {
-            "mode": "fixed",
-            "fixedColor": "blue"
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#e57373",
+                "value": null
+              },
+              {
+                "color": "#ffb74d",
+                "value": 100
+              },
+              {
+                "color": "#fff176",
+                "value": 180
+              },
+              {
+                "color": "#81c784",
+                "value": 250
+              }
+            ]
           }
         },
         "overrides": []
       },
       "options": {
-        "colorMode": "value",
-        "graphMode": "none",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -299,7 +319,9 @@
           "fields": "",
           "values": false
         },
-        "textMode": "value"
+        "orientation": "auto",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
       },
       "targets": [
         {
@@ -315,7 +337,7 @@
       ]
     },
     {
-      "type": "stat",
+      "type": "gauge",
       "title": "Top speed",
       "description": "Highest speed_kph seen across any event in this session.",
       "datasource": {
@@ -323,25 +345,46 @@
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "h": 4,
-        "w": 3,
-        "x": 18,
-        "y": 5
+        "x": 16,
+        "y": 9,
+        "w": 8,
+        "h": 6
       },
       "id": 6,
       "fieldConfig": {
         "defaults": {
           "unit": "velocitykmh",
+          "min": 0,
+          "max": 300,
+          "decimals": 0,
           "color": {
-            "mode": "fixed",
-            "fixedColor": "purple"
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#e57373",
+                "value": null
+              },
+              {
+                "color": "#ffb74d",
+                "value": 100
+              },
+              {
+                "color": "#fff176",
+                "value": 180
+              },
+              {
+                "color": "#81c784",
+                "value": 250
+              }
+            ]
           }
         },
         "overrides": []
       },
       "options": {
-        "colorMode": "value",
-        "graphMode": "none",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -349,7 +392,9 @@
           "fields": "",
           "values": false
         },
-        "textMode": "value"
+        "orientation": "auto",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
       },
       "targets": [
         {
@@ -365,33 +410,54 @@
       ]
     },
     {
-      "type": "stat",
+      "type": "gauge",
       "title": "Final score",
-      "description": "final_score of the latest COMPLETED game (last_over_time). During an in-progress game this still shows the previous game's score until this one ends.",
+      "description": "final_score vs the OutRun world record (~55.9M, gauge maxes at 56M). Red = low, greener the higher.",
       "datasource": {
         "type": "loki",
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "h": 4,
-        "w": 3,
-        "x": 21,
-        "y": 5
+        "x": 0,
+        "y": 9,
+        "w": 8,
+        "h": 6
       },
       "id": 7,
       "fieldConfig": {
         "defaults": {
           "unit": "short",
+          "min": 0,
+          "max": 6000000,
+          "decimals": 0,
           "color": {
-            "mode": "fixed",
-            "fixedColor": "green"
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#e57373",
+                "value": null
+              },
+              {
+                "color": "#ffb74d",
+                "value": 1500000
+              },
+              {
+                "color": "#fff176",
+                "value": 3000000
+              },
+              {
+                "color": "#81c784",
+                "value": 4500000
+              }
+            ]
           }
         },
         "overrides": []
       },
       "options": {
-        "colorMode": "value",
-        "graphMode": "none",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -399,7 +465,9 @@
           "fields": "",
           "values": false
         },
-        "textMode": "value"
+        "orientation": "auto",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
       },
       "targets": [
         {
@@ -415,7 +483,7 @@
       ]
     },
     {
-      "type": "barchart",
+      "type": "bargauge",
       "title": "Crashes by type",
       "description": "Crash count grouped by crash_type (bump / spin / flip) for the selected session.",
       "datasource": {
@@ -423,38 +491,62 @@
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "h": 8,
-        "w": 8,
         "x": 0,
-        "y": 9
+        "y": 15,
+        "w": 8,
+        "h": 8
       },
       "id": 3,
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "lineWidth": 1,
-            "fillOpacity": 80
-          },
           "unit": "short",
+          "decimals": 0,
           "color": {
-            "mode": "palette-classic"
+            "mode": "shades",
+            "fixedColor": "#e57373"
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "bump": {
+                  "text": "Bump",
+                  "index": 0
+                },
+                "flip": {
+                  "text": "Flip",
+                  "index": 1
+                },
+                "spin": {
+                  "text": "Spin",
+                  "index": 2
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
           }
         },
         "overrides": []
       },
       "options": {
+        "displayMode": "lcd",
         "orientation": "horizontal",
-        "xTickLabelRotation": 0,
-        "showValue": "auto",
-        "stacking": "none",
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": false
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
+        "valueMode": "color",
+        "showUnfilled": true,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
         }
       },
       "targets": [
@@ -472,7 +564,7 @@
       ]
     },
     {
-      "type": "barchart",
+      "type": "bargauge",
       "title": "Overtakes by vehicle",
       "description": "Overtake count grouped by vehicle (porsche, corvette, bmw, beetle, pickup, truck).",
       "datasource": {
@@ -480,38 +572,74 @@
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "h": 8,
-        "w": 8,
         "x": 8,
-        "y": 9
+        "y": 15,
+        "w": 8,
+        "h": 8
       },
       "id": 5,
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "lineWidth": 1,
-            "fillOpacity": 80
-          },
           "unit": "short",
+          "decimals": 0,
           "color": {
-            "mode": "palette-classic"
+            "mode": "shades",
+            "fixedColor": "#ffb74d"
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "truck": {
+                  "text": "Truck",
+                  "index": 0
+                },
+                "beetle": {
+                  "text": "Beetle",
+                  "index": 1
+                },
+                "corvette": {
+                  "text": "Corvette",
+                  "index": 2
+                },
+                "pickup": {
+                  "text": "Pickup",
+                  "index": 3
+                },
+                "bmw": {
+                  "text": "BMW",
+                  "index": 4
+                },
+                "porsche": {
+                  "text": "Porsche",
+                  "index": 5
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
           }
         },
         "overrides": []
       },
       "options": {
+        "displayMode": "lcd",
         "orientation": "horizontal",
-        "xTickLabelRotation": 0,
-        "showValue": "auto",
-        "stacking": "none",
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": false
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
+        "valueMode": "color",
+        "showUnfilled": true,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
         }
       },
       "targets": [
@@ -551,10 +679,10 @@
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "h": 5,
-        "w": 12,
         "x": 0,
-        "y": 17
+        "y": 23,
+        "w": 12,
+        "h": 5
       },
       "id": 8,
       "options": {
@@ -589,10 +717,10 @@
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
         "x": 12,
-        "y": 17
+        "y": 23,
+        "w": 12,
+        "h": 8
       },
       "id": 10,
       "options": {
@@ -626,10 +754,10 @@
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "h": 8,
-        "w": 24,
         "x": 0,
-        "y": 25
+        "y": 31,
+        "w": 24,
+        "h": 8
       },
       "id": 11,
       "options": {
@@ -663,10 +791,10 @@
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "h": 14,
-        "w": 24,
         "x": 0,
-        "y": 33
+        "y": 39,
+        "w": 24,
+        "h": 14
       },
       "id": 20,
       "options": {
@@ -712,10 +840,10 @@
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "h": 11,
-        "w": 8,
         "x": 0,
-        "y": 47
+        "y": 53,
+        "w": 8,
+        "h": 11
       },
       "id": 21,
       "options": {
@@ -770,10 +898,10 @@
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "h": 11,
-        "w": 8,
         "x": 8,
-        "y": 47
+        "y": 53,
+        "w": 8,
+        "h": 11
       },
       "id": 22,
       "options": {
@@ -828,10 +956,10 @@
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "h": 11,
-        "w": 24,
         "x": 0,
-        "y": 58
+        "y": 64,
+        "w": 24,
+        "h": 11
       },
       "id": 23,
       "options": {
@@ -884,23 +1012,24 @@
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "h": 4,
-        "w": 4,
         "x": 4,
-        "y": 5
+        "y": 5,
+        "w": 4,
+        "h": 4
       },
       "id": 16,
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "fixed",
-            "fixedColor": "text"
-          }
+            "fixedColor": "dark-blue"
+          },
+          "noValue": "WAITING"
         },
         "overrides": []
       },
       "options": {
-        "colorMode": "none",
+        "colorMode": "background",
         "graphMode": "none",
         "reduceOptions": {
           "calcs": [
@@ -944,7 +1073,7 @@
       ]
     },
     {
-      "type": "barchart",
+      "type": "bargauge",
       "title": "Overtakes by color",
       "description": "Overtake count grouped by the overtaken vehicle's color.",
       "datasource": {
@@ -952,38 +1081,100 @@
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "h": 8,
-        "w": 8,
         "x": 16,
-        "y": 9
+        "y": 15,
+        "w": 8,
+        "h": 8
       },
       "id": 17,
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "lineWidth": 1,
-            "fillOpacity": 80
-          },
           "unit": "short",
+          "decimals": 0,
           "color": {
-            "mode": "palette-classic"
+            "mode": "fixed",
+            "fixedColor": "#9e9e9e"
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "grey": {
+                  "text": "Grey",
+                  "color": "#9e9e9e",
+                  "index": 0
+                },
+                "red": {
+                  "text": "Red",
+                  "color": "#f2495c",
+                  "index": 1
+                },
+                "orange": {
+                  "text": "Orange",
+                  "color": "#ff9830",
+                  "index": 2
+                },
+                "yellow": {
+                  "text": "Yellow",
+                  "color": "#fade2a",
+                  "index": 3
+                },
+                "green": {
+                  "text": "Green",
+                  "color": "#73bf69",
+                  "index": 4
+                },
+                "cyan": {
+                  "text": "Cyan",
+                  "color": "#37d3d3",
+                  "index": 5
+                },
+                "blue": {
+                  "text": "Blue",
+                  "color": "#3274d9",
+                  "index": 6
+                },
+                "purple": {
+                  "text": "Purple",
+                  "color": "#b877d9",
+                  "index": 7
+                },
+                "pink": {
+                  "text": "Pink",
+                  "color": "#ff7fbf",
+                  "index": 8
+                },
+                "brown": {
+                  "text": "Brown",
+                  "color": "#b08c5a",
+                  "index": 9
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#9e9e9e",
+                "value": null
+              }
+            ]
           }
         },
         "overrides": []
       },
       "options": {
+        "displayMode": "lcd",
         "orientation": "horizontal",
-        "xTickLabelRotation": 0,
-        "showValue": "auto",
-        "stacking": "none",
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": false
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
+        "valueMode": "color",
+        "showUnfilled": true,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
         }
       },
       "targets": [
