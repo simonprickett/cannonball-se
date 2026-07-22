@@ -184,13 +184,54 @@
           "min": 0,
           "max": 5,
           "color": {
-            "mode": "continuous-GrYlRd"
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "1",
+                  "color": "#e53935",
+                  "index": 0
+                },
+                "2": {
+                  "text": "2",
+                  "color": "#fb8c00",
+                  "index": 1
+                },
+                "3": {
+                  "text": "3",
+                  "color": "#fdd835",
+                  "index": 2
+                },
+                "4": {
+                  "text": "4",
+                  "color": "#7cb342",
+                  "index": 3
+                },
+                "5": {
+                  "text": "5",
+                  "color": "#1e88e5",
+                  "index": 4
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "transparent"
+              }
+            ]
           }
         },
         "overrides": []
       },
       "options": {
-        "colorMode": "value",
+        "colorMode": "background",
         "graphMode": "none",
         "reduceOptions": {
           "calcs": [
@@ -312,6 +353,17 @@
         "overrides": []
       },
       "options": {
+        "barShape": "flat",
+        "barWidthFactor": 0.5,
+        "effects": {
+          "barGlow": false,
+          "centerGlow": false,
+          "gradient": false
+        },
+        "endpointMarker": "point",
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -319,9 +371,15 @@
           "fields": "",
           "values": false
         },
-        "orientation": "auto",
+        "segmentCount": 1,
+        "segmentSpacing": 0.3,
+        "shape": "gauge",
         "showThresholdLabels": false,
-        "showThresholdMarkers": true
+        "showThresholdMarkers": true,
+        "sizing": "auto",
+        "sparkline": false,
+        "style": "circle",
+        "textMode": "auto"
       },
       "targets": [
         {
@@ -385,6 +443,17 @@
         "overrides": []
       },
       "options": {
+        "barShape": "flat",
+        "barWidthFactor": 0.5,
+        "effects": {
+          "barGlow": false,
+          "centerGlow": false,
+          "gradient": false
+        },
+        "endpointMarker": "point",
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -392,9 +461,15 @@
           "fields": "",
           "values": false
         },
-        "orientation": "auto",
+        "segmentCount": 1,
+        "segmentSpacing": 0.3,
+        "shape": "gauge",
         "showThresholdLabels": false,
-        "showThresholdMarkers": true
+        "showThresholdMarkers": true,
+        "sizing": "auto",
+        "sparkline": false,
+        "style": "circle",
+        "textMode": "auto"
       },
       "targets": [
         {
@@ -411,8 +486,8 @@
     },
     {
       "type": "gauge",
-      "title": "Final score",
-      "description": "final_score vs the OutRun world record (~55.9M, gauge maxes at 56M). Red = low, greener the higher.",
+      "title": "Score",
+      "description": "Most recent score \u2014 updates live during the game via in-game events.",
       "datasource": {
         "type": "loki",
         "uid": "${DS_LOKI}"
@@ -426,7 +501,7 @@
       "id": 7,
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "unit": "none",
           "min": 0,
           "max": 6000000,
           "decimals": 0,
@@ -458,6 +533,17 @@
         "overrides": []
       },
       "options": {
+        "barShape": "flat",
+        "barWidthFactor": 0.5,
+        "effects": {
+          "barGlow": false,
+          "centerGlow": false,
+          "gradient": false
+        },
+        "endpointMarker": "point",
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -465,9 +551,15 @@
           "fields": "",
           "values": false
         },
-        "orientation": "auto",
+        "segmentCount": 1,
+        "segmentSpacing": 0.3,
+        "shape": "circle",
         "showThresholdLabels": false,
-        "showThresholdMarkers": true
+        "showThresholdMarkers": true,
+        "sizing": "auto",
+        "sparkline": false,
+        "style": "circle",
+        "textMode": "auto"
       },
       "targets": [
         {
@@ -478,7 +570,7 @@
           },
           "editorMode": "code",
           "queryType": "instant",
-          "expr": "max(last_over_time({service_name=\"cannonball-se\"} | event=\"game.session.end\" | unwrap final_score [$__range]))"
+          "expr": "max(last_over_time({service_name=\"cannonball-se\"} | unwrap score [$__range]))"
         }
       ]
     },

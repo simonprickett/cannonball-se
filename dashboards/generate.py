@@ -43,9 +43,9 @@ SPECIAL = {
         "expr": f'max(max_over_time({SEL} | session_label="$session" | unwrap stage_number [$__range]))',
         "description": "Highest stage_number reached in the selected session.",
     },
-    7: {  # Final score
-        "expr": f'max(max_over_time({SEL} | event="game.session.end" | session_label="$session" | unwrap final_score [$__range]))',
-        "description": "final_score from the selected session's game.session.end (blank while in progress).",
+    7: {  # Score (latest, updates through the game)
+        "expr": f'max(last_over_time({SEL} | session_label="$session" | unwrap score [$__range]))',
+        "description": "Latest score for the selected game — updates through the game via in-game events (crashes, overtakes, route choices).",
     },
 }
 
