@@ -482,11 +482,14 @@ void Outrun::main_switch()
                 std::string mode = (cannonball_mode == MODE_TTRIAL) ? "time_trial" : 
                                    (cannonball_mode == MODE_CONT) ? "continuous" : "original";
                 TelemetryManager::instance().start_game_session(mode, omusic.get_music_selected(), oname.get_initials());
+                // Capture the start-line frame: car sat at the lights, countdown just hit GO.
+                std::string start_screenshot_b64 = video.capture_screenshot_base64();
                 TelemetryManager::instance().log_game_event("game.session.start",
                     TelemetryManager::SEV_INFO,
                     {
                         {"game_mode", mode},
-                        {"player_initials", oname.get_initials()}
+                        {"player_initials", oname.get_initials()},
+                        {"screenshot_jpg", start_screenshot_b64}
                     },
                     {
                         {"music_selection", (int64_t)omusic.get_music_selected()},
