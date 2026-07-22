@@ -910,7 +910,7 @@
       "gridPos": {
         "x": 0,
         "y": 39,
-        "w": 24,
+        "w": 18,
         "h": 14
       },
       "id": 20,
@@ -959,7 +959,7 @@
       "gridPos": {
         "x": 0,
         "y": 53,
-        "w": 8,
+        "w": 9,
         "h": 11
       },
       "id": 21,
@@ -1015,9 +1015,9 @@
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "x": 8,
+        "x": 9,
         "y": 53,
-        "w": 8,
+        "w": 9,
         "h": 11
       },
       "id": 22,
@@ -1066,23 +1066,25 @@
     },
     {
       "type": "marcusolsson-dynamictext-panel",
-      "title": "Stage-by-stage (checkpoints)",
-      "description": "One screenshot per game.stage.end for the selected session, in play order. Caption = stage number.",
+      "title": "Screenshots (in order)",
+      "description": "Every screenshot captured during the game, in the order it occurred (oldest first).",
       "datasource": {
         "type": "loki",
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "x": 0,
-        "y": 64,
-        "w": 24,
-        "h": 11
+        "x": 18,
+        "y": 39,
+        "w": 6,
+        "h": 25
       },
       "id": 23,
       "options": {
-        "content": "<img src=\"data:image/jpeg;base64,{{{screenshot_jpg}}}\" style=\"height:160px;margin:4px;border-radius:4px\"/>",
+        "content": "<img src=\"data:image/jpeg;base64,{{{screenshot_jpg}}}\" style=\"width:100%;height:auto;border-radius:4px;margin-bottom:6px\"/>",
         "defaultContent": "No screenshot for this game.",
-        "everyRow": true
+        "everyRow": true,
+        "renderMode": "everyRow",
+        "styles": ""
       },
       "targets": [
         {
@@ -1093,7 +1095,8 @@
           },
           "editorMode": "code",
           "queryType": "range",
-          "expr": "{service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.stage.end\" | screenshot_jpg != \"\" | line_format \"{{.screenshot_jpg}}\""
+          "expr": "{service_name=\"cannonball-se\"} | session_label=\"$session\" | screenshot_jpg != \"\" | line_format \"{{.screenshot_jpg}}\"",
+          "direction": "forward"
         }
       ],
       "transformations": [
