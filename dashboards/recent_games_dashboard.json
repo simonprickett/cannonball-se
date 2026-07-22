@@ -1120,63 +1120,6 @@
             "mode": "fixed",
             "fixedColor": "#9e9e9e"
           },
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "grey": {
-                  "text": "Grey",
-                  "color": "#9e9e9e",
-                  "index": 0
-                },
-                "red": {
-                  "text": "Red",
-                  "color": "#f2495c",
-                  "index": 1
-                },
-                "orange": {
-                  "text": "Orange",
-                  "color": "#ff9830",
-                  "index": 2
-                },
-                "yellow": {
-                  "text": "Yellow",
-                  "color": "#fade2a",
-                  "index": 3
-                },
-                "green": {
-                  "text": "Green",
-                  "color": "#73bf69",
-                  "index": 4
-                },
-                "cyan": {
-                  "text": "Cyan",
-                  "color": "#37d3d3",
-                  "index": 5
-                },
-                "blue": {
-                  "text": "Blue",
-                  "color": "#3274d9",
-                  "index": 6
-                },
-                "purple": {
-                  "text": "Purple",
-                  "color": "#b877d9",
-                  "index": 7
-                },
-                "pink": {
-                  "text": "Pink",
-                  "color": "#ff7fbf",
-                  "index": 8
-                },
-                "brown": {
-                  "text": "Brown",
-                  "color": "#b08c5a",
-                  "index": 9
-                }
-              }
-            }
-          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1187,7 +1130,198 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "grey"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#9e9e9e"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Grey"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "red"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f2495c"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Red"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "orange"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#ff9830"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Orange"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "yellow"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#fade2a"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Yellow"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "green"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#73bf69"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Green"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cyan"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#37d3d3"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Cyan"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "blue"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#3274d9"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Blue"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "purple"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#b877d9"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Purple"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "pink"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#ff7fbf"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Pink"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "brown"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#b08c5a"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Brown"
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "displayMode": "lcd",
@@ -1199,7 +1333,7 @@
             "lastNotNull"
           ],
           "fields": "",
-          "values": true
+          "values": false
         }
       },
       "targets": [
@@ -1217,13 +1351,16 @@
       ],
       "transformations": [
         {
-          "id": "sortBy",
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "rowsToFields",
           "options": {
-            "fields": {},
-            "sort": [
+            "mappings": [
               {
-                "field": "Value #A",
-                "desc": true
+                "fieldName": "color",
+                "handlerKey": "field.name"
               }
             ]
           }
