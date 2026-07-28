@@ -1,19 +1,43 @@
 # Cannonball-SE Grafana Dashboards
 
 Importable Grafana 13 dashboards built on the structured logs described in
-[`../ADD_LOGS.md`](../ADD_LOGS.md). Panels query **Loki** with LogQL; the game picker on the
-Recent Games board queries **Tempo**. On import you're prompted for the data source(s).
+[`../ADD_LOGS.md`](../ADD_LOGS.md). Panels query **Loki** with LogQL — including the Recent Games
+game picker (Loki only, no Tempo). On import you're prompted for the Loki data source.
 
 | File | UID | Purpose |
 |------|-----|---------|
-| `live_game_dashboard.json` | `cannonball-now-playing` | **Now Playing** — hands-off, auto-follows the current/most-recent game (no picker). Identity/state/stage/screenshots are exact at any range; aggregations are a rolling time-window (keep the range short). |
-| `recent_games_dashboard.json` | `cannonball-recent-games` | **Recent Games** — pick any recent game from the Game dropdown (Tempo, newest first). Every panel is session-scoped, so exact at any range. Does NOT auto-follow. |
+| `live_game_dashboard.json` | `cannonball-now-playing` | **Now Playing** — hands-off, auto-follows the current/most-recent game (no picker; 10s auto-refresh). Identity/state/stage/screenshots are exact at any range; aggregations are a rolling time-window (keep the range short). |
+| `recent_games_dashboard.json` | `cannonball-recent-games` | **Recent Games** — pick any recent game by clicking a row in the Loki "Recent games" table (newest first). Every panel is session-scoped, so exact at any range. Does NOT auto-follow; no auto-refresh. |
 | `aggregate_dashboard.json` | `cannonball-aggregate` | Aggregate stats across all games in the selected time range |
 | `leaderboards_dashboard.json` | `cannonball-leaderboards` | Per-run "Hall of Fame" leaderboards |
 
 **`recent_games_dashboard.json` is generated, not hand-edited.** `live_game_dashboard.json` is the
 source of truth; `python3 generate.py` derives the Recent Games board from it (same layout/panels/viz,
-with session-scoped queries + the Tempo `Game` picker). Edit the live board, then regenerate.
+with session-scoped queries). The generator also applies **Recent-Games-only** changes that never
+touch the live board: it inserts the "Recent games" picker table + a textbox `$session` variable,
+adds the Total events / Fastest crash / Longest clean streak stats, drops the "Session result" and
+"Full event timeline" panels, turns off auto-refresh, and sorts overtakes-by-color descending. Edit
+the live board, then regenerate.
+
+## Deploying (generate → push)
+
+The repo dashboards are portable v1 exports (`${DS_LOKI}` / `${DS_TEMPO}` + `__inputs`). To deploy
+to Grafana Cloud, use **`push.sh`** (needs `gcx` logged in to the stack — check with
+`gcx config check`):
+
+```bash
+python3 generate.py                       # regenerate Recent Games from the live board
+./push.sh recent_games_dashboard.json     # push it (default target is Recent Games)
+./push.sh live_game_dashboard.json recent_games_dashboard.json   # push several
+```
+
+**Why `push.sh` and not a plain import:** this stack's Grafana (v2 schema) resolves a dashboard's
+datasource ref by its **display name**, and the `/api/dashboards/db` import copies the v1 `uid`
+value verbatim into that name field without translating uid→name. So `push.sh` substitutes
+`${DS_LOKI}` / `${DS_TEMPO}` with the datasource **display name** (not the uid) and drops the now
+unused datasource template variables before importing. Passing `inputs` in the import body, or
+pinning the variable's `current`, do **not** work. Override the display names for another stack via
+`DS_LOKI_NAME` / `DS_TEMPO_NAME` env vars.
 
 ## Required panel plugins
 
@@ -29,12 +53,13 @@ Both must be installed (declared in each dashboard's `__requires`):
 - **Two ways to scope to one game:** the **Now Playing** board auto-follows the latest game via
   `last_over_time`/newest + an `start_epoch_ms > end_epoch_ms` state check (no variable, so it
   can't be pinned and always tracks the current game — but its *aggregation* panels are a rolling
-  window, not session-scoped). The **Recent Games** board uses a `$session` picker — a **Tempo**
-  query variable `label_values(session_label)` sorted descending (newest first, default), and every
-  Loki panel filters `| session_label="$session"`, exact at any range. (Why Tempo: Loki can't
-  enumerate structured metadata in a variable; Tempo enumerates the `session_label` **span**
-  attribute. And a query variable keeps its selection across refreshes, which is why the picker
-  board can't auto-follow — hence the separate Now Playing board.)
+  window, not session-scoped). The **Recent Games** board uses a `$session` **textbox** variable set
+  by the "Recent games" table: a Loki instant query
+  `sum by (session_label) (count_over_time({service_name="cannonball-se"} | session_label!="" [$__range]))`
+  lists one row per game (newest first — `session_label` sorts lexically), and each row has a data
+  link `?var-session=${__value.raw}` that rewrites `$session`. Every Loki panel then filters
+  `| session_label="$session"`, exact at any range. Because it's a click-to-select textbox (not a
+  ranked query variable) there's no auto-default-to-newest — that's the Now Playing board's job.
 - **`game.session.end` is logged *before* the session span is closed** (`outrun.cpp`), so it
   retains `trace_id`. Every per-session query depends on this.
 - **No `| json` in queries.** The log *body* is just the event name; all attributes
@@ -96,15 +121,16 @@ full-resolution frames.
 
 ## Known caveats
 
-- **The `$session` picker is backed by Tempo, not Loki — deliberately.** Loki `label_values`
+- **The `$session` picker is a Loki table, not a dropdown — deliberately.** Loki `label_values`
   only enumerates *indexed stream labels*; our session keys (`session_label`, `trace_id`) are
-  *structured metadata*, which it can't list (an empty dropdown). Loki variables also can't run
-  a metric query, so there's no way to rank/pick the newest there. Tempo, however, exposes
-  `session_label` as a searchable **span** attribute (set in `TelemetryManager::start_game_session`),
-  so a Tempo `label_values` variable lists them; because `session_label` is time-sortable,
-  sorting descending makes the newest game the default. The Loki panels then filter by the same
-  `session_label` string. Net: Tempo enumerates + ranks, Loki filters — a cross-datasource
-  variable. (`trace_id` couldn't do this — random hex can't sort by time.)
+  *structured metadata*, which it can't list (an empty dropdown), and Loki variables can't run a
+  metric query to rank them. So instead of a variable dropdown, the board lists games with a metric
+  **table panel** (`sum by (session_label) …`) whose rows carry a data link that sets the `$session`
+  textbox. (An earlier version used a **Tempo** `label_values(session_label)` variable — Tempo
+  exposes `session_label` as a span attribute — but Tempo's tag-values discovery is recent-biased
+  and server-capped on Grafana Cloud ([tempo#6996](https://github.com/grafana/tempo/issues/6996)),
+  silently dropping older games, and the board went blank whenever Tempo was down. The Loki table
+  honours the full time range and has no such cap, so Tempo was dropped entirely.)
 - **Average speed is sampled**, not a true whole-lap mean — `speed_kph` is only logged on
   crash / off-road / stage-start / route / overtake events.
 - **"Fewest X" leaderboards are intentionally absent.** A run with zero crashes/off-road

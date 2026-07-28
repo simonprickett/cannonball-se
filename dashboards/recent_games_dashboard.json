@@ -7,14 +7,6 @@
       "type": "datasource",
       "pluginId": "loki",
       "pluginName": "Loki"
-    },
-    {
-      "name": "DS_TEMPO",
-      "label": "Tempo",
-      "description": "Tempo data source holding cannonball-se game traces (drives the Session picker)",
-      "type": "datasource",
-      "pluginId": "tempo",
-      "pluginName": "Tempo"
     }
   ],
   "__requires": [
@@ -41,12 +33,6 @@
       "id": "marcusolsson-dynamictext-panel",
       "name": "Dynamic Text",
       "version": ""
-    },
-    {
-      "type": "datasource",
-      "id": "tempo",
-      "name": "Tempo",
-      "version": "1.0.0"
     }
   ],
   "annotations": {
@@ -65,13 +51,113 @@
       }
     ]
   },
-  "description": "Browse any recent Cannonball-SE game. Pick one with the Game dropdown (Tempo label_values on session_label, sorted newest-first, defaults to the most recent); every panel is scoped to that game via session_label, so it's exact at ANY time range. Unlike the 'Now Playing' board this does NOT auto-follow \u2014 you choose the game. Generated from live_game_dashboard.json by generate.py \u2014 edit the live board, then regenerate. Requires grafana-graphviz-panel and dalvany-image-panel.",
+  "description": "Browse any recent Cannonball-SE game. Click a row in the 'Recent games' table (Loki, one row per game, newest first) to load it \u2014 every panel below is scoped to that game via session_label, exact at ANY time range. Widen the range to browse further back; Loki keeps full history (no Tempo tag-values cap). Unlike 'Now Playing' this does NOT auto-follow \u2014 you choose the game. Loki-only: no Tempo dependency. Generated from live_game_dashboard.json by generate.py \u2014 edit the live board, then regenerate. Requires grafana-graphviz-panel and marcusolsson-dynamictext-panel.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
   "links": [],
   "liveNow": true,
   "panels": [
+    {
+      "id": 30,
+      "type": "table",
+      "title": "Recent games \u2014 click a row to view",
+      "description": "Every game seen in the current time range, newest first (session_label sorts lexically by its timestamp prefix). Click a row to load that game into the panels below. Widen the time range to browse further back \u2014 Loki keeps full history, with none of the Tempo tag-values cap the old picker suffered.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "sum by (session_label) (count_over_time({service_name=\"cannonball-se\"} | session_label!=\"\" [$__range]))"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        },
+        "sortBy": [
+          {
+            "displayName": "Game",
+            "desc": true
+          }
+        ]
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "session_label": "Game",
+              "Value": "Events",
+              "Value #A": "Events"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Game"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 340
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "View this game",
+                    "url": "/d/cannonball-recent-games/?var-session=${__value.raw}&${__url_time_range}",
+                    "targetBlank": false
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Events"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          }
+        ]
+      }
+    },
     {
       "type": "logs",
       "title": "Selected game",
@@ -82,8 +168,8 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 0,
-        "w": 24,
+        "y": 7,
+        "w": 20,
         "h": 5
       },
       "id": 1,
@@ -120,7 +206,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 5,
+        "y": 12,
         "w": 4,
         "h": 4
       },
@@ -198,8 +284,8 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 5,
-        "w": 8,
+        "y": 12,
+        "w": 6,
         "h": 4
       },
       "id": 14,
@@ -288,9 +374,9 @@
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "x": 16,
-        "y": 5,
-        "w": 8,
+        "x": 14,
+        "y": 12,
+        "w": 5,
         "h": 4
       },
       "id": 4,
@@ -339,7 +425,7 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 9,
+        "y": 16,
         "w": 8,
         "h": 6
       },
@@ -429,7 +515,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 9,
+        "y": 16,
         "w": 8,
         "h": 6
       },
@@ -519,7 +605,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 9,
+        "y": 16,
         "w": 8,
         "h": 6
       },
@@ -609,7 +695,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 15,
+        "y": 22,
         "w": 8,
         "h": 8
       },
@@ -690,7 +776,7 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 15,
+        "y": 22,
         "w": 8,
         "h": 8
       },
@@ -788,103 +874,19 @@
       ]
     },
     {
-      "type": "logs",
-      "title": "Session result (end event)",
-      "description": "The game.session.end line for the selected session \u2014 completion status, final score and stage. Blank while a game is in progress.",
-      "datasource": {
-        "type": "loki",
-        "uid": "${DS_LOKI}"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 23,
-        "w": 12,
-        "h": 5
-      },
-      "id": 8,
-      "options": {
-        "dedupStrategy": "none",
-        "enableLogDetails": true,
-        "prettifyLogMessage": true,
-        "showLabels": false,
-        "showTime": true,
-        "sortOrder": "Descending",
-        "wrapLogMessage": true
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "loki",
-            "uid": "${DS_LOKI}"
-          },
-          "editorMode": "code",
-          "queryType": "range",
-          "maxLines": 1,
-          "expr": "{service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.session.end\" | line_format \"result={{.completion_status}}  final_score={{.final_score}}  final_stage={{.final_stage}}  clean={{.longest_clean_seconds}}s\""
-        }
-      ]
-    },
-    {
-      "type": "logs",
-      "title": "Crashes this game",
-      "description": "Every game.crash for the selected session, with stage, crash type and speed.",
-      "datasource": {
-        "type": "loki",
-        "uid": "${DS_LOKI}"
-      },
-      "gridPos": {
-        "x": 12,
-        "y": 23,
-        "w": 12,
-        "h": 8
-      },
       "id": 10,
-      "options": {
-        "dedupStrategy": "none",
-        "enableLogDetails": true,
-        "prettifyLogMessage": false,
-        "showLabels": false,
-        "showTime": true,
-        "sortOrder": "Descending",
-        "wrapLogMessage": true
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "loki",
-            "uid": "${DS_LOKI}"
-          },
-          "editorMode": "code",
-          "queryType": "range",
-          "expr": "{service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.crash\" | line_format \"Stage {{.stage_number}}: {{.crash_type}} @ {{.speed_kph}}kph (score {{.score}})\""
-        }
-      ]
-    },
-    {
-      "type": "logs",
-      "title": "Full event timeline (this game)",
-      "description": "Every event for the selected session in time order \u2014 the complete story of one game.",
+      "type": "stat",
+      "title": "Fastest crash",
+      "description": "Speed (km/h) of the fastest crash in the selected game \u2014 max speed_kph over game.crash events.",
       "datasource": {
         "type": "loki",
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
         "x": 0,
-        "y": 31,
+        "y": 30,
         "w": 24,
-        "h": 8
-      },
-      "id": 11,
-      "options": {
-        "dedupStrategy": "none",
-        "enableLogDetails": true,
-        "prettifyLogMessage": false,
-        "showLabels": false,
-        "showTime": true,
-        "sortOrder": "Ascending",
-        "wrapLogMessage": true
+        "h": 4
       },
       "targets": [
         {
@@ -894,10 +896,37 @@
             "uid": "${DS_LOKI}"
           },
           "editorMode": "code",
-          "queryType": "range",
-          "expr": "{service_name=\"cannonball-se\"} | session_label=\"$session\" | line_format \"{{.event}}  stage={{.stage_number}}  speed={{.speed_kph}}  score={{.score}}\""
+          "queryType": "instant",
+          "expr": "max(max_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.crash\" | unwrap speed_kph [$__range]))"
         }
-      ]
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "wideLayout": true,
+        "showPercentChange": false
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "velocitykmh",
+          "decimals": 0,
+          "mappings": [],
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "red"
+          }
+        },
+        "overrides": []
+      }
     },
     {
       "type": "grafana-graphviz-panel",
@@ -909,7 +938,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 39,
+        "y": 34,
         "w": 18,
         "h": 14
       },
@@ -958,7 +987,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 53,
+        "y": 48,
         "w": 9,
         "h": 11
       },
@@ -1016,7 +1045,7 @@
       },
       "gridPos": {
         "x": 9,
-        "y": 53,
+        "y": 48,
         "w": 9,
         "h": 11
       },
@@ -1074,7 +1103,7 @@
       },
       "gridPos": {
         "x": 18,
-        "y": 39,
+        "y": 34,
         "w": 6,
         "h": 25
       },
@@ -1133,7 +1162,7 @@
       },
       "gridPos": {
         "x": 4,
-        "y": 5,
+        "y": 12,
         "w": 4,
         "h": 4
       },
@@ -1202,7 +1231,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 15,
+        "y": 22,
         "w": 8,
         "h": 8
       },
@@ -1441,7 +1470,7 @@
           "editorMode": "code",
           "queryType": "instant",
           "legendFormat": "{{color}}",
-          "expr": "sum by (color) (count_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.vehicle_overtake\" [$__range]))"
+          "expr": "sort_desc(sum by (color) (count_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.vehicle_overtake\" [$__range])))"
         }
       ],
       "transformations": [
@@ -1461,9 +1490,138 @@
           }
         }
       ]
+    },
+    {
+      "id": 31,
+      "type": "stat",
+      "title": "Total events",
+      "description": "Total game events (log lines) captured for the selected game.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 20,
+        "y": 7,
+        "w": 4,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "sum(count_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" [$__range]))"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "wideLayout": true,
+        "showPercentChange": false
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "mappings": [],
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 32,
+      "type": "stat",
+      "title": "Longest clean streak",
+      "description": "Longest continuous stretch of clean driving (no crash / off-road) in the selected game, in seconds.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 19,
+        "y": 12,
+        "w": 5,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "max(max_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | unwrap longest_clean_seconds [$__range]))"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "wideLayout": true,
+        "showPercentChange": false
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 0,
+          "mappings": [],
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 10
+              },
+              {
+                "color": "yellow",
+                "value": 21
+              },
+              {
+                "color": "green",
+                "value": 31
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
     }
   ],
-  "refresh": "10s",
+  "refresh": "",
   "schemaVersion": 39,
   "tags": [
     "cannonball-se",
@@ -1484,44 +1642,29 @@
         "regex": ""
       },
       {
-        "name": "DS_TEMPO",
-        "label": "Tempo data source",
-        "type": "datasource",
-        "query": "tempo",
-        "current": {},
-        "hide": 2,
-        "refresh": 1,
-        "regex": ""
-      },
-      {
         "name": "session",
         "label": "Game",
-        "type": "query",
-        "datasource": {
-          "type": "tempo",
-          "uid": "${DS_TEMPO}"
+        "type": "textbox",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
         },
-        "query": {
-          "label": "session_label",
-          "refId": "TempoDatasourceVariableQueryEditor-VariableQuery",
-          "type": 1
-        },
-        "refresh": 2,
-        "sort": 2,
-        "regex": "",
-        "regexApplyTo": "value",
+        "options": [
+          {
+            "text": "",
+            "value": "",
+            "selected": true
+          }
+        ],
         "hide": 0,
-        "includeAll": false,
-        "multi": false,
-        "allowCustomValue": true,
-        "current": {},
-        "options": [],
-        "skipUrlSync": false
+        "skipUrlSync": false,
+        "description": "session_label of the game to view. Click a row in 'Recent games' to set it, or type/paste one."
       }
     ]
   },
   "time": {
-    "from": "now-6h",
+    "from": "now-7d",
     "to": "now"
   },
   "timepicker": {},
