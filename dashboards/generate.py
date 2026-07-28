@@ -294,10 +294,12 @@ def build_picker(live):
                     t["expr"] = f'sort_desc({t["expr"]})'
             break
     # Final frame (id 21) + Course map (id 22): these screenshots load a beat after
-    # the rest, so show a "loading" placeholder rather than a "no screenshot" message.
+    # the rest, so show a "loading" placeholder rather than a "no screenshot" message;
+    # and make the panels tall enough for the ~640x512 image (width:100%) not to clip.
     for p in d["panels"]:
         if p.get("id") in (21, 22):
             p["options"]["defaultContent"] = "Loading screenshot..."
+            p["gridPos"]["h"] = 16
 
     # Variables + import inputs (Loki only — Tempo dropped)
     d["templating"] = {"list": picker_variables()}
