@@ -199,8 +199,20 @@ def music_panel(x, y):
         "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False},
                     "colorMode": "none", "graphMode": "none", "justifyMode": "auto",
                     "textMode": "value", "wideLayout": True, "showPercentChange": False},
-        "fieldConfig": {"defaults": {"unit": "none", "decimals": 0, "mappings": [],
-                                     "color": {"mode": "fixed", "fixedColor": "text"}},
+        "fieldConfig": {"defaults": {"unit": "none", "decimals": 0,
+                                     "color": {"mode": "fixed", "fixedColor": "text"},
+                                     "mappings": [
+                                         # Stock OutRun tracks (music_selected indexes config.sound.music).
+                                         {"type": "value", "options": {
+                                             "0": {"text": "Magical Sound Shower", "index": 0},
+                                             "1": {"text": "Passing Breeze", "index": 1},
+                                             "2": {"text": "Splash Wave", "index": 2},
+                                         }},
+                                         # Anything else (custom tracks in res/) -> "Custom".
+                                         {"type": "range", "options": {
+                                             "from": 3, "to": 9999999,
+                                             "result": {"text": "Custom", "index": 3}}},
+                                     ]},
                         "overrides": []},
     }
 

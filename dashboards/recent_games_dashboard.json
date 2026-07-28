@@ -1541,11 +1541,40 @@
         "defaults": {
           "unit": "none",
           "decimals": 0,
-          "mappings": [],
           "color": {
             "mode": "fixed",
             "fixedColor": "text"
-          }
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Magical Sound Shower",
+                  "index": 0
+                },
+                "1": {
+                  "text": "Passing Breeze",
+                  "index": 1
+                },
+                "2": {
+                  "text": "Splash Wave",
+                  "index": 2
+                }
+              }
+            },
+            {
+              "type": "range",
+              "options": {
+                "from": 3,
+                "to": 9999999,
+                "result": {
+                  "text": "Custom",
+                  "index": 3
+                }
+              }
+            }
+          ]
         },
         "overrides": []
       }
