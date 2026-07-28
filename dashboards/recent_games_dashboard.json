@@ -103,12 +103,12 @@
           "id": "organize",
           "options": {
             "excludeByName": {
-              "Time": true
+              "Time": true,
+              "Value": true,
+              "Value #A": true
             },
             "renameByName": {
-              "session_label": "Game",
-              "Value": "Events",
-              "Value #A": "Events"
+              "session_label": "Game"
             }
           }
         }
@@ -142,59 +142,9 @@
                 ]
               }
             ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Events"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 110
-              }
-            ]
           }
         ]
       }
-    },
-    {
-      "type": "logs",
-      "title": "Selected game",
-      "description": "The game chosen in the Game picker above (defaults to the most recent).",
-      "datasource": {
-        "type": "loki",
-        "uid": "${DS_LOKI}"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 7,
-        "w": 20,
-        "h": 5
-      },
-      "id": 1,
-      "options": {
-        "dedupStrategy": "none",
-        "enableLogDetails": true,
-        "prettifyLogMessage": true,
-        "showLabels": false,
-        "showTime": true,
-        "sortOrder": "Descending",
-        "wrapLogMessage": true
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "loki",
-            "uid": "${DS_LOKI}"
-          },
-          "editorMode": "code",
-          "queryType": "range",
-          "maxLines": 1,
-          "expr": "{service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.session.start\" | line_format \"{{.session_label}}  mode={{.game_mode}}\""
-        }
-      ]
     },
     {
       "type": "stat",
@@ -994,7 +944,7 @@
       "id": 21,
       "options": {
         "content": "<img src=\"data:image/jpeg;base64,{{{screenshot_jpg}}}\" style=\"width:100%;border-radius:4px\"/>",
-        "defaultContent": "No screenshot for this game.",
+        "defaultContent": "Loading screenshot...",
         "everyRow": true
       },
       "targets": [
@@ -1052,7 +1002,7 @@
       "id": 22,
       "options": {
         "content": "<img src=\"data:image/jpeg;base64,{{{screenshot_jpg}}}\" style=\"width:100%;border-radius:4px\"/>",
-        "defaultContent": "No screenshot for this game.",
+        "defaultContent": "Loading screenshot...",
         "everyRow": true
       },
       "targets": [
@@ -1501,7 +1451,7 @@
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "x": 20,
+        "x": 0,
         "y": 7,
         "w": 4,
         "h": 5
@@ -1540,6 +1490,61 @@
           "color": {
             "mode": "fixed",
             "fixedColor": "blue"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 33,
+      "type": "stat",
+      "title": "Music",
+      "description": "music_selection for the selected game (numeric for now; track-name mappings TBD).",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 4,
+        "y": 7,
+        "w": 4,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "max(max_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | unwrap music_selection [$__range]))"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "value",
+        "wideLayout": true,
+        "showPercentChange": false
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "mappings": [],
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
           }
         },
         "overrides": []

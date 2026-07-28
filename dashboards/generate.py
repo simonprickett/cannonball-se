@@ -27,8 +27,6 @@ TABLE_H = 7
 # else auto-gets the session_label filter. "title"/"description"/"mappings" re-label
 # panels whose live wording ("latest", "follows it") is wrong on a pick-a-game board.
 SPECIAL = {
-    1: {"title": "Selected game",
-        "description": "The game chosen in the Game picker above (defaults to the most recent)."},
     16: {"description": "player_initials of the selected game."},
     2: {  # Session state (3-state). Session-scoped: the picked session's completion_code,
           # or null while it's still in progress (no session.end yet).
@@ -107,8 +105,9 @@ def recent_games_panel():
                     "sortBy": [{"displayName": "Game", "desc": True}]},
         "transformations": [
             {"id": "organize", "options": {
-                "excludeByName": {"Time": True},
-                "renameByName": {"session_label": "Game", "Value": "Events", "Value #A": "Events"},
+                # Keep only the game (session_label); drop Time and the event count.
+                "excludeByName": {"Time": True, "Value": True, "Value #A": True},
+                "renameByName": {"session_label": "Game"},
             }},
         ],
         "fieldConfig": {
@@ -123,8 +122,6 @@ def recent_games_panel():
                          "targetBlank": False,
                      }]},
                  ]},
-                {"matcher": {"id": "byName", "options": "Events"},
-                 "properties": [{"id": "custom.width", "value": 110}]},
             ],
         },
     }
@@ -139,7 +136,7 @@ def total_events_panel(y):
         "title": "Total events",
         "description": "Total game events (log lines) captured for the selected game.",
         "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
-        "gridPos": {"x": 20, "y": y, "w": 4, "h": 5},
+        "gridPos": {"x": 0, "y": y, "w": 4, "h": 5},
         "targets": [{
             "refId": "A",
             "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
@@ -178,6 +175,32 @@ def fastest_crash_panel(y):
                     "textMode": "value", "wideLayout": True, "showPercentChange": False},
         "fieldConfig": {"defaults": {"unit": "velocitykmh", "decimals": 0, "mappings": [],
                                      "color": {"mode": "fixed", "fixedColor": "red"}},
+                        "overrides": []},
+    }
+
+
+def music_panel(x, y):
+    # Picker-only stat: the game's music_selection (from game.session.start).
+    # Numeric for now — track-name value mappings can be added later.
+    return {
+        "id": 33,
+        "type": "stat",
+        "title": "Music",
+        "description": "music_selection for the selected game (numeric for now; track-name mappings TBD).",
+        "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+        "gridPos": {"x": x, "y": y, "w": 4, "h": 5},
+        "targets": [{
+            "refId": "A",
+            "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+            "editorMode": "code",
+            "queryType": "instant",
+            "expr": f'max(max_over_time({SCOPED} | unwrap music_selection [$__range]))',
+        }],
+        "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False},
+                    "colorMode": "none", "graphMode": "none", "justifyMode": "auto",
+                    "textMode": "value", "wideLayout": True, "showPercentChange": False},
+        "fieldConfig": {"defaults": {"unit": "none", "decimals": 0, "mappings": [],
+                                     "color": {"mode": "fixed", "fixedColor": "text"}},
                         "overrides": []},
     }
 
@@ -251,12 +274,10 @@ def build_picker(live):
     for p in d["panels"]:
         if p["gridPos"]["y"] >= below:
             p["gridPos"]["y"] -= gap
-    # Shrink the "Selected game" header (id 1) and drop a Total-events stat beside it.
-    for p in d["panels"]:
-        if p.get("id") == 1:
-            p["gridPos"]["w"] = 20
-            d["panels"].append(total_events_panel(p["gridPos"]["y"]))
-            break
+    # Drop the "Selected game" header (id 1) — adds no value; nothing depends on it.
+    d["panels"] = [p for p in d["panels"] if p.get("id") != 1]
+    d["panels"].append(total_events_panel(TABLE_H))
+    d["panels"].append(music_panel(4, TABLE_H))
     # Add "Longest clean streak" to the stat row (Game state / Player / Stage
     # reached / Off-road), rebalancing their widths to fit a fifth tile.
     row_y = next(p["gridPos"]["y"] for p in d["panels"] if p.get("id") == 2)
@@ -272,6 +293,11 @@ def build_picker(live):
                 if "expr" in t and not t["expr"].startswith("sort_desc("):
                     t["expr"] = f'sort_desc({t["expr"]})'
             break
+    # Final frame (id 21) + Course map (id 22): these screenshots load a beat after
+    # the rest, so show a "loading" placeholder rather than a "no screenshot" message.
+    for p in d["panels"]:
+        if p.get("id") in (21, 22):
+            p["options"]["defaultContent"] = "Loading screenshot..."
 
     # Variables + import inputs (Loki only — Tempo dropped)
     d["templating"] = {"list": picker_variables()}
