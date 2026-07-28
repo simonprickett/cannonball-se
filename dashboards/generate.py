@@ -324,6 +324,8 @@ def build_picker(live):
     d["tags"] = ["cannonball-se", "loki", "game", "recent"]
     d["time"] = {"from": "now-7d", "to": "now"}
     d["refresh"] = ""  # historical board — no auto-refresh (avoids slow periodic reloads)
+    d["preload"] = True  # load all panels on dashboard load, not lazily on scroll
+                         # (so the below-the-fold screenshots aren't sluggish)
     d["description"] = ("Browse any recent Cannonball-SE game. Click a row in the 'Recent games' "
                         "table (Loki, one row per game, newest first) to load it — every panel below "
                         "is scoped to that game via session_label, exact at ANY time range. Widen the "
