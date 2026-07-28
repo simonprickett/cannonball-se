@@ -249,6 +249,49 @@ def longest_clean_panel(x, y, w):
     }
 
 
+# Route-map stages: columns left->right (stage 1..5); within a column, top->bottom
+# is highest id first (= most left-turns), matching the OutRun stage_lookup_off ids.
+STAGES = [
+    [("0", "Coconut Beach")],
+    [("9", "Gateway"), ("8", "Devil's Canyon")],
+    [("18", "Desert"), ("17", "Alps"), ("16", "Cloudy Mountain")],
+    [("27", "Wilderness"), ("26", "Old Capital"), ("25", "Wheat Field"), ("24", "Seaside Town")],
+    [("36", "Vineyard"), ("35", "Death Valley"), ("34", "Desolation Hill"), ("33", "Autobahn"), ("32", "Lakeside")],
+]
+ROUTE_NODE_IDS = [nid for col in STAGES for nid, _ in col]
+ROUTE_EDGES = [
+    ("0", "8"), ("0", "9"),
+    ("8", "16"), ("8", "17"), ("9", "17"), ("9", "18"),
+    ("16", "24"), ("16", "25"), ("17", "25"), ("17", "26"), ("18", "26"), ("18", "27"),
+    ("24", "32"), ("24", "33"), ("25", "33"), ("25", "34"), ("26", "34"), ("26", "35"),
+    ("27", "35"), ("27", "36"),
+]
+
+
+def route_map_dot():
+    # Same layout as before, but every node defaults to grey (unvisited) and carries
+    # just its stage name — visited stages are lit red by the nodeOverride/threshold.
+    nodes = [f'  "{nid}" [label="{name}"];' for col in STAGES for nid, name in col]
+    ranks = ['  { rank=same; ' + ' '.join(f'"{nid}"' for nid, _ in col) + '; }'
+             for col in STAGES if len(col) > 1]
+    invis = ['  ' + ' -> '.join(f'"{nid}"' for nid, _ in col) + ' [style=invis];'
+             for col in STAGES if len(col) > 1]
+    edges = [f'  "{a}" -> "{b}";' for a, b in ROUTE_EDGES]
+    return (
+        'digraph OutRun {\n'
+        '  rankdir=LR;\n'
+        '  bgcolor="transparent";\n'
+        '  node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11, '
+        'fillcolor="#4a4a4a", fontcolor="white", color="#00000000", penwidth=1.5];\n'
+        '  edge [arrowsize=0.7, color="#9e9e9e", penwidth=1.2];\n\n'
+        + '\n'.join(nodes) + '\n\n'
+        + '\n'.join(ranks) + '\n\n'
+        + '\n'.join(invis) + '\n\n'
+        + '\n'.join(edges) + '\n'
+        '}'
+    )
+
+
 def build_picker(live):
     d = json.loads(json.dumps(live))  # deep copy
 
@@ -304,6 +347,34 @@ def build_picker(live):
             for t in p.get("targets", []):
                 if "expr" in t and not t["expr"].startswith("sort_desc("):
                     t["expr"] = f'sort_desc({t["expr"]})'
+            break
+    # Route map (id 20): recolour from static rainbow to visited/unvisited. Every
+    # stage defaults grey (in the DOT); a stage the player entered produces a
+    # stage_id series with a value, which the threshold lights red. Unvisited stages
+    # have no series, so they stay grey. (Edges left neutral for now — same
+    # threshold/override mechanism can drive edgeOverrides later.)
+    for p in d["panels"]:
+        if p.get("id") == 20:
+            p["options"]["dotDiagram"] = route_map_dot()
+            # The query returns long-format rows (Time, stage_id, "Value #A"). Pivot
+            # each row into a field named by its stage_id ("0","9",…) holding the
+            # count, so per-node overrides can read field "<stage_id>". Unvisited
+            # stages produce no row/field, so their override never fires -> stay grey.
+            p["transformations"] = [
+                {"id": "rowsToFields", "options": {"mappings": [
+                    {"fieldName": "stage_id", "handlerKey": "field.name"},
+                    {"fieldName": "Value #A", "handlerKey": "field.value"},
+                ]}},
+            ]
+            p["options"]["namedThresholds"] = [
+                {"id": "visited", "name": "Visited",
+                 "steps": [{"color": "transparent", "value": 0}, {"color": "#e53935", "value": 1}]}]
+            # One override per node: colour it red when its stage_id field == 1.
+            p["options"]["nodeOverrides"] = [
+                {"id": f"visited-{nid}", "targetNodeIds": [nid],
+                 "matchFieldName": nid, "matchPattern": "1",
+                 "rules": [{"kind": "fillColor", "colorFieldName": nid, "thresholdId": "visited"}]}
+                for nid in ROUTE_NODE_IDS]
             break
     # Final frame (id 21) + Course map (id 22): these screenshots load a beat after
     # the rest, so show a "loading" placeholder rather than a "no screenshot" message;
