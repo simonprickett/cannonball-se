@@ -271,6 +271,8 @@ ROUTE_EDGES = [
 def route_map_dot():
     # Same layout as before, but every node defaults to grey (unvisited) and carries
     # just its stage name — visited stages are lit red by the nodeOverride/threshold.
+    # Node ids are the stage_id values ("0","9",…) so a node override can match each
+    # node against the stage_id column (matchPattern "${id}").
     nodes = [f'  "{nid}" [label="{name}"];' for col in STAGES for nid, name in col]
     ranks = ['  { rank=same; ' + ' '.join(f'"{nid}"' for nid, _ in col) + '; }'
              for col in STAGES if len(col) > 1]
@@ -356,25 +358,24 @@ def build_picker(live):
     for p in d["panels"]:
         if p.get("id") == 20:
             p["options"]["dotDiagram"] = route_map_dot()
-            # The query returns long-format rows (Time, stage_id, "Value #A"). Pivot
-            # each row into a field named by its stage_id ("0","9",…) holding the
-            # count, so per-node overrides can read field "<stage_id>". Unvisited
-            # stages produce no row/field, so their override never fires -> stay grey.
-            p["transformations"] = [
-                {"id": "rowsToFields", "options": {"mappings": [
-                    {"fieldName": "stage_id", "handlerKey": "field.name"},
-                    {"fieldName": "Value #A", "handlerKey": "field.value"},
-                ]}},
-            ]
+            # No transforms: the raw query is already the long shape the plugin's data
+            # binding wants — a stage_id id-column + a "Value #A" value-column.
+            p.pop("transformations", None)
             p["options"]["namedThresholds"] = [
                 {"id": "visited", "name": "Visited",
                  "steps": [{"color": "transparent", "value": 0}, {"color": "#e53935", "value": 1}]}]
-            # One override per node: colour it red when its stage_id field == 1.
-            p["options"]["nodeOverrides"] = [
-                {"id": f"visited-{nid}", "targetNodeIds": [nid],
-                 "matchFieldName": nid, "matchPattern": "1",
-                 "rules": [{"kind": "fillColor", "colorFieldName": nid, "thresholdId": "visited"}]}
-                for nid in ROUTE_NODE_IDS]
+            # ONE node override for all nodes: matchPattern "${id}" resolves to each
+            # node's id, the plugin finds the row where stage_id == that id, reads its
+            # "Value #A" count, and the threshold colours the node red. Unvisited stages
+            # have no matching row -> node left grey. (Edges parked until nodes confirmed.)
+            p["options"]["nodeOverrides"] = [{
+                "id": "visited-nodes",
+                "targetNodeIds": ROUTE_NODE_IDS,
+                "matchFieldName": "stage_id",
+                "matchPattern": "${id}",
+                "rules": [{"kind": "fillColor", "colorFieldName": "Value #A", "thresholdId": "visited"}],
+            }]
+            p["options"]["edgeOverrides"] = []
             break
     # Final frame (id 21) + Course map (id 22): these screenshots load a beat after
     # the rest, so show a "loading" placeholder rather than a "no screenshot" message;

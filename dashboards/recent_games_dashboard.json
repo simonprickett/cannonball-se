@@ -901,226 +901,30 @@
         "splineType": "true",
         "nodeOverrides": [
           {
-            "id": "visited-0",
+            "id": "visited-nodes",
             "targetNodeIds": [
-              "0"
-            ],
-            "matchFieldName": "0",
-            "matchPattern": "1",
-            "rules": [
-              {
-                "kind": "fillColor",
-                "colorFieldName": "0",
-                "thresholdId": "visited"
-              }
-            ]
-          },
-          {
-            "id": "visited-9",
-            "targetNodeIds": [
-              "9"
-            ],
-            "matchFieldName": "9",
-            "matchPattern": "1",
-            "rules": [
-              {
-                "kind": "fillColor",
-                "colorFieldName": "9",
-                "thresholdId": "visited"
-              }
-            ]
-          },
-          {
-            "id": "visited-8",
-            "targetNodeIds": [
-              "8"
-            ],
-            "matchFieldName": "8",
-            "matchPattern": "1",
-            "rules": [
-              {
-                "kind": "fillColor",
-                "colorFieldName": "8",
-                "thresholdId": "visited"
-              }
-            ]
-          },
-          {
-            "id": "visited-18",
-            "targetNodeIds": [
-              "18"
-            ],
-            "matchFieldName": "18",
-            "matchPattern": "1",
-            "rules": [
-              {
-                "kind": "fillColor",
-                "colorFieldName": "18",
-                "thresholdId": "visited"
-              }
-            ]
-          },
-          {
-            "id": "visited-17",
-            "targetNodeIds": [
-              "17"
-            ],
-            "matchFieldName": "17",
-            "matchPattern": "1",
-            "rules": [
-              {
-                "kind": "fillColor",
-                "colorFieldName": "17",
-                "thresholdId": "visited"
-              }
-            ]
-          },
-          {
-            "id": "visited-16",
-            "targetNodeIds": [
-              "16"
-            ],
-            "matchFieldName": "16",
-            "matchPattern": "1",
-            "rules": [
-              {
-                "kind": "fillColor",
-                "colorFieldName": "16",
-                "thresholdId": "visited"
-              }
-            ]
-          },
-          {
-            "id": "visited-27",
-            "targetNodeIds": [
-              "27"
-            ],
-            "matchFieldName": "27",
-            "matchPattern": "1",
-            "rules": [
-              {
-                "kind": "fillColor",
-                "colorFieldName": "27",
-                "thresholdId": "visited"
-              }
-            ]
-          },
-          {
-            "id": "visited-26",
-            "targetNodeIds": [
-              "26"
-            ],
-            "matchFieldName": "26",
-            "matchPattern": "1",
-            "rules": [
-              {
-                "kind": "fillColor",
-                "colorFieldName": "26",
-                "thresholdId": "visited"
-              }
-            ]
-          },
-          {
-            "id": "visited-25",
-            "targetNodeIds": [
-              "25"
-            ],
-            "matchFieldName": "25",
-            "matchPattern": "1",
-            "rules": [
-              {
-                "kind": "fillColor",
-                "colorFieldName": "25",
-                "thresholdId": "visited"
-              }
-            ]
-          },
-          {
-            "id": "visited-24",
-            "targetNodeIds": [
-              "24"
-            ],
-            "matchFieldName": "24",
-            "matchPattern": "1",
-            "rules": [
-              {
-                "kind": "fillColor",
-                "colorFieldName": "24",
-                "thresholdId": "visited"
-              }
-            ]
-          },
-          {
-            "id": "visited-36",
-            "targetNodeIds": [
-              "36"
-            ],
-            "matchFieldName": "36",
-            "matchPattern": "1",
-            "rules": [
-              {
-                "kind": "fillColor",
-                "colorFieldName": "36",
-                "thresholdId": "visited"
-              }
-            ]
-          },
-          {
-            "id": "visited-35",
-            "targetNodeIds": [
-              "35"
-            ],
-            "matchFieldName": "35",
-            "matchPattern": "1",
-            "rules": [
-              {
-                "kind": "fillColor",
-                "colorFieldName": "35",
-                "thresholdId": "visited"
-              }
-            ]
-          },
-          {
-            "id": "visited-34",
-            "targetNodeIds": [
-              "34"
-            ],
-            "matchFieldName": "34",
-            "matchPattern": "1",
-            "rules": [
-              {
-                "kind": "fillColor",
-                "colorFieldName": "34",
-                "thresholdId": "visited"
-              }
-            ]
-          },
-          {
-            "id": "visited-33",
-            "targetNodeIds": [
-              "33"
-            ],
-            "matchFieldName": "33",
-            "matchPattern": "1",
-            "rules": [
-              {
-                "kind": "fillColor",
-                "colorFieldName": "33",
-                "thresholdId": "visited"
-              }
-            ]
-          },
-          {
-            "id": "visited-32",
-            "targetNodeIds": [
+              "0",
+              "9",
+              "8",
+              "18",
+              "17",
+              "16",
+              "27",
+              "26",
+              "25",
+              "24",
+              "36",
+              "35",
+              "34",
+              "33",
               "32"
             ],
-            "matchFieldName": "32",
-            "matchPattern": "1",
+            "matchFieldName": "stage_id",
+            "matchPattern": "${id}",
             "rules": [
               {
                 "kind": "fillColor",
-                "colorFieldName": "32",
+                "colorFieldName": "Value #A",
                 "thresholdId": "visited"
               }
             ]
@@ -1154,23 +958,6 @@
           "editorMode": "code",
           "queryType": "instant",
           "expr": "sum by (stage_id) (count_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.stage.start\" [$__range]))"
-        }
-      ],
-      "transformations": [
-        {
-          "id": "rowsToFields",
-          "options": {
-            "mappings": [
-              {
-                "fieldName": "stage_id",
-                "handlerKey": "field.name"
-              },
-              {
-                "fieldName": "Value #A",
-                "handlerKey": "field.value"
-              }
-            ]
-          }
         }
       ]
     },
