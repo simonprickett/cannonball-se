@@ -462,14 +462,37 @@ def build_picker(live):
             # node's id, the plugin finds the row where stage_id == that id, reads its
             # "Value #A" count, and the threshold colours the node red. Unvisited stages
             # have no matching row -> node left grey. (Edges parked until nodes confirmed.)
+            # BOTH nodes and edges are driven by Grafana SQL expressions over one Loki
+            # query — no C++ change, no transform pile. Crucially, each override then
+            # reads a FLAT column (which the plugin binds cleanly). A plain metric query
+            # returns stage_id as a LABEL not a column, and silently breaks node matching
+            # as soon as any expression is in the query list.
+            #   A = stage.start events, stage_id emitted as the log line
+            #   B = one row per visited stage (stage_id + visited=1)          -> nodes
+            #   C = LAG over the ordered stage_ids -> "prev__to__cur" edge ids -> edges
+            edge_sql = ("SELECT CONCAT(prev,'__to__',sid) AS edge_id, 1 AS taken "
+                        "FROM (SELECT sid, lag(sid) OVER (ORDER BY t ASC) AS prev "
+                        "FROM (SELECT `Time` AS t, Line AS sid FROM A) q1) q2 "  # `Time` backticked (MySQL identifier)
+                        "WHERE prev IS NOT NULL")
+            p["targets"] = [
+                {"refId": "A", "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+                 "editorMode": "code", "queryType": "range", "maxLines": 50,
+                 "expr": SCOPED + ' | event="game.stage.start" | line_format "{{.stage_id}}"'},
+                {"refId": "B", "datasource": {"type": "__expr__", "uid": "__expr__"}, "type": "sql",
+                 "expression": "SELECT DISTINCT Line AS stage_id, 1 AS visited FROM A"},
+                {"refId": "C", "datasource": {"type": "__expr__", "uid": "__expr__"}, "type": "sql",
+                 "expression": edge_sql},
+            ]
             p["options"]["nodeOverrides"] = [{
-                "id": "visited-nodes",
-                "targetNodeIds": ROUTE_NODE_IDS,
-                "matchFieldName": "stage_id",
-                "matchPattern": "${id}",
-                "rules": [{"kind": "fillColor", "colorFieldName": "Value #A", "thresholdId": "visited"}],
-            }]
-            p["options"]["edgeOverrides"] = []
+                "id": "visited-nodes", "targetNodeIds": ROUTE_NODE_IDS,
+                "matchFieldName": "stage_id", "matchPattern": "${id}",
+                "rules": [{"kind": "fillColor", "colorFieldName": "visited", "thresholdId": "visited"}]}]
+            # matchPattern "${id}" resolves to each edge's id (e.g. "0__to__8"); if that id
+            # is in D's edge_id column (a taken edge) the threshold colours it red, else grey.
+            p["options"]["edgeOverrides"] = [{
+                "id": "route-edges", "targetEdgeIds": [f"{a}__to__{b}" for a, b in ROUTE_EDGES],
+                "matchFieldName": "edge_id", "matchPattern": "${id}",
+                "rules": [{"kind": "strokeColor", "colorFieldName": "taken", "thresholdId": "visited"}]}]
             break
     # Final frame (id 21) + Course map (id 22): these screenshots load a beat after
     # the rest, so show a "loading" placeholder rather than a "no screenshot" message;

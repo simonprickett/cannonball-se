@@ -924,13 +924,48 @@
             "rules": [
               {
                 "kind": "fillColor",
-                "colorFieldName": "Value #A",
+                "colorFieldName": "visited",
                 "thresholdId": "visited"
               }
             ]
           }
         ],
-        "edgeOverrides": [],
+        "edgeOverrides": [
+          {
+            "id": "route-edges",
+            "targetEdgeIds": [
+              "0__to__8",
+              "0__to__9",
+              "8__to__16",
+              "8__to__17",
+              "9__to__17",
+              "9__to__18",
+              "16__to__24",
+              "16__to__25",
+              "17__to__25",
+              "17__to__26",
+              "18__to__26",
+              "18__to__27",
+              "24__to__32",
+              "24__to__33",
+              "25__to__33",
+              "25__to__34",
+              "26__to__34",
+              "26__to__35",
+              "27__to__35",
+              "27__to__36"
+            ],
+            "matchFieldName": "edge_id",
+            "matchPattern": "${id}",
+            "rules": [
+              {
+                "kind": "strokeColor",
+                "colorFieldName": "taken",
+                "thresholdId": "visited"
+              }
+            ]
+          }
+        ],
         "namedThresholds": [
           {
             "id": "visited",
@@ -956,8 +991,27 @@
             "uid": "${DS_LOKI}"
           },
           "editorMode": "code",
-          "queryType": "instant",
-          "expr": "sum by (stage_id) (count_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.stage.start\" [$__range]))"
+          "queryType": "range",
+          "maxLines": 50,
+          "expr": "{service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.stage.start\" | line_format \"{{.stage_id}}\""
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "type": "sql",
+          "expression": "SELECT DISTINCT Line AS stage_id, 1 AS visited FROM A"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "type": "sql",
+          "expression": "SELECT CONCAT(prev,'__to__',sid) AS edge_id, 1 AS taken FROM (SELECT sid, lag(sid) OVER (ORDER BY t ASC) AS prev FROM (SELECT `Time` AS t, Line AS sid FROM A) q1) q2 WHERE prev IS NOT NULL"
         }
       ]
     },
