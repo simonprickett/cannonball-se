@@ -22,6 +22,12 @@ SCOPED = f'{SEL} | session_label="$session"'
 # the picker board; every inherited panel is pushed down by this much.
 TABLE_H = 7
 
+# Ordinal single-hue ramp (light -> dark, stage 1 -> 5) for the Time-per-stage bar.
+# Warm orange ramp (soft peach -> deep orange), tuned to read on Grafana's dark
+# theme without a stark near-white lightest step. Swap the list for another hue
+# (e.g. blue #cde2fb/#9ec5f4/#5598e7/#2a78d6/#184f95) to recolour all 5 stages.
+STAGE_COLORS = ["#ffcc80", "#ffb74d", "#ffa726", "#fb8c00", "#ef6c00"]
+
 # Per-panel picker overrides. "expr" = the session-scoped query (live board uses
 # "latest"/epoch tricks that don't apply once a specific game is chosen); everything
 # else auto-gets the session_label filter. "title"/"description"/"mappings" re-label
@@ -215,12 +221,16 @@ def stage_time_bar_panel(y):
                     "legend": {"showLegend": True, "displayMode": "list", "placement": "bottom"},
                     "tooltip": {"mode": "multi", "sort": "none"}},
         "fieldConfig": {"defaults": {"unit": "s",
-                                     "color": {"mode": "palette-classic"},
-                                     "custom": {"fillOpacity": 85, "gradientMode": "none",
-                                                "lineWidth": 1, "axisPlacement": "auto",
+                                     "color": {"mode": "fixed", "fixedColor": STAGE_COLORS[0]},
+                                     "custom": {"fillOpacity": 85, "gradientMode": "hue",
+                                                "lineWidth": 1, "axisPlacement": "hidden",
                                                 "thresholdsStyle": {"mode": "off"}},
                                      "mappings": []},
-                        "overrides": []},
+                        # Ordinal single-hue ramp (light->dark) per stage — see STAGE_COLORS.
+                        "overrides": [
+                            {"matcher": {"id": "byName", "options": f"Stage {i}"},
+                             "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": c}}]}
+                            for i, c in enumerate(STAGE_COLORS, 1)]},
     }
 
 
