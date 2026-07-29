@@ -1614,6 +1614,168 @@
       }
     },
     {
+      "id": 34,
+      "type": "stat",
+      "title": "Total crashes",
+      "description": "Total crashes in the selected game.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 7,
+        "w": 4,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "sum(count_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.crash\" [$__range]))"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "wideLayout": true,
+        "showPercentChange": false
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "mappings": [],
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "red"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 35,
+      "type": "stat",
+      "title": "Total overtakes",
+      "description": "Total vehicles overtaken in the selected game.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 7,
+        "w": 4,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "sum(count_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.vehicle_overtake\" [$__range]))"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "wideLayout": true,
+        "showPercentChange": false
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "mappings": [],
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "green"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 36,
+      "type": "stat",
+      "title": "Game duration",
+      "description": "Wall-clock duration of the selected game (session.end epoch minus session.start epoch).",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 7,
+        "w": 4,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "(max(max_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.session.end\" | unwrap end_epoch_ms [$__range])) - max(max_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.session.start\" | unwrap start_epoch_ms [$__range]))) / 1000"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "wideLayout": true,
+        "showPercentChange": false
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "mappings": [],
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
       "id": 32,
       "type": "stat",
       "title": "Longest clean streak",
@@ -1684,6 +1846,139 @@
               }
             ]
           }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 37,
+      "type": "barchart",
+      "title": "Time per stage",
+      "description": "Total game time split by stage \u2014 each segment is the wall-clock seconds spent on that stage (stage_duration_seconds on game.stage.end, incl. the final stage to game over).",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 64,
+        "w": 24,
+        "h": 6
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "max by (player_initials) (max_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.stage.end\" | stage_number=\"1\" | unwrap stage_duration_seconds [$__range]))"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "max by (player_initials) (max_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.stage.end\" | stage_number=\"2\" | unwrap stage_duration_seconds [$__range]))"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "max by (player_initials) (max_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.stage.end\" | stage_number=\"3\" | unwrap stage_duration_seconds [$__range]))"
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "max by (player_initials) (max_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.stage.end\" | stage_number=\"4\" | unwrap stage_duration_seconds [$__range]))"
+        },
+        {
+          "refId": "E",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "max by (player_initials) (max_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.stage.end\" | stage_number=\"5\" | unwrap stage_duration_seconds [$__range]))"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {
+            "mode": "columns"
+          }
+        },
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "player_initials": "Player",
+              "Value #A": "Stage 1",
+              "Value #B": "Stage 2",
+              "Value #C": "Stage 3",
+              "Value #D": "Stage 4",
+              "Value #E": "Stage 5"
+            }
+          }
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "stacking": "normal",
+        "showValue": "auto",
+        "xField": "Player",
+        "groupWidth": 0.7,
+        "barWidth": 0.97,
+        "fullHighlight": true,
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 85,
+            "gradientMode": "none",
+            "lineWidth": 1,
+            "axisPlacement": "auto",
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": []
         },
         "overrides": []
       }

@@ -153,6 +153,77 @@ def total_events_panel(y):
     }
 
 
+def stat_panel(pid, x, y, title, description, expr, unit="short", color="blue"):
+    # Generic picker-only session-scoped stat tile.
+    return {
+        "id": pid,
+        "type": "stat",
+        "title": title,
+        "description": description,
+        "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+        "gridPos": {"x": x, "y": y, "w": 4, "h": 5},
+        "targets": [{
+            "refId": "A",
+            "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+            "editorMode": "code",
+            "queryType": "instant",
+            "expr": expr,
+        }],
+        "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False},
+                    "colorMode": "value", "graphMode": "none", "justifyMode": "auto",
+                    "textMode": "auto", "wideLayout": True, "showPercentChange": False},
+        "fieldConfig": {"defaults": {"unit": unit, "mappings": [],
+                                     "color": {"mode": "fixed", "fixedColor": color}},
+                        "overrides": []},
+    }
+
+
+def stage_time_bar_panel(y):
+    # Picker-only: a single HORIZONTAL STACKED bar whose total length = game time,
+    # split into one coloured segment per stage (seconds). Per-stage durations come
+    # from stage_duration_seconds on game.stage.end (now emitted for the final stage
+    # too, at game over). Pivot the long (stage_number, value) result into one row of
+    # per-stage fields ("Stage 1", "Stage 2", …) so the bar chart can stack them.
+    return {
+        "id": 37,
+        "type": "barchart",
+        "title": "Time per stage",
+        "description": "Total game time split by stage — each segment is the wall-clock seconds spent on that stage (stage_duration_seconds on game.stage.end, incl. the final stage to game over).",
+        "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+        "gridPos": {"x": 0, "y": y, "w": 24, "h": 6},
+        # One query per stage (1..5, OutRun's max) so each becomes its own value field
+        # (Value #A..#E) = a separate stackable series. `by (player_initials)` keeps the
+        # initials as a label so labelsToFields can surface it as the x-axis category.
+        "targets": [
+            {"refId": rid, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+             "editorMode": "code", "queryType": "instant",
+             "expr": f'max by (player_initials) (max_over_time({SCOPED} | event="game.stage.end" | stage_number="{n}" | unwrap stage_duration_seconds [$__range]))'}
+            for n, rid in [(1, "A"), (2, "B"), (3, "C"), (4, "D"), (5, "E")]
+        ],
+        "transformations": [
+            {"id": "labelsToFields", "options": {"mode": "columns"}},
+            {"id": "merge", "options": {}},
+            {"id": "organize", "options": {
+                "excludeByName": {"Time": True},
+                "renameByName": {"player_initials": "Player",
+                                 "Value #A": "Stage 1", "Value #B": "Stage 2", "Value #C": "Stage 3",
+                                 "Value #D": "Stage 4", "Value #E": "Stage 5"}}},
+        ],
+        "options": {"orientation": "horizontal", "stacking": "normal", "showValue": "auto",
+                    "xField": "Player",
+                    "groupWidth": 0.7, "barWidth": 0.97, "fullHighlight": True,
+                    "legend": {"showLegend": True, "displayMode": "list", "placement": "bottom"},
+                    "tooltip": {"mode": "multi", "sort": "none"}},
+        "fieldConfig": {"defaults": {"unit": "s",
+                                     "color": {"mode": "palette-classic"},
+                                     "custom": {"fillOpacity": 85, "gradientMode": "none",
+                                                "lineWidth": 1, "axisPlacement": "auto",
+                                                "thresholdsStyle": {"mode": "off"}},
+                                     "mappings": []},
+                        "overrides": []},
+    }
+
+
 def fastest_crash_panel(y):
     # Picker-only stat: the km/h at which the car hit its fastest crash in the
     # selected game (max speed_kph over game.crash events). Always red background.
@@ -335,6 +406,19 @@ def build_picker(live):
     d["panels"] = [p for p in d["panels"] if p.get("id") != 1]
     d["panels"].append(total_events_panel(TABLE_H))
     d["panels"].append(music_panel(4, TABLE_H))
+    # Fill the rest of the header row with session totals.
+    d["panels"].append(stat_panel(
+        34, 8, TABLE_H, "Total crashes", "Total crashes in the selected game.",
+        f'sum(count_over_time({SCOPED} | event="game.crash" [$__range]))', "short", "red"))
+    d["panels"].append(stat_panel(
+        35, 12, TABLE_H, "Total overtakes", "Total vehicles overtaken in the selected game.",
+        f'sum(count_over_time({SCOPED} | event="game.vehicle_overtake" [$__range]))', "short", "green"))
+    d["panels"].append(stat_panel(
+        36, 16, TABLE_H, "Game duration",
+        "Wall-clock duration of the selected game (session.end epoch minus session.start epoch).",
+        f'(max(max_over_time({SCOPED} | event="game.session.end" | unwrap end_epoch_ms [$__range])) '
+        f'- max(max_over_time({SCOPED} | event="game.session.start" | unwrap start_epoch_ms [$__range]))) / 1000',
+        "s", "blue"))
     # Add "Longest clean streak" to the stat row (Game state / Player / Stage
     # reached / Off-road), rebalancing their widths to fit a fifth tile.
     row_y = next(p["gridPos"]["y"] for p in d["panels"] if p.get("id") == 2)
@@ -384,6 +468,10 @@ def build_picker(live):
         if p.get("id") in (21, 22):
             p["options"]["defaultContent"] = "Loading screenshot..."
             p["gridPos"]["h"] = 16
+    # Time-per-stage stacked bar — appended at the bottom (below all other panels)
+    # so it never overlaps, regardless of the layout above.
+    bottom = max(p["gridPos"]["y"] + p["gridPos"]["h"] for p in d["panels"])
+    d["panels"].append(stage_time_bar_panel(bottom))
 
     # Variables + import inputs (Loki only — Tempo dropped)
     d["templating"] = {"list": picker_variables()}
