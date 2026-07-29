@@ -39,6 +39,11 @@ public:
     // Stage span management
     void start_stage_span(int stage_num, int64_t score_start);
     void end_stage_span(int time_remaining_seconds, int64_t score_end);
+
+    // Wall-clock seconds spent on the current stage (since its start_stage_span).
+    // Emitted as stage_duration_seconds on game.stage.end so dashboards can chart
+    // time-per-stage. Returns -1 if no stage has started yet.
+    int64_t get_current_stage_duration_seconds() const;
     
     // Post-game span management (for high score entry, etc.)
     void start_post_game_span();
@@ -93,4 +98,7 @@ private:
     // Pimpl idiom - hides OpenTelemetry types from header
     std::unique_ptr<TelemetryImpl> impl_;
     bool initialized_;
+
+    // Wall-clock epoch (ms) when the current stage started; drives stage_duration_seconds.
+    int64_t stage_start_epoch_ms_ = 0;
 };

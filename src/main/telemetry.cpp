@@ -319,6 +319,10 @@ int64_t TelemetryManager::now_epoch_ms() {
 }
 
 void TelemetryManager::start_stage_span(int stage_num, int64_t score_start) {
+    // Record wall-clock start even if tracing is disabled, so stage_duration_seconds
+    // (a Loki log attribute) is correct regardless of the trace pipeline.
+    stage_start_epoch_ms_ = now_epoch_ms();
+
     if (!initialized_ || !impl_->tracer || !impl_->game_session_span) return;
 
     try {
@@ -347,12 +351,18 @@ void TelemetryManager::start_stage_span(int stage_num, int64_t score_start) {
     }
 }
 
+int64_t TelemetryManager::get_current_stage_duration_seconds() const {
+    if (stage_start_epoch_ms_ <= 0) return -1;
+    return (now_epoch_ms() - stage_start_epoch_ms_) / 1000;
+}
+
 void TelemetryManager::end_stage_span(int time_remaining_seconds, int64_t score_end) {
     if (!initialized_ || !impl_->stage_span) return;
 
     try {
         impl_->stage_span->SetAttribute("time_remaining_seconds", time_remaining_seconds);
         impl_->stage_span->SetAttribute("score_end", score_end);
+        impl_->stage_span->SetAttribute("stage_duration_seconds", get_current_stage_duration_seconds());
         impl_->stage_span->End();
         impl_->stage_span = nullptr;
     } catch (const std::exception& e) {
