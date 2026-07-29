@@ -706,6 +706,9 @@ void Outrun::main_switch()
                 // Save score and final stage before reinit resets them
                 int64_t final_score = TelemetryManager::bcd_score_to_decimal(ostats.score);
                 int final_stage = ostats.cur_stage + 1;
+                // Wall-clock seconds on the final stage (start -> game over). The final
+                // stage never hits a mid-game transition, so this is its only duration.
+                int64_t final_stage_duration = TelemetryManager::instance().get_current_stage_duration_seconds();
                 std::string completion = (ostats.game_completed & BIT_0) ? "completed" : "timeout";
                 // Numeric form of completion so dashboards can unwrap/last_over_time it
                 // (1 = completed, 2 = timed out). Drives the 3-state Session panel.
@@ -717,6 +720,17 @@ void Outrun::main_switch()
                 // End post-game span and game session
                 TelemetryManager::instance().end_post_game_span();
                 TelemetryManager::instance().log_game_event("game.post_game.end", TelemetryManager::SEV_INFO);
+                // Emit the final stage's stage.end (it has no mid-game transition) so
+                // time-per-stage dashboards cover every stage and sum to the game duration.
+                TelemetryManager::instance().log_game_event("game.stage.end",
+                    TelemetryManager::SEV_INFO,
+                    {},
+                    {
+                        {"stage_number", (int64_t)final_stage},
+                        {"score_end", final_score},
+                        {"stage_duration_seconds", final_stage_duration}
+                    }
+                );
                 // Log session.end BEFORE ending the session span, so the record still carries
                 // trace_id/span_id (every per-session dashboard query relies on it).
                 TelemetryManager::instance().log_game_event("game.session.end",
