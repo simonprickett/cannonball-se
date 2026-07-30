@@ -237,6 +237,33 @@ def stage_time_bar_panel(y):
     }
 
 
+def speed_gauge_panel(pid, x, y, w, h, title, description, expr):
+    # Session-scoped speed gauge matching the Top speed / Avg speed gauges (km/h,
+    # 0-300, red->orange->yellow->green thresholds, circle style).
+    return {
+        "id": pid, "type": "gauge", "title": title, "description": description,
+        "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+        "gridPos": {"x": x, "y": y, "w": w, "h": h},
+        "targets": [{"refId": "A", "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+                     "editorMode": "code", "queryType": "instant", "expr": expr}],
+        "options": {"barShape": "flat", "barWidthFactor": 0.5,
+                    "effects": {"barGlow": False, "centerGlow": False, "gradient": False},
+                    "endpointMarker": "point", "minVizHeight": 75, "minVizWidth": 75,
+                    "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False},
+                    "segmentCount": 1, "segmentSpacing": 0.3, "shape": "gauge",
+                    "showThresholdLabels": False, "showThresholdMarkers": True, "sizing": "auto",
+                    "sparkline": False, "style": "circle", "textMode": "auto"},
+        "fieldConfig": {"defaults": {"unit": "velocitykmh", "min": 0, "max": 300, "decimals": 0,
+                                     "color": {"mode": "thresholds"},
+                                     "thresholds": {"mode": "absolute", "steps": [
+                                         {"color": "#e57373", "value": None},
+                                         {"color": "#ffb74d", "value": 100},
+                                         {"color": "#fff176", "value": 180},
+                                         {"color": "#81c784", "value": 250}]}},
+                        "overrides": []},
+    }
+
+
 def overtake_speed_hist_panel(pid, x, y):
     # "Histogram" of overtake speeds, built as a BAR CHART because the Histogram viz
     # has no bar-gap control. A hidden Loki query emits speed_kph as the line; a SQL
@@ -681,6 +708,15 @@ def build_picker(live):
         f'max by (session_label) (max_over_time({SEL} | event="game.session.end" | unwrap longest_clean_seconds [$__range]))',
         f'max(max_over_time({SCOPED} | event="game.session.end" | unwrap longest_clean_seconds [$__range]))',
         "Rank by longest clean-driving streak among all games in the dashboard time range (1 = longest)."))
+    d["panels"].append(speed_gauge_panel(
+        46, 16, rank_y, 4, 5, "Fastest overtake",
+        "Top speed (km/h) at which an overtake happened in the selected game.",
+        f'max(max_over_time({SCOPED} | event="game.vehicle_overtake" | unwrap speed_kph [$__range]))'))
+    d["panels"].append(rank_panel(
+        47, 20, rank_y, "Fastest overtake rank",
+        f'max by (session_label) (max_over_time({SEL} | event="game.vehicle_overtake" | unwrap speed_kph [$__range]))',
+        f'max(max_over_time({SCOPED} | event="game.vehicle_overtake" | unwrap speed_kph [$__range]))',
+        "Rank by fastest overtake speed among all games in the dashboard time range (1 = fastest)."))
 
     # Time-per-stage stacked bar — appended at the bottom (below all other panels)
     # so it never overlaps, regardless of the layout above.
