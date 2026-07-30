@@ -234,6 +234,58 @@ def stage_time_bar_panel(y):
     }
 
 
+def _ordinal(n):
+    # 1->1st, 2->2nd, 3->3rd, 4->4th … with the 11th/12th/13th exceptions.
+    suffix = "th" if 10 <= n % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suffix}"
+
+
+_MEDAL = {1: "#b8860b", 2: "#808891", 3: "#a05a2c"}  # deep gold / silver / bronze (readable w/ white text)
+
+
+def rank_panel(pid, x, y, title, all_games_expr, selected_expr, description):
+    # Picker-only stat: rank the selected game by a metric among ALL games in the
+    # dashboard time range (higher = 1st). A = per-game metric for all games (hidden),
+    # B = the selected game's metric (hidden, session-scoped), C = SQL that counts how
+    # many games rank higher (+1). $session interpolates in Loki queries but NOT in the
+    # SQL expr, so the selected value comes via B. A/B are hidden so their
+    # numeric-full-long frames don't reach the stat display ("No data" otherwise).
+    return {
+        "id": pid, "type": "stat", "title": title, "description": description,
+        "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+        "gridPos": {"x": x, "y": y, "w": 4, "h": 5},
+        "targets": [
+            {"refId": "A", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+             "editorMode": "code", "queryType": "instant", "expr": all_games_expr},
+            {"refId": "B", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+             "editorMode": "code", "queryType": "instant", "expr": selected_expr},
+            {"refId": "C", "datasource": {"type": "__expr__", "uid": "__expr__"}, "type": "sql",
+             "expression": ("SELECT COUNT(*) + 1 AS game_rank FROM A "
+                            "WHERE `__value__` > (SELECT MAX(`__value__`) FROM B)")},
+        ],
+        "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "/^game_rank$/", "values": False},
+                    "colorMode": "background", "graphMode": "none", "justifyMode": "auto",
+                    "textMode": "auto", "wideLayout": True, "showPercentChange": False},
+        "fieldConfig": {"defaults": {"unit": "short",
+                                     # 1..100 -> ordinals; podium (1/2/3) gold/silver/bronze background,
+                                     # everything else the same dark-blue as the Player tile.
+                                     "mappings": [{"type": "value", "options": {
+                                         str(n): {"text": _ordinal(n), "index": n - 1,
+                                                  **({"color": _MEDAL[n]} if n in _MEDAL else {})}
+                                         for n in range(1, 101)}}],
+                                     "color": {"mode": "fixed", "fixedColor": "dark-blue"}},
+                        "overrides": []},
+    }
+
+
+def score_rank_panel(x, y):
+    return rank_panel(
+        38, x, y, "Overall Rank",
+        f'max by (session_label) (max_over_time({SEL} | event="game.session.end" | unwrap final_score [$__range]))',
+        f'max(max_over_time({SCOPED} | event="game.session.end" | unwrap final_score [$__range]))',
+        "This game's rank by final score among all games in the dashboard time range (1 = highest score).")
+
+
 def fastest_crash_panel(y):
     # Picker-only stat: the km/h at which the car hit its fastest crash in the
     # selected game (max speed_kph over game.crash events). Always red background.
@@ -429,6 +481,7 @@ def build_picker(live):
         f'(max(max_over_time({SCOPED} | event="game.session.end" | unwrap end_epoch_ms [$__range])) '
         f'- max(max_over_time({SCOPED} | event="game.session.start" | unwrap start_epoch_ms [$__range]))) / 1000',
         "s", "blue"))
+    d["panels"].append(score_rank_panel(20, TABLE_H))  # fills the last header-row slot
     # Add "Longest clean streak" to the stat row (Game state / Player / Stage
     # reached / Off-road), rebalancing their widths to fit a fifth tile.
     row_y = next(p["gridPos"]["y"] for p in d["panels"] if p.get("id") == 2)
@@ -501,6 +554,27 @@ def build_picker(live):
         if p.get("id") in (21, 22):
             p["options"]["defaultContent"] = "Loading screenshot..."
             p["gridPos"]["h"] = 16
+    # More rank tiles in a throwaway new row (layout TBD) — same rank_panel pattern
+    # as Overall Rank, each "higher = 1st".
+    rank_y = max(p["gridPos"]["y"] + p["gridPos"]["h"] for p in d["panels"])
+    d["panels"].append(rank_panel(
+        39, 0, rank_y, "Longest time played",
+        f'(max by (session_label) (max_over_time({SEL} | event="game.session.end" | unwrap end_epoch_ms [$__range])) '
+        f'- max by (session_label) (max_over_time({SEL} | event="game.session.start" | unwrap start_epoch_ms [$__range]))) / 1000',
+        f'(max(max_over_time({SCOPED} | event="game.session.end" | unwrap end_epoch_ms [$__range])) '
+        f'- max(max_over_time({SCOPED} | event="game.session.start" | unwrap start_epoch_ms [$__range]))) / 1000',
+        "Rank by game duration among all games in the dashboard time range (1 = longest)."))
+    d["panels"].append(rank_panel(
+        40, 4, rank_y, "Most overtakes",
+        f'sum by (session_label) (count_over_time({SEL} | event="game.vehicle_overtake" [$__range]))',
+        f'sum(count_over_time({SCOPED} | event="game.vehicle_overtake" [$__range]))',
+        "Rank by total overtakes among all games in the dashboard time range (1 = most)."))
+    d["panels"].append(rank_panel(
+        41, 8, rank_y, "Average speed",
+        f'avg by (session_label) (avg_over_time({SEL} | unwrap speed_kph [$__range]))',
+        f'avg(avg_over_time({SCOPED} | unwrap speed_kph [$__range]))',
+        "Rank by average speed (km/h) among all games in the dashboard time range (1 = fastest)."))
+
     # Time-per-stage stacked bar — appended at the bottom (below all other panels)
     # so it never overlaps, regardless of the layout above.
     bottom = max(p["gridPos"]["y"] + p["gridPos"]["h"] for p in d["panels"])
