@@ -27,6 +27,8 @@ TABLE_H = 7
 # theme without a stark near-white lightest step. Swap the list for another hue
 # (e.g. blue #cde2fb/#9ec5f4/#5598e7/#2a78d6/#184f95) to recolour all 5 stages.
 STAGE_COLORS = ["#ffcc80", "#ffb74d", "#ffa726", "#fb8c00", "#ef6c00"]
+# Deep-purple ordinal ramp (dark, light->dark) for the Score-progression stacked bar.
+SCORE_COLORS = ["#7e57c2", "#673ab7", "#5e35b1", "#4527a0", "#311b92"]
 
 # Per-panel picker overrides. "expr" = the session-scoped query (live board uses
 # "latest"/epoch tricks that don't apply once a specific game is chosen); everything
@@ -34,6 +36,7 @@ STAGE_COLORS = ["#ffcc80", "#ffb74d", "#ffa726", "#fb8c00", "#ef6c00"]
 # panels whose live wording ("latest", "follows it") is wrong on a pick-a-game board.
 SPECIAL = {
     16: {"description": "player_initials of the selected game."},
+    4: {"description": "Number of times the car went off-road (game.off_road events) in the selected game."},
     2: {  # Session state (3-state). Session-scoped: the picked session's completion_code,
           # or null while it's still in progress (no session.end yet).
         "expr": f'max(max_over_time({SEL} | event="game.session.end" | session_label="$session" | unwrap completion_code [$__range]))',
@@ -231,6 +234,105 @@ def stage_time_bar_panel(y):
                             {"matcher": {"id": "byName", "options": f"Stage {i}"},
                              "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": c}}]}
                             for i, c in enumerate(STAGE_COLORS, 1)]},
+    }
+
+
+def overtake_speed_hist_panel(pid, x, y):
+    # "Histogram" of overtake speeds, built as a BAR CHART because the Histogram viz
+    # has no bar-gap control. A hidden Loki query emits speed_kph as the line; a SQL
+    # expr buckets it into 10 km/h bins with counts; the bar chart draws gapped purple
+    # bars (barWidth 0.9) with an opacity gradient for the synthwave shading.
+    return {
+        "id": pid, "type": "barchart", "title": "Overtake speeds",
+        "description": "Overtakes bucketed by speed (10 km/h bins) in the selected game.",
+        "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+        "gridPos": {"x": x, "y": y, "w": 12, "h": 8},
+        "targets": [
+            {"refId": "A", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+             "editorMode": "code", "queryType": "range", "maxLines": 1000,
+             "expr": SCOPED + ' | event="game.vehicle_overtake" | line_format "{{.speed_kph}}"'},
+            {"refId": "B", "datasource": {"type": "__expr__", "uid": "__expr__"}, "type": "sql",
+             "expression": ("SELECT CAST(FLOOR(CAST(Line AS DOUBLE)/10)*10 AS CHAR) AS speed_kmh, "
+                            "COUNT(*) AS overtakes FROM A GROUP BY speed_kmh ORDER BY speed_kmh")},
+        ],
+        "options": {"orientation": "vertical", "xField": "speed_kmh", "showValue": "never",
+                    "barWidth": 0.95, "groupWidth": 0.7, "fullHighlight": False, "stacking": "none",
+                    "legend": {"showLegend": False}, "tooltip": {"mode": "single", "sort": "none"}},
+        "fieldConfig": {"defaults": {"unit": "short", "decimals": 0,
+                                     "color": {"mode": "fixed", "fixedColor": "#7e57c2"},
+                                     "custom": {"fillOpacity": 90, "gradientMode": "opacity",
+                                                "lineWidth": 1, "axisPlacement": "auto",
+                                                "axisLabel": "Overtakes", "thresholdsStyle": {"mode": "off"}},
+                                     "mappings": []},
+                        "overrides": []},
+    }
+
+
+def checkpoint_buffer_panel(pid, x, y):
+    # Seconds left on the clock at each checkpoint (time_remaining_seconds on
+    # game.stage.end) — one bar per COMPLETED stage; low buffer = red, high = green.
+    return {
+        "id": pid, "type": "bargauge", "title": "Checkpoint time buffer",
+        "description": "Seconds left on the clock at each checkpoint (game.stage.end time_remaining_seconds). One bar per completed stage.",
+        "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+        "gridPos": {"x": x, "y": y, "w": 12, "h": 8},
+        "targets": [{"refId": "A", "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+                     "editorMode": "code", "queryType": "instant",
+                     "legendFormat": "Stage {{stage_number}}",
+                     "expr": f'max by (stage_number) (max_over_time({SCOPED} | event="game.stage.end" | unwrap time_remaining_seconds [$__range]))'}],
+        "options": {"displayMode": "lcd", "orientation": "horizontal", "valueMode": "color",
+                    "showUnfilled": True,
+                    "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": True}},
+        "fieldConfig": {"defaults": {"unit": "s", "decimals": 0,
+                                     "color": {"mode": "thresholds"},
+                                     "thresholds": {"mode": "absolute", "steps": [
+                                         {"color": "red", "value": None},
+                                         {"color": "orange", "value": 10},
+                                         {"color": "green", "value": 20}]},
+                                     "mappings": []},
+                        "overrides": []},
+    }
+
+
+def score_progression_panel(y):
+    # Same stacked-bar setup as Time per stage, but each segment is the POINTS scored
+    # in that stage (score_end - score_start), stacked up to the final score. Purple ramp.
+    def per_stage(n):
+        return (f'(max by (player_initials) (max_over_time({SCOPED} | event="game.stage.end" | stage_number="{n}" | unwrap score_end [$__range])) '
+                f'- max by (player_initials) (max_over_time({SCOPED} | event="game.stage.start" | stage_number="{n}" | unwrap score_start [$__range])))')
+    return {
+        "id": 45, "type": "barchart", "title": "Score progression",
+        "description": "Points scored in each stage (score_end - score_start on the stage events), stacked to the final score.",
+        "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+        "gridPos": {"x": 0, "y": y, "w": 24, "h": 6},
+        "targets": [
+            {"refId": rid, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+             "editorMode": "code", "queryType": "instant", "expr": per_stage(n)}
+            for n, rid in [(1, "A"), (2, "B"), (3, "C"), (4, "D"), (5, "E")]
+        ],
+        "transformations": [
+            {"id": "labelsToFields", "options": {"mode": "columns"}},
+            {"id": "merge", "options": {}},
+            {"id": "organize", "options": {
+                "excludeByName": {"Time": True},
+                "renameByName": {"player_initials": "Player",
+                                 "Value #A": "Stage 1", "Value #B": "Stage 2", "Value #C": "Stage 3",
+                                 "Value #D": "Stage 4", "Value #E": "Stage 5"}}},
+        ],
+        "options": {"orientation": "horizontal", "stacking": "normal", "showValue": "auto",
+                    "xField": "Player", "groupWidth": 0.7, "barWidth": 0.97, "fullHighlight": True,
+                    "legend": {"showLegend": True, "displayMode": "list", "placement": "bottom"},
+                    "tooltip": {"mode": "multi", "sort": "none"}},
+        "fieldConfig": {"defaults": {"unit": "short",
+                                     "color": {"mode": "fixed", "fixedColor": SCORE_COLORS[0]},
+                                     "custom": {"fillOpacity": 85, "gradientMode": "hue",
+                                                "lineWidth": 1, "axisPlacement": "hidden",
+                                                "thresholdsStyle": {"mode": "off"}},
+                                     "mappings": []},
+                        "overrides": [
+                            {"matcher": {"id": "byName", "options": f"Stage {i}"},
+                             "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": c}}]}
+                            for i, c in enumerate(SCORE_COLORS, 1)]},
     }
 
 
@@ -584,6 +686,12 @@ def build_picker(live):
     # so it never overlaps, regardless of the layout above.
     bottom = max(p["gridPos"]["y"] + p["gridPos"]["h"] for p in d["panels"])
     d["panels"].append(stage_time_bar_panel(bottom))
+    # More summary panels in throwaway bottom rows (layout TBD).
+    r = max(p["gridPos"]["y"] + p["gridPos"]["h"] for p in d["panels"])
+    d["panels"].append(overtake_speed_hist_panel(43, 0, r))
+    d["panels"].append(checkpoint_buffer_panel(44, 12, r))
+    r2 = max(p["gridPos"]["y"] + p["gridPos"]["h"] for p in d["panels"])
+    d["panels"].append(score_progression_panel(r2))
 
     # Variables + import inputs (Loki only — Tempo dropped)
     d["templating"] = {"list": picker_variables()}

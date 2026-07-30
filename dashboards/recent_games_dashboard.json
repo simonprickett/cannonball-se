@@ -363,7 +363,8 @@
           "queryType": "instant",
           "expr": "sum(count_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.off_road\" [$__range]))"
         }
-      ]
+      ],
+      "description": "Number of times the car went off-road (game.off_road events) in the selected game."
     },
     {
       "type": "gauge",
@@ -4527,6 +4528,363 @@
                 "value": {
                   "mode": "fixed",
                   "fixedColor": "#ef6c00"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 43,
+      "type": "barchart",
+      "title": "Overtake speeds",
+      "description": "Overtakes bucketed by speed (10 km/h bins) in the selected game.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 75,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "hide": true,
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "range",
+          "maxLines": 1000,
+          "expr": "{service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.vehicle_overtake\" | line_format \"{{.speed_kph}}\""
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "type": "sql",
+          "expression": "SELECT CAST(FLOOR(CAST(Line AS DOUBLE)/10)*10 AS CHAR) AS speed_kmh, COUNT(*) AS overtakes FROM A GROUP BY speed_kmh ORDER BY speed_kmh"
+        }
+      ],
+      "options": {
+        "orientation": "vertical",
+        "xField": "speed_kmh",
+        "showValue": "never",
+        "barWidth": 0.95,
+        "groupWidth": 0.7,
+        "fullHighlight": false,
+        "stacking": "none",
+        "legend": {
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#7e57c2"
+          },
+          "custom": {
+            "fillOpacity": 90,
+            "gradientMode": "opacity",
+            "lineWidth": 1,
+            "axisPlacement": "auto",
+            "axisLabel": "Overtakes",
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": []
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 44,
+      "type": "bargauge",
+      "title": "Checkpoint time buffer",
+      "description": "Seconds left on the clock at each checkpoint (game.stage.end time_remaining_seconds). One bar per completed stage.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 75,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "legendFormat": "Stage {{stage_number}}",
+          "expr": "max by (stage_number) (max_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.stage.end\" | unwrap time_remaining_seconds [$__range]))"
+        }
+      ],
+      "options": {
+        "displayMode": "lcd",
+        "orientation": "horizontal",
+        "valueMode": "color",
+        "showUnfilled": true,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 10
+              },
+              {
+                "color": "green",
+                "value": 20
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 45,
+      "type": "barchart",
+      "title": "Score progression",
+      "description": "Points scored in each stage (score_end - score_start on the stage events), stacked to the final score.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 83,
+        "w": 24,
+        "h": 6
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "(max by (player_initials) (max_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.stage.end\" | stage_number=\"1\" | unwrap score_end [$__range])) - max by (player_initials) (max_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.stage.start\" | stage_number=\"1\" | unwrap score_start [$__range])))"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "(max by (player_initials) (max_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.stage.end\" | stage_number=\"2\" | unwrap score_end [$__range])) - max by (player_initials) (max_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.stage.start\" | stage_number=\"2\" | unwrap score_start [$__range])))"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "(max by (player_initials) (max_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.stage.end\" | stage_number=\"3\" | unwrap score_end [$__range])) - max by (player_initials) (max_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.stage.start\" | stage_number=\"3\" | unwrap score_start [$__range])))"
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "(max by (player_initials) (max_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.stage.end\" | stage_number=\"4\" | unwrap score_end [$__range])) - max by (player_initials) (max_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.stage.start\" | stage_number=\"4\" | unwrap score_start [$__range])))"
+        },
+        {
+          "refId": "E",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "(max by (player_initials) (max_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.stage.end\" | stage_number=\"5\" | unwrap score_end [$__range])) - max by (player_initials) (max_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.stage.start\" | stage_number=\"5\" | unwrap score_start [$__range])))"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {
+            "mode": "columns"
+          }
+        },
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "player_initials": "Player",
+              "Value #A": "Stage 1",
+              "Value #B": "Stage 2",
+              "Value #C": "Stage 3",
+              "Value #D": "Stage 4",
+              "Value #E": "Stage 5"
+            }
+          }
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "stacking": "normal",
+        "showValue": "auto",
+        "xField": "Player",
+        "groupWidth": 0.7,
+        "barWidth": 0.97,
+        "fullHighlight": true,
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#7e57c2"
+          },
+          "custom": {
+            "fillOpacity": 85,
+            "gradientMode": "hue",
+            "lineWidth": 1,
+            "axisPlacement": "hidden",
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": []
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Stage 1"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7e57c2"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Stage 2"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#673ab7"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Stage 3"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5e35b1"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Stage 4"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#4527a0"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Stage 5"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#311b92"
                 }
               }
             ]
