@@ -574,6 +574,11 @@ def build_picker(live):
         f'avg by (session_label) (avg_over_time({SEL} | unwrap speed_kph [$__range]))',
         f'avg(avg_over_time({SCOPED} | unwrap speed_kph [$__range]))',
         "Rank by average speed (km/h) among all games in the dashboard time range (1 = fastest)."))
+    d["panels"].append(rank_panel(
+        42, 12, rank_y, "Longest clean streak",
+        f'max by (session_label) (max_over_time({SEL} | event="game.session.end" | unwrap longest_clean_seconds [$__range]))',
+        f'max(max_over_time({SCOPED} | event="game.session.end" | unwrap longest_clean_seconds [$__range]))',
+        "Rank by longest clean-driving streak among all games in the dashboard time range (1 = longest)."))
 
     # Time-per-stage stacked bar — appended at the bottom (below all other panels)
     # so it never overlaps, regardless of the layout above.

@@ -3841,6 +3841,490 @@
       }
     },
     {
+      "id": 42,
+      "type": "stat",
+      "title": "Longest clean streak",
+      "description": "Rank by longest clean-driving streak among all games in the dashboard time range (1 = longest).",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 64,
+        "w": 4,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "hide": true,
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "max by (session_label) (max_over_time({service_name=\"cannonball-se\"} | event=\"game.session.end\" | unwrap longest_clean_seconds [$__range]))"
+        },
+        {
+          "refId": "B",
+          "hide": true,
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "max(max_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.session.end\" | unwrap longest_clean_seconds [$__range]))"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "type": "sql",
+          "expression": "SELECT COUNT(*) + 1 AS game_rank FROM A WHERE `__value__` > (SELECT MAX(`__value__`) FROM B)"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^game_rank$/",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "wideLayout": true,
+        "showPercentChange": false
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "1st",
+                  "index": 0,
+                  "color": "#b8860b"
+                },
+                "2": {
+                  "text": "2nd",
+                  "index": 1,
+                  "color": "#808891"
+                },
+                "3": {
+                  "text": "3rd",
+                  "index": 2,
+                  "color": "#a05a2c"
+                },
+                "4": {
+                  "text": "4th",
+                  "index": 3
+                },
+                "5": {
+                  "text": "5th",
+                  "index": 4
+                },
+                "6": {
+                  "text": "6th",
+                  "index": 5
+                },
+                "7": {
+                  "text": "7th",
+                  "index": 6
+                },
+                "8": {
+                  "text": "8th",
+                  "index": 7
+                },
+                "9": {
+                  "text": "9th",
+                  "index": 8
+                },
+                "10": {
+                  "text": "10th",
+                  "index": 9
+                },
+                "11": {
+                  "text": "11th",
+                  "index": 10
+                },
+                "12": {
+                  "text": "12th",
+                  "index": 11
+                },
+                "13": {
+                  "text": "13th",
+                  "index": 12
+                },
+                "14": {
+                  "text": "14th",
+                  "index": 13
+                },
+                "15": {
+                  "text": "15th",
+                  "index": 14
+                },
+                "16": {
+                  "text": "16th",
+                  "index": 15
+                },
+                "17": {
+                  "text": "17th",
+                  "index": 16
+                },
+                "18": {
+                  "text": "18th",
+                  "index": 17
+                },
+                "19": {
+                  "text": "19th",
+                  "index": 18
+                },
+                "20": {
+                  "text": "20th",
+                  "index": 19
+                },
+                "21": {
+                  "text": "21st",
+                  "index": 20
+                },
+                "22": {
+                  "text": "22nd",
+                  "index": 21
+                },
+                "23": {
+                  "text": "23rd",
+                  "index": 22
+                },
+                "24": {
+                  "text": "24th",
+                  "index": 23
+                },
+                "25": {
+                  "text": "25th",
+                  "index": 24
+                },
+                "26": {
+                  "text": "26th",
+                  "index": 25
+                },
+                "27": {
+                  "text": "27th",
+                  "index": 26
+                },
+                "28": {
+                  "text": "28th",
+                  "index": 27
+                },
+                "29": {
+                  "text": "29th",
+                  "index": 28
+                },
+                "30": {
+                  "text": "30th",
+                  "index": 29
+                },
+                "31": {
+                  "text": "31st",
+                  "index": 30
+                },
+                "32": {
+                  "text": "32nd",
+                  "index": 31
+                },
+                "33": {
+                  "text": "33rd",
+                  "index": 32
+                },
+                "34": {
+                  "text": "34th",
+                  "index": 33
+                },
+                "35": {
+                  "text": "35th",
+                  "index": 34
+                },
+                "36": {
+                  "text": "36th",
+                  "index": 35
+                },
+                "37": {
+                  "text": "37th",
+                  "index": 36
+                },
+                "38": {
+                  "text": "38th",
+                  "index": 37
+                },
+                "39": {
+                  "text": "39th",
+                  "index": 38
+                },
+                "40": {
+                  "text": "40th",
+                  "index": 39
+                },
+                "41": {
+                  "text": "41st",
+                  "index": 40
+                },
+                "42": {
+                  "text": "42nd",
+                  "index": 41
+                },
+                "43": {
+                  "text": "43rd",
+                  "index": 42
+                },
+                "44": {
+                  "text": "44th",
+                  "index": 43
+                },
+                "45": {
+                  "text": "45th",
+                  "index": 44
+                },
+                "46": {
+                  "text": "46th",
+                  "index": 45
+                },
+                "47": {
+                  "text": "47th",
+                  "index": 46
+                },
+                "48": {
+                  "text": "48th",
+                  "index": 47
+                },
+                "49": {
+                  "text": "49th",
+                  "index": 48
+                },
+                "50": {
+                  "text": "50th",
+                  "index": 49
+                },
+                "51": {
+                  "text": "51st",
+                  "index": 50
+                },
+                "52": {
+                  "text": "52nd",
+                  "index": 51
+                },
+                "53": {
+                  "text": "53rd",
+                  "index": 52
+                },
+                "54": {
+                  "text": "54th",
+                  "index": 53
+                },
+                "55": {
+                  "text": "55th",
+                  "index": 54
+                },
+                "56": {
+                  "text": "56th",
+                  "index": 55
+                },
+                "57": {
+                  "text": "57th",
+                  "index": 56
+                },
+                "58": {
+                  "text": "58th",
+                  "index": 57
+                },
+                "59": {
+                  "text": "59th",
+                  "index": 58
+                },
+                "60": {
+                  "text": "60th",
+                  "index": 59
+                },
+                "61": {
+                  "text": "61st",
+                  "index": 60
+                },
+                "62": {
+                  "text": "62nd",
+                  "index": 61
+                },
+                "63": {
+                  "text": "63rd",
+                  "index": 62
+                },
+                "64": {
+                  "text": "64th",
+                  "index": 63
+                },
+                "65": {
+                  "text": "65th",
+                  "index": 64
+                },
+                "66": {
+                  "text": "66th",
+                  "index": 65
+                },
+                "67": {
+                  "text": "67th",
+                  "index": 66
+                },
+                "68": {
+                  "text": "68th",
+                  "index": 67
+                },
+                "69": {
+                  "text": "69th",
+                  "index": 68
+                },
+                "70": {
+                  "text": "70th",
+                  "index": 69
+                },
+                "71": {
+                  "text": "71st",
+                  "index": 70
+                },
+                "72": {
+                  "text": "72nd",
+                  "index": 71
+                },
+                "73": {
+                  "text": "73rd",
+                  "index": 72
+                },
+                "74": {
+                  "text": "74th",
+                  "index": 73
+                },
+                "75": {
+                  "text": "75th",
+                  "index": 74
+                },
+                "76": {
+                  "text": "76th",
+                  "index": 75
+                },
+                "77": {
+                  "text": "77th",
+                  "index": 76
+                },
+                "78": {
+                  "text": "78th",
+                  "index": 77
+                },
+                "79": {
+                  "text": "79th",
+                  "index": 78
+                },
+                "80": {
+                  "text": "80th",
+                  "index": 79
+                },
+                "81": {
+                  "text": "81st",
+                  "index": 80
+                },
+                "82": {
+                  "text": "82nd",
+                  "index": 81
+                },
+                "83": {
+                  "text": "83rd",
+                  "index": 82
+                },
+                "84": {
+                  "text": "84th",
+                  "index": 83
+                },
+                "85": {
+                  "text": "85th",
+                  "index": 84
+                },
+                "86": {
+                  "text": "86th",
+                  "index": 85
+                },
+                "87": {
+                  "text": "87th",
+                  "index": 86
+                },
+                "88": {
+                  "text": "88th",
+                  "index": 87
+                },
+                "89": {
+                  "text": "89th",
+                  "index": 88
+                },
+                "90": {
+                  "text": "90th",
+                  "index": 89
+                },
+                "91": {
+                  "text": "91st",
+                  "index": 90
+                },
+                "92": {
+                  "text": "92nd",
+                  "index": 91
+                },
+                "93": {
+                  "text": "93rd",
+                  "index": 92
+                },
+                "94": {
+                  "text": "94th",
+                  "index": 93
+                },
+                "95": {
+                  "text": "95th",
+                  "index": 94
+                },
+                "96": {
+                  "text": "96th",
+                  "index": 95
+                },
+                "97": {
+                  "text": "97th",
+                  "index": 96
+                },
+                "98": {
+                  "text": "98th",
+                  "index": 97
+                },
+                "99": {
+                  "text": "99th",
+                  "index": 98
+                },
+                "100": {
+                  "text": "100th",
+                  "index": 99
+                }
+              }
+            }
+          ],
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "dark-blue"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
       "id": 37,
       "type": "barchart",
       "title": "Time per stage",
