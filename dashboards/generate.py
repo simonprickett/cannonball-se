@@ -36,7 +36,10 @@ SCORE_COLORS = ["#7e57c2", "#673ab7", "#5e35b1", "#4527a0", "#311b92"]
 # panels whose live wording ("latest", "follows it") is wrong on a pick-a-game board.
 SPECIAL = {
     16: {"description": "player_initials of the selected game."},
-    4: {"description": "Number of times the car went off-road (game.off_road events) in the selected game."},
+    4: {"description": "Number of times the car went off-road (game.off_road events) in the selected game.",
+        "thresholds": [{"color": "green", "value": None},   # 0-5
+                       {"color": "orange", "value": 6},     # 6-12
+                       {"color": "red", "value": 13}]},     # 13+
     2: {  # Session state (3-state). Session-scoped: the picked session's completion_code,
           # or null while it's still in progress (no session.end yet).
         "expr": f'max(max_over_time({SEL} | event="game.session.end" | session_label="$session" | unwrap completion_code [$__range]))',
@@ -162,8 +165,16 @@ def total_events_panel(y):
     }
 
 
-def stat_panel(pid, x, y, title, description, expr, unit="short", color="blue"):
-    # Generic picker-only session-scoped stat tile.
+def stat_panel(pid, x, y, title, description, expr, unit="short", color="blue", thresholds=None):
+    # Generic picker-only session-scoped stat tile. Pass `thresholds` (a list of
+    # {color,value} steps) to colour a GRADIENT BACKGROUND by value instead of the
+    # fixed-colour value text.
+    defaults = {"unit": unit, "mappings": []}
+    if thresholds:
+        defaults["color"] = {"mode": "thresholds"}
+        defaults["thresholds"] = {"mode": "absolute", "steps": thresholds}
+    else:
+        defaults["color"] = {"mode": "fixed", "fixedColor": color}
     return {
         "id": pid,
         "type": "stat",
@@ -179,11 +190,10 @@ def stat_panel(pid, x, y, title, description, expr, unit="short", color="blue"):
             "expr": expr,
         }],
         "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False},
-                    "colorMode": "value", "graphMode": "none", "justifyMode": "auto",
+                    "colorMode": "background" if thresholds else "value",
+                    "graphMode": "none", "justifyMode": "auto",
                     "textMode": "auto", "wideLayout": True, "showPercentChange": False},
-        "fieldConfig": {"defaults": {"unit": unit, "mappings": [],
-                                     "color": {"mode": "fixed", "fixedColor": color}},
-                        "overrides": []},
+        "fieldConfig": {"defaults": defaults, "overrides": []},
     }
 
 
@@ -570,6 +580,10 @@ def build_picker(live):
             p["description"] = SPECIAL[pid]["description"]
         if pid in SPECIAL and "mappings" in SPECIAL[pid]:
             p["fieldConfig"]["defaults"]["mappings"] = SPECIAL[pid]["mappings"]
+        if pid in SPECIAL and "thresholds" in SPECIAL[pid]:
+            p["fieldConfig"]["defaults"]["color"] = {"mode": "thresholds"}
+            p["fieldConfig"]["defaults"]["thresholds"] = {"mode": "absolute", "steps": SPECIAL[pid]["thresholds"]}
+            p["options"]["colorMode"] = "background"
 
     # Make room at the top and insert the Loki "Recent games" picker table.
     for p in d["panels"]:
@@ -600,10 +614,16 @@ def build_picker(live):
     # Fill the rest of the header row with session totals.
     d["panels"].append(stat_panel(
         34, 8, TABLE_H, "Total crashes", "Total crashes in the selected game.",
-        f'sum(count_over_time({SCOPED} | event="game.crash" [$__range]))', "short", "red"))
+        f'sum(count_over_time({SCOPED} | event="game.crash" [$__range]))', "short",
+        thresholds=[{"color": "green", "value": None},   # 0-3
+                    {"color": "orange", "value": 4},     # 4-7
+                    {"color": "red", "value": 8}]))      # 8+
     d["panels"].append(stat_panel(
         35, 12, TABLE_H, "Total overtakes", "Total vehicles overtaken in the selected game.",
-        f'sum(count_over_time({SCOPED} | event="game.vehicle_overtake" [$__range]))', "short", "green"))
+        f'sum(count_over_time({SCOPED} | event="game.vehicle_overtake" [$__range]))', "short",
+        thresholds=[{"color": "red", "value": None},    # 0-9
+                    {"color": "orange", "value": 10},   # 10-19
+                    {"color": "green", "value": 20}]))  # 20+
     d["panels"].append(stat_panel(
         36, 16, TABLE_H, "Game duration",
         "Wall-clock duration of the selected game (session.end epoch minus session.start epoch).",
