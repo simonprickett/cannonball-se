@@ -440,7 +440,14 @@ void Outrun::main_switch()
             omusic.play_music();
 
             if (!freeze_timer)
-                ostats.time_counter = ostats.TIME[config.engine.dip_time * 40]; // Set time to begin level with
+            {
+                // Set time to begin level with. dip_time 0 = Very Easy (max clock);
+                // 1..4 map to the ROM TIME table's Easy..Very Hard blocks (dip_time-1).
+                if (config.engine.dip_time == 0)
+                    ostats.time_counter = 0x99;
+                else
+                    ostats.time_counter = ostats.TIME[(config.engine.dip_time - 1) * 40];
+            }
             else
                 ostats.time_counter = 0x30;
 
