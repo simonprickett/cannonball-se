@@ -158,7 +158,7 @@
         "x": 0,
         "y": 12,
         "w": 4,
-        "h": 4
+        "h": 5
       },
       "id": 2,
       "fieldConfig": {
@@ -233,10 +233,10 @@
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "x": 8,
+        "x": 12,
         "y": 12,
-        "w": 6,
-        "h": 4
+        "w": 4,
+        "h": 5
       },
       "id": 14,
       "fieldConfig": {
@@ -324,10 +324,10 @@
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "x": 14,
+        "x": 16,
         "y": 12,
-        "w": 5,
-        "h": 4
+        "w": 4,
+        "h": 5
       },
       "id": 4,
       "fieldConfig": {
@@ -392,7 +392,7 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 16,
+        "y": 17,
         "w": 8,
         "h": 6
       },
@@ -482,7 +482,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 16,
+        "y": 17,
         "w": 8,
         "h": 6
       },
@@ -572,7 +572,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 16,
+        "y": 17,
         "w": 8,
         "h": 6
       },
@@ -662,7 +662,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 22,
+        "y": 23,
         "w": 8,
         "h": 8
       },
@@ -734,7 +734,7 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 22,
+        "y": 23,
         "w": 8,
         "h": 8
       },
@@ -842,7 +842,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 30,
+        "y": 31,
         "w": 24,
         "h": 4
       },
@@ -896,7 +896,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 34,
+        "y": 35,
         "w": 18,
         "h": 14
       },
@@ -1062,7 +1062,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 48,
+        "y": 49,
         "w": 9,
         "h": 16
       },
@@ -1120,7 +1120,7 @@
       },
       "gridPos": {
         "x": 9,
-        "y": 48,
+        "y": 49,
         "w": 9,
         "h": 16
       },
@@ -1178,7 +1178,7 @@
       },
       "gridPos": {
         "x": 18,
-        "y": 34,
+        "y": 35,
         "w": 6,
         "h": 25
       },
@@ -1239,7 +1239,7 @@
         "x": 4,
         "y": 12,
         "w": 4,
-        "h": 4
+        "h": 5
       },
       "id": 16,
       "fieldConfig": {
@@ -1306,7 +1306,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 22,
+        "y": 23,
         "w": 8,
         "h": 8
       },
@@ -2407,6 +2407,89 @@
       }
     },
     {
+      "id": 48,
+      "type": "stat",
+      "title": "Gearbox",
+      "description": "Transmission mode of the selected game (gearbox_mode on game.session.start): Auto or Manual.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 12,
+        "w": 4,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "hide": true,
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "range",
+          "maxLines": 5,
+          "expr": "{service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.session.start\" | line_format \"{{.gearbox_mode}}\""
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "type": "sql",
+          "expression": "SELECT CASE WHEN (SELECT Line FROM A ORDER BY `Time` DESC LIMIT 1) = 'automatic' THEN 1 WHEN (SELECT Line FROM A ORDER BY `Time` DESC LIMIT 1) = 'manual' THEN 2 ELSE 0 END AS gearbox"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "wideLayout": true,
+        "showPercentChange": false
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#ffd319"
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "\u2014",
+                  "index": 0
+                },
+                "1": {
+                  "text": "Auto",
+                  "index": 1
+                },
+                "2": {
+                  "text": "Manual",
+                  "index": 2
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      }
+    },
+    {
       "id": 32,
       "type": "stat",
       "title": "Longest clean streak",
@@ -2416,10 +2499,10 @@
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "x": 19,
+        "x": 20,
         "y": 12,
-        "w": 5,
-        "h": 4
+        "w": 4,
+        "h": 5
       },
       "targets": [
         {
@@ -2492,7 +2575,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 64,
+        "y": 65,
         "w": 4,
         "h": 5
       },
@@ -2976,7 +3059,7 @@
       },
       "gridPos": {
         "x": 4,
-        "y": 64,
+        "y": 65,
         "w": 4,
         "h": 5
       },
@@ -3460,7 +3543,7 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 64,
+        "y": 65,
         "w": 4,
         "h": 5
       },
@@ -3944,7 +4027,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 64,
+        "y": 65,
         "w": 4,
         "h": 5
       },
@@ -4428,7 +4511,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 64,
+        "y": 65,
         "w": 4,
         "h": 5
       },
@@ -4518,7 +4601,7 @@
       },
       "gridPos": {
         "x": 20,
-        "y": 64,
+        "y": 65,
         "w": 4,
         "h": 5
       },
@@ -5002,7 +5085,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 69,
+        "y": 70,
         "w": 24,
         "h": 6
       },
@@ -5212,7 +5295,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 75,
+        "y": 76,
         "w": 12,
         "h": 8
       },
@@ -5236,7 +5319,7 @@
             "uid": "__expr__"
           },
           "type": "sql",
-          "expression": "SELECT CAST(FLOOR(CAST(Line AS DOUBLE)/10)*10 AS CHAR) AS speed_kmh, COUNT(*) AS overtakes FROM A GROUP BY speed_kmh ORDER BY speed_kmh"
+          "expression": "SELECT CAST(FLOOR(CAST(Line AS DOUBLE)/10)*10 AS CHAR) AS speed_kmh, COUNT(*) AS overtakes FROM A GROUP BY speed_kmh ORDER BY CAST(speed_kmh AS DOUBLE)"
         }
       ],
       "options": {
@@ -5289,7 +5372,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 75,
+        "y": 76,
         "w": 12,
         "h": 8
       },
@@ -5368,7 +5451,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 83,
+        "y": 84,
         "w": 24,
         "h": 6
       },
@@ -5560,6 +5643,577 @@
                 "value": {
                   "mode": "fixed",
                   "fixedColor": "#311b92"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 49,
+      "type": "barchart",
+      "title": "Gear shifts per stage",
+      "description": "Up/down gear shifts in each stage (game.gear_shift), stages 1-5. In automatic mode a shift is a crossing of the ~160 km/h auto threshold, so this tracks braking/slowdowns per stage; in manual mode it is driver input.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 90,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "hide": true,
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "sum by (stage_number, direction) (count_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.gear_shift\" [$__range]))"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "type": "sql",
+          "expression": "SELECT t.label AS stage, COALESCE(SUM(CASE WHEN a.direction = 'up' THEN a.cnt END), 0) AS `Up shifts`, COALESCE(SUM(CASE WHEN a.direction = 'down' THEN a.cnt END), 0) AS `Down shifts` FROM (SELECT '1' AS n, 'Stage 1' AS label UNION ALL SELECT '2','Stage 2' UNION ALL SELECT '3','Stage 3' UNION ALL SELECT '4','Stage 4' UNION ALL SELECT '5','Stage 5') t LEFT JOIN (SELECT stage_number, direction, `__value__` AS cnt FROM A) a ON a.stage_number = t.n GROUP BY t.n, t.label ORDER BY t.n"
+        }
+      ],
+      "options": {
+        "orientation": "vertical",
+        "xField": "stage",
+        "stacking": "normal",
+        "showValue": "never",
+        "barWidth": 0.95,
+        "groupWidth": 0.7,
+        "fullHighlight": true,
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "custom": {
+            "fillOpacity": 85,
+            "gradientMode": "opacity",
+            "lineWidth": 1,
+            "axisPlacement": "auto",
+            "axisLabel": "Shifts",
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": []
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Up shifts"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#26c6da"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Down shifts"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#ff7043"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 50,
+      "type": "barchart",
+      "title": "Down-shift speeds",
+      "description": "Down-shifts bucketed by speed (10 km/h bins) in the selected game. In automatic mode a down-shift fires as speed drops back below the ~160 km/h auto threshold, so lower speeds mean harder braking.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 90,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "hide": true,
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "range",
+          "maxLines": 1000,
+          "expr": "{service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.gear_shift\" | direction=\"down\" | line_format \"{{.speed_kph}}\""
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "type": "sql",
+          "expression": "SELECT CAST(FLOOR(CAST(Line AS DOUBLE)/10)*10 AS CHAR) AS speed_kmh, COUNT(*) AS downshifts FROM A WHERE CAST(Line AS DOUBLE) > 0 GROUP BY speed_kmh ORDER BY CAST(speed_kmh AS DOUBLE)"
+        }
+      ],
+      "options": {
+        "orientation": "vertical",
+        "xField": "speed_kmh",
+        "showValue": "never",
+        "barWidth": 0.95,
+        "groupWidth": 0.7,
+        "fullHighlight": false,
+        "stacking": "none",
+        "legend": {
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#ff7043"
+          },
+          "custom": {
+            "fillOpacity": 90,
+            "gradientMode": "opacity",
+            "lineWidth": 1,
+            "axisPlacement": "auto",
+            "axisLabel": "Down-shifts",
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": []
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 51,
+      "type": "barchart",
+      "title": "Incidents by stage",
+      "description": "Crashes and off-road events in each stage (game.crash + game.off_road), stages 1-5, stacked.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 98,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "hide": true,
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "sum by (stage_number) (count_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.crash\" [$__range]))"
+        },
+        {
+          "refId": "B",
+          "hide": true,
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "sum by (stage_number) (count_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.off_road\" [$__range]))"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "type": "sql",
+          "expression": "SELECT t.label AS stage, COALESCE(c.cnt, 0) AS `Crashes`, COALESCE(o.cnt, 0) AS `Off-road` FROM (SELECT '1' AS n, 'Stage 1' AS label UNION ALL SELECT '2','Stage 2' UNION ALL SELECT '3','Stage 3' UNION ALL SELECT '4','Stage 4' UNION ALL SELECT '5','Stage 5') t LEFT JOIN (SELECT stage_number, `__value__` AS cnt FROM A) c ON c.stage_number = t.n LEFT JOIN (SELECT stage_number, `__value__` AS cnt FROM B) o ON o.stage_number = t.n ORDER BY t.n"
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "xField": "stage",
+        "stacking": "normal",
+        "showValue": "never",
+        "barWidth": 0.95,
+        "groupWidth": 0.7,
+        "fullHighlight": true,
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "custom": {
+            "fillOpacity": 90,
+            "gradientMode": "opacity",
+            "lineWidth": 1,
+            "axisPlacement": "auto",
+            "axisLabel": "Incidents",
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": []
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Crashes"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#ff2975"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Off-road"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#ff7043"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 52,
+      "type": "barchart",
+      "title": "Overtakes by stage",
+      "description": "Vehicles overtaken in each stage (game.vehicle_overtake), stages 1-5.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 98,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "hide": true,
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "sum by (stage_number) (count_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.vehicle_overtake\" [$__range]))"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "type": "sql",
+          "expression": "SELECT t.label AS stage, COALESCE(a.cnt, 0) AS overtakes FROM (SELECT '1' AS n, 'Stage 1' AS label UNION ALL SELECT '2','Stage 2' UNION ALL SELECT '3','Stage 3' UNION ALL SELECT '4','Stage 4' UNION ALL SELECT '5','Stage 5') t LEFT JOIN (SELECT stage_number, `__value__` AS cnt FROM A) a ON a.stage_number = t.n ORDER BY t.n"
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "xField": "stage",
+        "showValue": "never",
+        "barWidth": 0.95,
+        "groupWidth": 0.7,
+        "fullHighlight": false,
+        "stacking": "none",
+        "legend": {
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#7e57c2"
+          },
+          "custom": {
+            "fillOpacity": 90,
+            "gradientMode": "opacity",
+            "lineWidth": 1,
+            "axisPlacement": "auto",
+            "axisLabel": "Overtakes",
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": []
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 53,
+      "type": "barchart",
+      "title": "Up-shift speeds",
+      "description": "Up-shifts bucketed by speed (10 km/h bins) in the selected game. Meaningful in manual mode (driver picks the shift point); in automatic every up-shift is pinned to the ~160 km/h auto threshold, so it collapses to one bar.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 106,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "hide": true,
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "range",
+          "maxLines": 1000,
+          "expr": "{service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.gear_shift\" | direction=\"up\" | line_format \"{{.speed_kph}}\""
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "type": "sql",
+          "expression": "SELECT CAST(FLOOR(CAST(Line AS DOUBLE)/10)*10 AS CHAR) AS speed_kmh, COUNT(*) AS upshifts FROM A WHERE CAST(Line AS DOUBLE) > 0 GROUP BY speed_kmh ORDER BY CAST(speed_kmh AS DOUBLE)"
+        }
+      ],
+      "options": {
+        "orientation": "vertical",
+        "xField": "speed_kmh",
+        "showValue": "never",
+        "barWidth": 0.95,
+        "groupWidth": 0.7,
+        "fullHighlight": false,
+        "stacking": "none",
+        "legend": {
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#26c6da"
+          },
+          "custom": {
+            "fillOpacity": 90,
+            "gradientMode": "opacity",
+            "lineWidth": 1,
+            "axisPlacement": "auto",
+            "axisLabel": "Up-shifts",
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": []
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 54,
+      "type": "barchart",
+      "title": "Crashes by stage",
+      "description": "Crashes in each stage by type (game.crash crash_type: bump/spin/flip), stages 1-5, stacked bump\u2192spin\u2192flip.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 106,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "hide": true,
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "sum by (stage_number, crash_type) (count_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.crash\" [$__range]))"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "type": "sql",
+          "expression": "SELECT t.label AS stage, COALESCE(SUM(CASE WHEN a.crash_type = 'bump' THEN a.cnt END), 0) AS `Bump`, COALESCE(SUM(CASE WHEN a.crash_type = 'spin' THEN a.cnt END), 0) AS `Spin`, COALESCE(SUM(CASE WHEN a.crash_type = 'flip' THEN a.cnt END), 0) AS `Flip` FROM (SELECT '1' AS n, 'Stage 1' AS label UNION ALL SELECT '2','Stage 2' UNION ALL SELECT '3','Stage 3' UNION ALL SELECT '4','Stage 4' UNION ALL SELECT '5','Stage 5') t LEFT JOIN (SELECT stage_number, crash_type, `__value__` AS cnt FROM A) a ON a.stage_number = t.n GROUP BY t.n, t.label ORDER BY t.n"
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "xField": "stage",
+        "stacking": "normal",
+        "showValue": "never",
+        "barWidth": 0.95,
+        "groupWidth": 0.7,
+        "fullHighlight": true,
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "custom": {
+            "fillOpacity": 90,
+            "gradientMode": "opacity",
+            "lineWidth": 1,
+            "axisPlacement": "auto",
+            "axisLabel": "Crashes",
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": []
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Bump"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#ffd54f"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Spin"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#ff9800"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Flip"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#c62828"
                 }
               }
             ]

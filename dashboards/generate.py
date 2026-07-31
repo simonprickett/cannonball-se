@@ -199,6 +199,274 @@ def stat_panel(pid, x, y, title, description, expr, unit="short", color="blue", 
     }
 
 
+def gearbox_mode_panel(pid, x, y, w):
+    # Picker-only stat: the transmission mode of the selected game, read from the
+    # gearbox_mode attribute on game.session.start ("automatic"/"manual"). A hidden
+    # Loki query flattens it to the log line; a SQL expr maps it to a numeric code so
+    # value mappings can print "Auto"/"Manual". Fixed synthwave-yellow gradient bg.
+    return {
+        "id": pid, "type": "stat", "title": "Gearbox",
+        "description": "Transmission mode of the selected game (gearbox_mode on game.session.start): Auto or Manual.",
+        "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+        "gridPos": {"x": x, "y": y, "w": w, "h": 5},
+        "targets": [
+            {"refId": "A", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+             "editorMode": "code", "queryType": "range", "maxLines": 5,
+             "expr": SCOPED + ' | event="game.session.start" | line_format "{{.gearbox_mode}}"'},
+            {"refId": "B", "datasource": {"type": "__expr__", "uid": "__expr__"}, "type": "sql",
+             "expression": ("SELECT CASE "
+                            "WHEN (SELECT Line FROM A ORDER BY `Time` DESC LIMIT 1) = 'automatic' THEN 1 "
+                            "WHEN (SELECT Line FROM A ORDER BY `Time` DESC LIMIT 1) = 'manual' THEN 2 "
+                            "ELSE 0 END AS gearbox")},
+        ],
+        "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False},
+                    "colorMode": "background", "graphMode": "none", "justifyMode": "auto",
+                    "textMode": "auto", "wideLayout": True, "showPercentChange": False},
+        "fieldConfig": {"defaults": {
+            "unit": "short",
+            "color": {"mode": "fixed", "fixedColor": "#ffd319"},  # synthwave yellow
+            "mappings": [{"type": "value", "options": {
+                "0": {"text": "—", "index": 0},
+                "1": {"text": "Auto", "index": 1},
+                "2": {"text": "Manual", "index": 2}}}]},
+            "overrides": []},
+    }
+
+
+def shifts_per_stage_panel(pid, x, y, w):
+    # Picker-only: up/down gear shifts per stage as a stacked bar (one bar per stage,
+    # 1-5). Hidden Loki metric splits by (stage_number, direction); a SQL expr LEFT
+    # JOINs the fixed 5 stages and pivots direction into Up/Down columns (0-filled),
+    # so all 5 stages always show even with no shifts. See gear_shift telemetry note:
+    # up - down ≈ crashes (a crash resets the gear without a logged down-shift).
+    return {
+        "id": pid, "type": "barchart", "title": "Gear shifts per stage",
+        "description": ("Up/down gear shifts in each stage (game.gear_shift), stages 1-5. In "
+                        "automatic mode a shift is a crossing of the ~160 km/h auto threshold, so "
+                        "this tracks braking/slowdowns per stage; in manual mode it is driver input."),
+        "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+        "gridPos": {"x": x, "y": y, "w": w, "h": 8},
+        "targets": [
+            {"refId": "A", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+             "editorMode": "code", "queryType": "instant",
+             "expr": f'sum by (stage_number, direction) (count_over_time({SCOPED} | event="game.gear_shift" [$__range]))'},
+            {"refId": "B", "datasource": {"type": "__expr__", "uid": "__expr__"}, "type": "sql",
+             "expression": ("SELECT t.label AS stage, "
+                            "COALESCE(SUM(CASE WHEN a.direction = 'up' THEN a.cnt END), 0) AS `Up shifts`, "
+                            "COALESCE(SUM(CASE WHEN a.direction = 'down' THEN a.cnt END), 0) AS `Down shifts` "
+                            "FROM (SELECT '1' AS n, 'Stage 1' AS label UNION ALL SELECT '2','Stage 2' "
+                            "UNION ALL SELECT '3','Stage 3' UNION ALL SELECT '4','Stage 4' UNION ALL SELECT '5','Stage 5') t "
+                            "LEFT JOIN (SELECT stage_number, direction, `__value__` AS cnt FROM A) a ON a.stage_number = t.n "
+                            "GROUP BY t.n, t.label ORDER BY t.n")},
+        ],
+        "options": {"orientation": "vertical", "xField": "stage", "stacking": "normal",
+                    "showValue": "never", "barWidth": 0.95, "groupWidth": 0.7, "fullHighlight": True,
+                    "legend": {"showLegend": True, "displayMode": "list", "placement": "bottom"},
+                    "tooltip": {"mode": "multi", "sort": "none"}},
+        "fieldConfig": {"defaults": {"unit": "short", "decimals": 0,
+                                     "custom": {"fillOpacity": 85, "gradientMode": "opacity",
+                                                "lineWidth": 1, "axisPlacement": "auto",
+                                                "axisLabel": "Shifts", "thresholdsStyle": {"mode": "off"}},
+                                     "mappings": []},
+                        "overrides": [
+                            {"matcher": {"id": "byName", "options": "Up shifts"},
+                             "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#26c6da"}}]},
+                            {"matcher": {"id": "byName", "options": "Down shifts"},
+                             "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#ff7043"}}]},
+                        ]},
+    }
+
+
+def downshift_speed_hist_panel(pid, x, y, w):
+    # Picker-only: down-shift speeds bucketed into 10 km/h bins (bar chart, same trick
+    # as Overtake speeds). Up-shifts are all pinned to the ~160 threshold so only
+    # down-shifts carry a distribution — lower speed = harder braking (auto mode).
+    return {
+        "id": pid, "type": "barchart", "title": "Down-shift speeds",
+        "description": ("Down-shifts bucketed by speed (10 km/h bins) in the selected game. In "
+                        "automatic mode a down-shift fires as speed drops back below the ~160 km/h "
+                        "auto threshold, so lower speeds mean harder braking."),
+        "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+        "gridPos": {"x": x, "y": y, "w": w, "h": 8},
+        "targets": [
+            {"refId": "A", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+             "editorMode": "code", "queryType": "range", "maxLines": 1000,
+             "expr": SCOPED + ' | event="game.gear_shift" | direction="down" | line_format "{{.speed_kph}}"'},
+            {"refId": "B", "datasource": {"type": "__expr__", "uid": "__expr__"}, "type": "sql",
+             "expression": ("SELECT CAST(FLOOR(CAST(Line AS DOUBLE)/10)*10 AS CHAR) AS speed_kmh, "
+                            "COUNT(*) AS downshifts FROM A WHERE CAST(Line AS DOUBLE) > 0 "
+                            "GROUP BY speed_kmh ORDER BY CAST(speed_kmh AS DOUBLE)")},
+        ],
+        "options": {"orientation": "vertical", "xField": "speed_kmh", "showValue": "never",
+                    "barWidth": 0.95, "groupWidth": 0.7, "fullHighlight": False, "stacking": "none",
+                    "legend": {"showLegend": False}, "tooltip": {"mode": "single", "sort": "none"}},
+        "fieldConfig": {"defaults": {"unit": "short", "decimals": 0,
+                                     "color": {"mode": "fixed", "fixedColor": "#ff7043"},
+                                     "custom": {"fillOpacity": 90, "gradientMode": "opacity",
+                                                "lineWidth": 1, "axisPlacement": "auto",
+                                                "axisLabel": "Down-shifts", "thresholdsStyle": {"mode": "off"}},
+                                     "mappings": []},
+                        "overrides": []},
+    }
+
+
+def upshift_speed_hist_panel(pid, x, y, w):
+    # Picker-only: up-shift speeds bucketed into 10 km/h bins (bar chart, mirror of
+    # Down-shift speeds). Meaningful in MANUAL mode where the driver chooses when to
+    # shift up; in AUTO it collapses to a single bar at the ~160 threshold. Cyan to
+    # match the "Up shifts" series in the per-stage panel (up=cyan / down=orange).
+    return {
+        "id": pid, "type": "barchart", "title": "Up-shift speeds",
+        "description": ("Up-shifts bucketed by speed (10 km/h bins) in the selected game. Meaningful "
+                        "in manual mode (driver picks the shift point); in automatic every up-shift is "
+                        "pinned to the ~160 km/h auto threshold, so it collapses to one bar."),
+        "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+        "gridPos": {"x": x, "y": y, "w": w, "h": 8},
+        "targets": [
+            {"refId": "A", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+             "editorMode": "code", "queryType": "range", "maxLines": 1000,
+             "expr": SCOPED + ' | event="game.gear_shift" | direction="up" | line_format "{{.speed_kph}}"'},
+            {"refId": "B", "datasource": {"type": "__expr__", "uid": "__expr__"}, "type": "sql",
+             "expression": ("SELECT CAST(FLOOR(CAST(Line AS DOUBLE)/10)*10 AS CHAR) AS speed_kmh, "
+                            "COUNT(*) AS upshifts FROM A WHERE CAST(Line AS DOUBLE) > 0 "
+                            "GROUP BY speed_kmh ORDER BY CAST(speed_kmh AS DOUBLE)")},
+        ],
+        "options": {"orientation": "vertical", "xField": "speed_kmh", "showValue": "never",
+                    "barWidth": 0.95, "groupWidth": 0.7, "fullHighlight": False, "stacking": "none",
+                    "legend": {"showLegend": False}, "tooltip": {"mode": "single", "sort": "none"}},
+        "fieldConfig": {"defaults": {"unit": "short", "decimals": 0,
+                                     "color": {"mode": "fixed", "fixedColor": "#26c6da"},
+                                     "custom": {"fillOpacity": 90, "gradientMode": "opacity",
+                                                "lineWidth": 1, "axisPlacement": "auto",
+                                                "axisLabel": "Up-shifts", "thresholdsStyle": {"mode": "off"}},
+                                     "mappings": []},
+                        "overrides": []},
+    }
+
+
+def incidents_by_stage_panel(pid, x, y, w):
+    # Picker-only: crashes + off-road events per stage as a stacked bar (stages 1-5).
+    # Two hidden Loki metric queries (crash / off_road counts by stage_number); a SQL
+    # expr LEFT JOINs both against the fixed 5 stages and 0-fills, so every stage shows.
+    # Synthwave warm pair: crashes magenta, off-road deep orange (matches the shift bar).
+    return {
+        "id": pid, "type": "barchart", "title": "Incidents by stage",
+        "description": "Crashes and off-road events in each stage (game.crash + game.off_road), stages 1-5, stacked.",
+        "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+        "gridPos": {"x": x, "y": y, "w": w, "h": 8},
+        "targets": [
+            {"refId": "A", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+             "editorMode": "code", "queryType": "instant",
+             "expr": f'sum by (stage_number) (count_over_time({SCOPED} | event="game.crash" [$__range]))'},
+            {"refId": "B", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+             "editorMode": "code", "queryType": "instant",
+             "expr": f'sum by (stage_number) (count_over_time({SCOPED} | event="game.off_road" [$__range]))'},
+            {"refId": "C", "datasource": {"type": "__expr__", "uid": "__expr__"}, "type": "sql",
+             "expression": ("SELECT t.label AS stage, "
+                            "COALESCE(c.cnt, 0) AS `Crashes`, "
+                            "COALESCE(o.cnt, 0) AS `Off-road` "
+                            "FROM (SELECT '1' AS n, 'Stage 1' AS label UNION ALL SELECT '2','Stage 2' "
+                            "UNION ALL SELECT '3','Stage 3' UNION ALL SELECT '4','Stage 4' UNION ALL SELECT '5','Stage 5') t "
+                            "LEFT JOIN (SELECT stage_number, `__value__` AS cnt FROM A) c ON c.stage_number = t.n "
+                            "LEFT JOIN (SELECT stage_number, `__value__` AS cnt FROM B) o ON o.stage_number = t.n "
+                            "ORDER BY t.n")},
+        ],
+        "options": {"orientation": "horizontal", "xField": "stage", "stacking": "normal",
+                    "showValue": "never", "barWidth": 0.95, "groupWidth": 0.7, "fullHighlight": True,
+                    "legend": {"showLegend": True, "displayMode": "list", "placement": "bottom"},
+                    "tooltip": {"mode": "multi", "sort": "none"}},
+        "fieldConfig": {"defaults": {"unit": "short", "decimals": 0,
+                                     "custom": {"fillOpacity": 90, "gradientMode": "opacity",
+                                                "lineWidth": 1, "axisPlacement": "auto",
+                                                "axisLabel": "Incidents", "thresholdsStyle": {"mode": "off"}},
+                                     "mappings": []},
+                        "overrides": [
+                            {"matcher": {"id": "byName", "options": "Crashes"},
+                             "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#ff2975"}}]},
+                            {"matcher": {"id": "byName", "options": "Off-road"},
+                             "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#ff7043"}}]},
+                        ]},
+    }
+
+
+def crashes_by_stage_panel(pid, x, y, w):
+    # Picker-only: crashes per stage broken down by TYPE, stacked (stages 1-5). One
+    # hidden Loki metric split by (stage_number, crash_type); a SQL expr pivots type
+    # into Bump/Spin/Flip columns, LEFT JOINed to the fixed 5 stages and 0-filled.
+    # Column order Bump -> Spin -> Flip sets the stack order (bump at the base). Red
+    # severity ramp: bump least-red, spin mid, flip the most severe (darkest red).
+    return {
+        "id": pid, "type": "barchart", "title": "Crashes by stage",
+        "description": "Crashes in each stage by type (game.crash crash_type: bump/spin/flip), stages 1-5, stacked bump→spin→flip.",
+        "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+        "gridPos": {"x": x, "y": y, "w": w, "h": 8},
+        "targets": [
+            {"refId": "A", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+             "editorMode": "code", "queryType": "instant",
+             "expr": f'sum by (stage_number, crash_type) (count_over_time({SCOPED} | event="game.crash" [$__range]))'},
+            {"refId": "B", "datasource": {"type": "__expr__", "uid": "__expr__"}, "type": "sql",
+             "expression": ("SELECT t.label AS stage, "
+                            "COALESCE(SUM(CASE WHEN a.crash_type = 'bump' THEN a.cnt END), 0) AS `Bump`, "
+                            "COALESCE(SUM(CASE WHEN a.crash_type = 'spin' THEN a.cnt END), 0) AS `Spin`, "
+                            "COALESCE(SUM(CASE WHEN a.crash_type = 'flip' THEN a.cnt END), 0) AS `Flip` "
+                            "FROM (SELECT '1' AS n, 'Stage 1' AS label UNION ALL SELECT '2','Stage 2' "
+                            "UNION ALL SELECT '3','Stage 3' UNION ALL SELECT '4','Stage 4' UNION ALL SELECT '5','Stage 5') t "
+                            "LEFT JOIN (SELECT stage_number, crash_type, `__value__` AS cnt FROM A) a ON a.stage_number = t.n "
+                            "GROUP BY t.n, t.label ORDER BY t.n")},
+        ],
+        "options": {"orientation": "horizontal", "xField": "stage", "stacking": "normal",
+                    "showValue": "never", "barWidth": 0.95, "groupWidth": 0.7, "fullHighlight": True,
+                    "legend": {"showLegend": True, "displayMode": "list", "placement": "bottom"},
+                    "tooltip": {"mode": "multi", "sort": "none"}},
+        "fieldConfig": {"defaults": {"unit": "short", "decimals": 0,
+                                     "custom": {"fillOpacity": 90, "gradientMode": "opacity",
+                                                "lineWidth": 1, "axisPlacement": "auto",
+                                                "axisLabel": "Crashes", "thresholdsStyle": {"mode": "off"}},
+                                     "mappings": []},
+                        "overrides": [
+                            {"matcher": {"id": "byName", "options": "Bump"},
+                             "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#ffd54f"}}]},  # yellow, least severe
+                            {"matcher": {"id": "byName", "options": "Spin"},
+                             "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#ff9800"}}]},  # orange, mid
+                            {"matcher": {"id": "byName", "options": "Flip"},
+                             "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#c62828"}}]},  # deep red, most severe
+                        ]},
+    }
+
+
+def overtakes_by_stage_panel(pid, x, y, w):
+    # Picker-only: overtakes per stage as a single-series bar (stages 1-5). Hidden Loki
+    # metric counts by stage_number; SQL LEFT JOINs the fixed 5 stages and 0-fills.
+    # Synthwave purple to match the Overtake-speeds panel.
+    return {
+        "id": pid, "type": "barchart", "title": "Overtakes by stage",
+        "description": "Vehicles overtaken in each stage (game.vehicle_overtake), stages 1-5.",
+        "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+        "gridPos": {"x": x, "y": y, "w": w, "h": 8},
+        "targets": [
+            {"refId": "A", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+             "editorMode": "code", "queryType": "instant",
+             "expr": f'sum by (stage_number) (count_over_time({SCOPED} | event="game.vehicle_overtake" [$__range]))'},
+            {"refId": "B", "datasource": {"type": "__expr__", "uid": "__expr__"}, "type": "sql",
+             "expression": ("SELECT t.label AS stage, COALESCE(a.cnt, 0) AS overtakes "
+                            "FROM (SELECT '1' AS n, 'Stage 1' AS label UNION ALL SELECT '2','Stage 2' "
+                            "UNION ALL SELECT '3','Stage 3' UNION ALL SELECT '4','Stage 4' UNION ALL SELECT '5','Stage 5') t "
+                            "LEFT JOIN (SELECT stage_number, `__value__` AS cnt FROM A) a ON a.stage_number = t.n "
+                            "ORDER BY t.n")},
+        ],
+        "options": {"orientation": "horizontal", "xField": "stage", "showValue": "never",
+                    "barWidth": 0.95, "groupWidth": 0.7, "fullHighlight": False, "stacking": "none",
+                    "legend": {"showLegend": False}, "tooltip": {"mode": "single", "sort": "none"}},
+        "fieldConfig": {"defaults": {"unit": "short", "decimals": 0,
+                                     "color": {"mode": "fixed", "fixedColor": "#7e57c2"},
+                                     "custom": {"fillOpacity": 90, "gradientMode": "opacity",
+                                                "lineWidth": 1, "axisPlacement": "auto",
+                                                "axisLabel": "Overtakes", "thresholdsStyle": {"mode": "off"}},
+                                     "mappings": []},
+                        "overrides": []},
+    }
+
+
 def stage_time_bar_panel(y):
     # Picker-only: a single HORIZONTAL STACKED bar whose total length = game time,
     # split into one coloured segment per stage (seconds). Per-stage durations come
@@ -292,7 +560,7 @@ def overtake_speed_hist_panel(pid, x, y):
              "expr": SCOPED + ' | event="game.vehicle_overtake" | line_format "{{.speed_kph}}"'},
             {"refId": "B", "datasource": {"type": "__expr__", "uid": "__expr__"}, "type": "sql",
              "expression": ("SELECT CAST(FLOOR(CAST(Line AS DOUBLE)/10)*10 AS CHAR) AS speed_kmh, "
-                            "COUNT(*) AS overtakes FROM A GROUP BY speed_kmh ORDER BY speed_kmh")},
+                            "COUNT(*) AS overtakes FROM A GROUP BY speed_kmh ORDER BY CAST(speed_kmh AS DOUBLE)")},
         ],
         "options": {"orientation": "vertical", "xField": "speed_kmh", "showValue": "never",
                     "barWidth": 0.95, "groupWidth": 0.7, "fullHighlight": False, "stacking": "none",
@@ -648,14 +916,16 @@ def build_picker(live):
                     {"color": "#9ccc65", "value": 240},   # 240-300s
                     {"color": "#43a047", "value": 300}]))  # 300s+
     d["panels"].append(score_rank_panel(20, TABLE_H))  # fills the last header-row slot
-    # Add "Longest clean streak" to the stat row (Game state / Player / Stage
-    # reached / Off-road), rebalancing their widths to fit a fifth tile.
+    # Stat row: Game state / Player / Gearbox / Stage reached / Off-road / Longest
+    # clean streak — six equal 4-wide tiles. Gearbox sits between Player and Stage
+    # reached (per request); Longest clean streak is appended at the right end.
     row_y = next(p["gridPos"]["y"] for p in d["panels"] if p.get("id") == 2)
-    row_widths = {2: (0, 4), 16: (4, 4), 14: (8, 6), 4: (14, 5)}  # id: (x, w)
+    row_widths = {2: (0, 4), 16: (4, 4), 14: (12, 4), 4: (16, 4)}  # id: (x, w)
     for p in d["panels"]:
         if p.get("id") in row_widths:
             p["gridPos"]["x"], p["gridPos"]["w"] = row_widths[p["id"]]
-    d["panels"].append(longest_clean_panel(19, row_y, 5))
+    d["panels"].append(gearbox_mode_panel(48, 8, row_y, 4))   # between Player and Stage reached
+    d["panels"].append(longest_clean_panel(20, row_y, 4))
     # Sort "Overtakes by color" (id 17) bars descending (wrap the already-scoped expr).
     for p in d["panels"]:
         if p.get("id") == 17:
@@ -794,6 +1064,34 @@ def build_picker(live):
     d["panels"].append(checkpoint_buffer_panel(44, 12, r))
     r2 = max(p["gridPos"]["y"] + p["gridPos"]["h"] for p in d["panels"])
     d["panels"].append(score_progression_panel(r2))
+    # Gear-shift panels — a new row at the very bottom (layout TBD): shifts per stage
+    # (stacked up/down) + down-shift speed distribution.
+    r3 = max(p["gridPos"]["y"] + p["gridPos"]["h"] for p in d["panels"])
+    d["panels"].append(shifts_per_stage_panel(49, 0, r3, 12))
+    d["panels"].append(downshift_speed_hist_panel(50, 12, r3, 12))
+    # Per-stage breakdowns (new bottom row, layout TBD): incidents (crashes+off-road,
+    # stacked) + overtakes.
+    r4 = max(p["gridPos"]["y"] + p["gridPos"]["h"] for p in d["panels"])
+    d["panels"].append(incidents_by_stage_panel(51, 0, r4, 12))
+    d["panels"].append(overtakes_by_stage_panel(52, 12, r4, 12))
+    # Up-shift speeds (companion to Down-shift speeds; meaningful in manual mode) +
+    # Crashes by stage (crash-type breakdown, stacked).
+    r5 = max(p["gridPos"]["y"] + p["gridPos"]["h"] for p in d["panels"])
+    d["panels"].append(upshift_speed_hist_panel(53, 0, r5, 12))
+    d["panels"].append(crashes_by_stage_panel(54, 12, r5, 12))
+
+    # Match the primary stat row (Game state / Player / Gearbox / Stage reached /
+    # Off-road / Longest clean streak) to the header stat row height (5). The live
+    # board ships these tiles at h=4; bump them to 5 and push everything below down
+    # 1u so the taller row stays flush with the row beneath it.
+    STAT_ROW_IDS = {2, 16, 48, 14, 4, 32}
+    stat_row_y = next(p["gridPos"]["y"] for p in d["panels"] if p.get("id") == 2)
+    for p in d["panels"]:
+        if p["gridPos"]["y"] > stat_row_y:
+            p["gridPos"]["y"] += 1
+    for p in d["panels"]:
+        if p.get("id") in STAT_ROW_IDS:
+            p["gridPos"]["h"] = 5
 
     # Variables + import inputs (Loki only — Tempo dropped)
     d["templating"] = {"list": picker_variables()}
