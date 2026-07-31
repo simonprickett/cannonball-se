@@ -156,8 +156,10 @@ def total_events_panel(y):
             "queryType": "instant",
             "expr": f'sum(count_over_time({SCOPED} [$__range]))',
         }],
+        # Not a metric we compare on / the user controls -> plain blue gradient
+        # background rather than value-graded thresholds.
         "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False},
-                    "colorMode": "value", "graphMode": "none", "justifyMode": "auto",
+                    "colorMode": "background", "graphMode": "none", "justifyMode": "auto",
                     "textMode": "auto", "wideLayout": True, "showPercentChange": False},
         "fieldConfig": {"defaults": {"unit": "short", "mappings": [],
                                      "color": {"mode": "fixed", "fixedColor": "blue"}},
@@ -468,11 +470,12 @@ def music_panel(x, y):
             "queryType": "instant",
             "expr": f'max(max_over_time({SCOPED} | unwrap music_selection [$__range]))',
         }],
+        # Not a comparison metric -> plain blue gradient background (same as Total events).
         "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False},
-                    "colorMode": "none", "graphMode": "none", "justifyMode": "auto",
+                    "colorMode": "background", "graphMode": "none", "justifyMode": "auto",
                     "textMode": "value", "wideLayout": True, "showPercentChange": False},
         "fieldConfig": {"defaults": {"unit": "none", "decimals": 0,
-                                     "color": {"mode": "fixed", "fixedColor": "text"},
+                                     "color": {"mode": "fixed", "fixedColor": "blue"},
                                      "mappings": [
                                          # Stock OutRun tracks (music_selected indexes config.sound.music).
                                          {"type": "value", "options": {
@@ -629,7 +632,12 @@ def build_picker(live):
         "Wall-clock duration of the selected game (session.end epoch minus session.start epoch).",
         f'(max(max_over_time({SCOPED} | event="game.session.end" | unwrap end_epoch_ms [$__range])) '
         f'- max(max_over_time({SCOPED} | event="game.session.start" | unwrap start_epoch_ms [$__range]))) / 1000',
-        "s", "blue"))
+        "s",
+        thresholds=[{"color": "#e53935", "value": None},  # 0-80s
+                    {"color": "#fb8c00", "value": 80},    # 80-160s
+                    {"color": "#fdd835", "value": 160},   # 160-240s
+                    {"color": "#9ccc65", "value": 240},   # 240-300s
+                    {"color": "#43a047", "value": 300}]))  # 300s+
     d["panels"].append(score_rank_panel(20, TABLE_H))  # fills the last header-row slot
     # Add "Longest clean streak" to the stat row (Game state / Player / Stage
     # reached / Off-road), rebalancing their widths to fit a fifth tile.
@@ -654,24 +662,19 @@ def build_picker(live):
     for p in d["panels"]:
         if p.get("id") == 20:
             p["options"]["dotDiagram"] = route_map_dot()
-            # No transforms: the raw query is already the long shape the plugin's data
-            # binding wants — a stage_id id-column + a "Value #A" value-column.
             p.pop("transformations", None)
-            p["options"]["namedThresholds"] = [
-                {"id": "visited", "name": "Visited",
-                 "steps": [{"color": "transparent", "value": 0}, {"color": "#e53935", "value": 1}]}]
-            # ONE node override for all nodes: matchPattern "${id}" resolves to each
-            # node's id, the plugin finds the row where stage_id == that id, reads its
-            # "Value #A" count, and the threshold colours the node red. Unvisited stages
-            # have no matching row -> node left grey. (Edges parked until nodes confirmed.)
-            # BOTH nodes and edges are driven by Grafana SQL expressions over one Loki
-            # query — no C++ change, no transform pile. Crucially, each override then
-            # reads a FLAT column (which the plugin binds cleanly). A plain metric query
-            # returns stage_id as a LABEL not a column, and silently breaks node matching
-            # as soon as any expression is in the query list.
-            #   A = stage.start events, stage_id emitted as the log line
-            #   B = one row per visited stage (stage_id + visited=1)          -> nodes
-            #   C = LAG over the ordered stage_ids -> "prev__to__cur" edge ids -> edges
+            # Route colouring via SQL expressions over Loki (each override reads a FLAT
+            # column). Completed stages -> GREEN; the stage the player timed out on -> RED;
+            # taken edges -> GREEN; unvisited stages stay grey. A completed game has no red
+            # node (every visited stage is green).
+            #   A = stage.start events (stage_id as the ordered log line)
+            #   B = session.end completion_status (the log line: "timeout"/"completed")
+            #   C = per visited stage: status 2 (completed/green) or 1 (timed-out last stage/red)
+            #   D = LAG over the ordered stage_ids -> "prev__to__cur" taken edge ids
+            node_sql = ("SELECT DISTINCT s.sid AS stage_id, "
+                        "CASE WHEN s.sid = (SELECT sid FROM (SELECT Line AS sid, `Time` AS t FROM A) q ORDER BY t DESC LIMIT 1) "
+                        "AND (SELECT Line FROM B LIMIT 1) = 'timeout' THEN 1 ELSE 2 END AS status "
+                        "FROM (SELECT Line AS sid FROM A) s")
             edge_sql = ("SELECT CONCAT(prev,'__to__',sid) AS edge_id, 1 AS taken "
                         "FROM (SELECT sid, lag(sid) OVER (ORDER BY t ASC) AS prev "
                         "FROM (SELECT `Time` AS t, Line AS sid FROM A) q1) q2 "  # `Time` backticked (MySQL identifier)
@@ -680,21 +683,30 @@ def build_picker(live):
                 {"refId": "A", "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
                  "editorMode": "code", "queryType": "range", "maxLines": 50,
                  "expr": SCOPED + ' | event="game.stage.start" | line_format "{{.stage_id}}"'},
-                {"refId": "B", "datasource": {"type": "__expr__", "uid": "__expr__"}, "type": "sql",
-                 "expression": "SELECT DISTINCT Line AS stage_id, 1 AS visited FROM A"},
+                {"refId": "B", "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+                 "editorMode": "code", "queryType": "range", "maxLines": 5,
+                 "expr": SCOPED + ' | event="game.session.end" | line_format "{{.completion_status}}"'},
                 {"refId": "C", "datasource": {"type": "__expr__", "uid": "__expr__"}, "type": "sql",
+                 "expression": node_sql},
+                {"refId": "D", "datasource": {"type": "__expr__", "uid": "__expr__"}, "type": "sql",
                  "expression": edge_sql},
             ]
+            p["options"]["namedThresholds"] = [
+                {"id": "node-status", "name": "Node status",
+                 "steps": [{"color": "transparent", "value": 0},
+                           {"color": "#e53935", "value": 1},    # 1 = timed-out stage -> red
+                           {"color": "#43a047", "value": 2}]},  # 2 = completed stage -> green
+                {"id": "edge-green", "name": "Edge",
+                 "steps": [{"color": "transparent", "value": 0}, {"color": "#43a047", "value": 1}]},
+            ]
             p["options"]["nodeOverrides"] = [{
-                "id": "visited-nodes", "targetNodeIds": ROUTE_NODE_IDS,
+                "id": "route-nodes", "targetNodeIds": ROUTE_NODE_IDS,
                 "matchFieldName": "stage_id", "matchPattern": "${id}",
-                "rules": [{"kind": "fillColor", "colorFieldName": "visited", "thresholdId": "visited"}]}]
-            # matchPattern "${id}" resolves to each edge's id (e.g. "0__to__8"); if that id
-            # is in D's edge_id column (a taken edge) the threshold colours it red, else grey.
+                "rules": [{"kind": "fillColor", "colorFieldName": "status", "thresholdId": "node-status"}]}]
             p["options"]["edgeOverrides"] = [{
                 "id": "route-edges", "targetEdgeIds": [f"{a}__to__{b}" for a, b in ROUTE_EDGES],
                 "matchFieldName": "edge_id", "matchPattern": "${id}",
-                "rules": [{"kind": "strokeColor", "colorFieldName": "taken", "thresholdId": "visited"}]}]
+                "rules": [{"kind": "strokeColor", "colorFieldName": "taken", "thresholdId": "edge-green"}]}]
             break
     # Final frame (id 21) + Course map (id 22): these screenshots load a beat after
     # the rest, so show a "loading" placeholder rather than a "no screenshot" message;
