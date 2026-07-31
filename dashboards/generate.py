@@ -663,6 +663,11 @@ def build_picker(live):
                 if "expr" in t and not t["expr"].startswith("sort_desc("):
                     t["expr"] = f'sort_desc({t["expr"]})'
             break
+    # Overtakes by vehicle (id 5): overtakes are all good -> shades of GREEN.
+    for p in d["panels"]:
+        if p.get("id") == 5:
+            p["fieldConfig"]["defaults"]["color"] = {"mode": "shades", "fixedColor": "#66bb6a"}
+            break
     # Crashes by type (id 3): the bargauge fails to render the label when the query
     # returns only ONE crash_type. Work around it with a SQL expr that LEFT JOINs a
     # fixed set of all 3 types against the counts (0-fill for missing) and orders by
