@@ -675,25 +675,7 @@
             "mode": "shades",
             "fixedColor": "#e57373"
           },
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "bump": {
-                  "text": "Bump",
-                  "index": 0
-                },
-                "flip": {
-                  "text": "Flip",
-                  "index": 1
-                },
-                "spin": {
-                  "text": "Spin",
-                  "index": 2
-                }
-              }
-            }
-          ],
+          "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -722,14 +704,23 @@
       "targets": [
         {
           "refId": "A",
+          "hide": true,
           "datasource": {
             "type": "loki",
             "uid": "${DS_LOKI}"
           },
           "editorMode": "code",
           "queryType": "instant",
-          "legendFormat": "{{crash_type}}",
           "expr": "sum by (crash_type) (count_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.crash\" [$__range]))"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "type": "sql",
+          "expression": "SELECT t.label AS crash_type, COALESCE(a.cnt, 0) AS crashes FROM (SELECT 'bump' AS ct, 'Bump' AS label UNION ALL SELECT 'flip','Flip' UNION ALL SELECT 'spin','Spin') t LEFT JOIN (SELECT crash_type, `__value__` AS cnt FROM A) a ON a.crash_type = t.ct ORDER BY crashes DESC"
         }
       ]
     },

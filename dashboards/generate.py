@@ -654,6 +654,26 @@ def build_picker(live):
                 if "expr" in t and not t["expr"].startswith("sort_desc("):
                     t["expr"] = f'sort_desc({t["expr"]})'
             break
+    # Crashes by type (id 3): the bargauge fails to render the label when the query
+    # returns only ONE crash_type. Work around it with a SQL expr that LEFT JOINs a
+    # fixed set of all 3 types against the counts (0-fill for missing) and orders by
+    # count desc (most at top). A is hidden — it just feeds the expression.
+    for p in d["panels"]:
+        if p.get("id") == 3:
+            p.pop("transformations", None)
+            p["targets"] = [
+                {"refId": "A", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+                 "editorMode": "code", "queryType": "instant",
+                 "expr": f'sum by (crash_type) (count_over_time({SCOPED} | event="game.crash" [$__range]))'},
+                {"refId": "B", "datasource": {"type": "__expr__", "uid": "__expr__"}, "type": "sql",
+                 "expression": ("SELECT t.label AS crash_type, COALESCE(a.cnt, 0) AS crashes "
+                                "FROM (SELECT 'bump' AS ct, 'Bump' AS label UNION ALL SELECT 'flip','Flip' "
+                                "UNION ALL SELECT 'spin','Spin') t "
+                                "LEFT JOIN (SELECT crash_type, `__value__` AS cnt FROM A) a ON a.crash_type = t.ct "
+                                "ORDER BY crashes DESC")},
+            ]
+            p["fieldConfig"]["defaults"]["mappings"] = []  # labels now come from the SQL
+            break
     # Route map (id 20): recolour from static rainbow to visited/unvisited. Every
     # stage defaults grey (in the DOT); a stage the player entered produces a
     # stage_id series with a value, which the threshold lights red. Unvisited stages
