@@ -496,6 +496,7 @@ void Outrun::main_switch()
                     {
                         {"game_mode", mode},
                         {"player_initials", oname.get_initials()},
+                        {"gearbox_mode", (config.controls.gear == config.controls.GEAR_AUTO) ? "automatic" : "manual"},
                         {"screenshot_jpg", start_screenshot_b64}
                     },
                     {
