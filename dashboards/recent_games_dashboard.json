@@ -5282,7 +5282,7 @@
       "id": 44,
       "type": "bargauge",
       "title": "Checkpoint time buffer",
-      "description": "Seconds left on the clock at each checkpoint (game.stage.end time_remaining_seconds). One bar per completed stage.",
+      "description": "Seconds left on the clock at each checkpoint (game.stage.end time_remaining_seconds), stages 1-5. Uncompleted stages show 0.",
       "datasource": {
         "type": "loki",
         "uid": "${DS_LOKI}"
@@ -5296,14 +5296,23 @@
       "targets": [
         {
           "refId": "A",
+          "hide": true,
           "datasource": {
             "type": "loki",
             "uid": "${DS_LOKI}"
           },
           "editorMode": "code",
           "queryType": "instant",
-          "legendFormat": "Stage {{stage_number}}",
           "expr": "max by (stage_number) (max_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.stage.end\" | unwrap time_remaining_seconds [$__range]))"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "type": "sql",
+          "expression": "SELECT t.label AS stage, COALESCE(a.secs, 0) AS seconds FROM (SELECT '1' AS n, 'Stage 1' AS label UNION ALL SELECT '2','Stage 2' UNION ALL SELECT '3','Stage 3' UNION ALL SELECT '4','Stage 4' UNION ALL SELECT '5','Stage 5') t LEFT JOIN (SELECT stage_number, `__value__` AS secs FROM A) a ON a.stage_number = t.n ORDER BY t.n"
         }
       ],
       "options": {
@@ -5335,11 +5344,11 @@
               },
               {
                 "color": "orange",
-                "value": 10
+                "value": 4
               },
               {
                 "color": "green",
-                "value": 20
+                "value": 8
               }
             ]
           },

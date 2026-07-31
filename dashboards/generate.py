@@ -309,25 +309,34 @@ def overtake_speed_hist_panel(pid, x, y):
 
 def checkpoint_buffer_panel(pid, x, y):
     # Seconds left on the clock at each checkpoint (time_remaining_seconds on
-    # game.stage.end) — one bar per COMPLETED stage; low buffer = red, high = green.
+    # game.stage.end). Always show a bar for all 5 stages in order (a SQL expr
+    # LEFT JOINs stages 1-5 against the data and 0-fills the missing ones — the
+    # bargauge won't render a label when only one series is returned). Low = red,
+    # high = green. A is hidden; it just feeds the expression.
     return {
         "id": pid, "type": "bargauge", "title": "Checkpoint time buffer",
-        "description": "Seconds left on the clock at each checkpoint (game.stage.end time_remaining_seconds). One bar per completed stage.",
+        "description": "Seconds left on the clock at each checkpoint (game.stage.end time_remaining_seconds), stages 1-5. Uncompleted stages show 0.",
         "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
         "gridPos": {"x": x, "y": y, "w": 12, "h": 8},
-        "targets": [{"refId": "A", "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
-                     "editorMode": "code", "queryType": "instant",
-                     "legendFormat": "Stage {{stage_number}}",
-                     "expr": f'max by (stage_number) (max_over_time({SCOPED} | event="game.stage.end" | unwrap time_remaining_seconds [$__range]))'}],
+        "targets": [
+            {"refId": "A", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+             "editorMode": "code", "queryType": "instant",
+             "expr": f'max by (stage_number) (max_over_time({SCOPED} | event="game.stage.end" | unwrap time_remaining_seconds [$__range]))'},
+            {"refId": "B", "datasource": {"type": "__expr__", "uid": "__expr__"}, "type": "sql",
+             "expression": ("SELECT t.label AS stage, COALESCE(a.secs, 0) AS seconds "
+                            "FROM (SELECT '1' AS n, 'Stage 1' AS label UNION ALL SELECT '2','Stage 2' "
+                            "UNION ALL SELECT '3','Stage 3' UNION ALL SELECT '4','Stage 4' UNION ALL SELECT '5','Stage 5') t "
+                            "LEFT JOIN (SELECT stage_number, `__value__` AS secs FROM A) a ON a.stage_number = t.n "
+                            "ORDER BY t.n")}],
         "options": {"displayMode": "lcd", "orientation": "horizontal", "valueMode": "color",
                     "showUnfilled": True,
                     "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": True}},
         "fieldConfig": {"defaults": {"unit": "s", "decimals": 0,
                                      "color": {"mode": "thresholds"},
                                      "thresholds": {"mode": "absolute", "steps": [
-                                         {"color": "red", "value": None},
-                                         {"color": "orange", "value": 10},
-                                         {"color": "green", "value": 20}]},
+                                         {"color": "red", "value": None},    # 0-3
+                                         {"color": "orange", "value": 4},    # 4-7
+                                         {"color": "green", "value": 8}]},   # 8+
                                      "mappings": []},
                         "overrides": []},
     }
