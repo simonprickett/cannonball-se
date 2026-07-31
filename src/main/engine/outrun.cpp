@@ -61,6 +61,8 @@ Outrun::Outrun()
     outputs = new OOutputs();
     gameover_screenshot_delay = 0;
     map_screenshot_taken = false;
+    goal_screenshot_delay = 0;
+    goal_screenshot_taken = false;
 }
 
 Outrun::~Outrun()
@@ -539,11 +541,27 @@ void Outrun::main_switch()
             oroad.road_load_end   |= BIT_0;             // Instruct CPU 1 to load end road section
             ostats.game_completed |= BIT_0;             // Denote game completed
             obonus.bonus_timer = 3600;                  // Safety Timer Added in Rev. A Roms
+            // Arm the "reached the goal" screenshot. The car drives the whole bonus
+            // road first; only once it parks at the finish does bonus_control reach
+            // BONUS_SEQ0 (the flag-waving end sequence). This delay is the settle
+            // time AFTER arrival so the celebration is on screen.
+            goal_screenshot_delay = 45;                 // ~0.75s @ 60fps; tune on Pi
+            goal_screenshot_taken = false;
             game_state = GS_BONUS;
 
             [[fallthrough]];
 
         case GS_BONUS:
+            // Once the car has parked at the goal (end-sequence animation running),
+            // let the flag/crowd celebration settle then grab the frame. Reuse
+            // gameover_screenshot_b64 so game.session.end carries it for completed
+            // games (the GAME OVER path never captures on a completion).
+            if (!goal_screenshot_taken && obonus.bonus_control >= OBonus::BONUS_SEQ0
+                && --goal_screenshot_delay <= 0)
+            {
+                goal_screenshot_taken = true;
+                gameover_screenshot_b64 = video.capture_screenshot_base64();
+            }
             if (--obonus.bonus_timer < 0)
             {
                 obonus.bonus_control = OBonus::BONUS_DISABLE;
@@ -582,7 +600,10 @@ void Outrun::main_switch()
                 ohud.blit_text_new(31, 18, Utils::to_string((int) ttrial.crashes).c_str(), OHud::GREEN);
             }
             osoundint.queue_sound(sound::NEW_COMMAND);
-            gameover_screenshot_delay = 2;  // wait for GAME OVER text to render
+            // Only capture the GAME OVER frame when the player did NOT complete the
+            // game. On a completion we already grabbed the car parked at the goal in
+            // GS_BONUS and must not overwrite it here.
+            gameover_screenshot_delay = (ostats.game_completed & BIT_0) ? 0 : 2;
             game_state = GS_GAMEOVER;
             [[fallthrough]];
 

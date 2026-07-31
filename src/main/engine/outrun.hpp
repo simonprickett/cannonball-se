@@ -243,6 +243,11 @@ private:
     std::string map_screenshot_b64;
     int  gameover_screenshot_delay;
     bool map_screenshot_taken;
+    // Completed-game "reached the goal" capture: on completion the GAME OVER
+    // path never captures (bonus sequence runs instead), so grab the car parked
+    // at the finish during GS_BONUS and reuse gameover_screenshot_b64 for it.
+    int  goal_screenshot_delay;
+    bool goal_screenshot_taken;
 
 	void jump_table();
 	void init_jump_table();
