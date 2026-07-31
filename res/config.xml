@@ -161,11 +161,12 @@
 -->
 <engine>
 	<!-- Game Time: 
-         0 = Easy      (80 seconds)
-         1 = Normal    (75 seconds) 
-         2 = Hard      (72 seconds) 
-         3 = Very Hard (70 seconds)  
-         4 = Infinite Time 
+         0 = Very Easy (max time ~99 seconds/stage, for testing)
+         1 = Easy      (80 seconds)
+         2 = Normal    (75 seconds)
+         3 = Hard      (72 seconds)
+         4 = Very Hard (70 seconds)
+         5 = Infinite Time
     -->
 	<time>0</time>
 	<!-- Traffic Difficulty: 

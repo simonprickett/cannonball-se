@@ -327,9 +327,9 @@ void Config::load()
     engine.dip_time      = cfg.get_int("engine.time",    0);
     engine.dip_traffic   = cfg.get_int("engine.traffic", 1);
 
-    engine.freeze_timer    = engine.dip_time == 4;
+    engine.freeze_timer    = engine.dip_time == 5;   // 5 = Infinite Time
     engine.disable_traffic = engine.dip_traffic == 4;
-    engine.dip_time    &= 3;
+    if (engine.dip_time > 4) engine.dip_time = 4;    // 0 = Very Easy .. 4 = Very Hard
     engine.dip_traffic &= 3;
 
     engine.freeplay      = cfg.get_int("engine.freeplay",        1) != 0;
@@ -466,7 +466,7 @@ bool Config::save()
     cfg.put_int("controls.analog.axis.brake", controls.axis[2]);
 
     cfg.put_int("engine.freeplay",        (int) engine.freeplay);
-    cfg.put_int("engine.time",            engine.freeze_timer ? 4 : engine.dip_time);
+    cfg.put_int("engine.time",            engine.freeze_timer ? 5 : engine.dip_time);
     cfg.put_int("engine.traffic",         engine.disable_traffic ? 4 : engine.dip_traffic);
     cfg.put_int("engine.japanese_tracks", engine.jap);
     cfg.put_int("engine.prototype",       engine.prototype);
@@ -684,7 +684,7 @@ void Config::set_fps(int fps)
 // Inc time setting from menu
 void Config::inc_time()
 {
-    if (engine.dip_time == 3)
+    if (engine.dip_time == 4)   // Very Hard -> Infinite -> wrap to Very Easy
     {
         if (!engine.freeze_timer)
             engine.freeze_timer = 1;

@@ -219,12 +219,18 @@ void OStats::init_next_level()
         oinitengine.checkpoint_marker = 0;
         extend_play_timer             = 0x80;
         
-        // Calculate Time To Add
-        uint16_t time_lookup = (config.engine.dip_time * 40) + oroad.stage_lookup_off;
+        // Calculate Time To Add. dip_time 0 = Very Easy (max out the clock); 1..4 map to
+        // the ROM TIME table's Easy..Very Hard blocks (index dip_time-1).
         if (!outrun.freeze_timer)
         {
             if (outrun.cannonball_mode == outrun.MODE_ORIGINAL)
-                time_counter = outils::bcd_add(time_counter, TIME[time_lookup]);
+            {
+                if (config.engine.dip_time == 0)
+                    time_counter = outils::bcd_add(time_counter, 0x99);
+                else
+                    time_counter = outils::bcd_add(time_counter,
+                        TIME[((config.engine.dip_time - 1) * 40) + oroad.stage_lookup_off]);
+            }
             else if (outrun.cannonball_mode == outrun.MODE_CONT)
                 time_counter = outils::bcd_add(time_counter, 0x55);
 
