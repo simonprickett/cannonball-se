@@ -119,7 +119,7 @@
                   "spec": {
                     "element": {
                       "kind": "ElementReference",
-                      "name": "panel-21"
+                      "name": "panel-20"
                     },
                     "height": 13,
                     "width": 8,
@@ -171,7 +171,7 @@
                   "spec": {
                     "element": {
                       "kind": "ElementReference",
-                      "name": "panel-39"
+                      "name": "panel-40"
                     },
                     "height": 5,
                     "width": 5,
@@ -236,7 +236,7 @@
                   "spec": {
                     "element": {
                       "kind": "ElementReference",
-                      "name": "panel-40"
+                      "name": "panel-39"
                     },
                     "height": 5,
                     "width": 5,
@@ -469,46 +469,6 @@
             }
           },
           "title": "Incidents"
-        }
-      },
-      {
-        "kind": "RowsLayoutRow",
-        "spec": {
-          "collapse": false,
-          "layout": {
-            "kind": "GridLayout",
-            "spec": {
-              "items": [
-                {
-                  "kind": "GridLayoutItem",
-                  "spec": {
-                    "element": {
-                      "kind": "ElementReference",
-                      "name": "panel-20"
-                    },
-                    "height": 13,
-                    "width": 16,
-                    "x": 0,
-                    "y": 0
-                  }
-                },
-                {
-                  "kind": "GridLayoutItem",
-                  "spec": {
-                    "element": {
-                      "kind": "ElementReference",
-                      "name": "panel-22"
-                    },
-                    "height": 13,
-                    "width": 8,
-                    "x": 16,
-                    "y": 0
-                  }
-                }
-              ]
-            }
-          },
-          "title": "Route"
         }
       },
       {

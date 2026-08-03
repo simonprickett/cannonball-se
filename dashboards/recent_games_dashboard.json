@@ -1274,166 +1274,6 @@
           }
         }
       },
-      "panel-21": {
-        "kind": "Panel",
-        "spec": {
-          "id": 21,
-          "title": "\ud83d\udcf7 Final frame (game over)",
-          "description": "The game.session.end screenshot for the selected session. Caption shows completion status.",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "loki",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "grafanacloud-simonprickett-logs"
-                      },
-                      "spec": {
-                        "editorMode": "code",
-                        "queryType": "range",
-                        "expr": "{service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.session.end\" | screenshot_jpg != \"\" | line_format \"{{.screenshot_jpg}}\"",
-                        "maxLines": 1
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [
-                {
-                  "group": "organize",
-                  "kind": "Transformation",
-                  "spec": {
-                    "options": {
-                      "renameByName": {
-                        "Line": "screenshot_jpg"
-                      }
-                    }
-                  }
-                },
-                {
-                  "group": "filterFieldsByName",
-                  "kind": "Transformation",
-                  "spec": {
-                    "options": {
-                      "include": {
-                        "names": [
-                          "screenshot_jpg"
-                        ]
-                      }
-                    }
-                  }
-                }
-              ],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "marcusolsson-dynamictext-panel",
-            "version": "",
-            "spec": {
-              "options": {
-                "content": "<img src=\"data:image/jpeg;base64,{{{screenshot_jpg}}}\" style=\"width:100%;border-radius:4px\"/>",
-                "defaultContent": "Loading screenshot...",
-                "everyRow": true
-              },
-              "fieldConfig": {
-                "defaults": {},
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
-      "panel-22": {
-        "kind": "Panel",
-        "spec": {
-          "id": 22,
-          "title": "\ud83d\uddfa\ufe0f Course map",
-          "description": "The game.map_screen capture for the selected session (route overview).",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "loki",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "grafanacloud-simonprickett-logs"
-                      },
-                      "spec": {
-                        "editorMode": "code",
-                        "queryType": "range",
-                        "expr": "{service_name=\"cannonball-se\"} | session_label=\"$session\" | event=\"game.map_screen\" | screenshot_jpg != \"\" | line_format \"{{.screenshot_jpg}}\"",
-                        "maxLines": 1
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [
-                {
-                  "group": "organize",
-                  "kind": "Transformation",
-                  "spec": {
-                    "options": {
-                      "renameByName": {
-                        "Line": "screenshot_jpg"
-                      }
-                    }
-                  }
-                },
-                {
-                  "group": "filterFieldsByName",
-                  "kind": "Transformation",
-                  "spec": {
-                    "options": {
-                      "include": {
-                        "names": [
-                          "screenshot_jpg"
-                        ]
-                      }
-                    }
-                  }
-                }
-              ],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "marcusolsson-dynamictext-panel",
-            "version": "",
-            "spec": {
-              "options": {
-                "content": "<img src=\"data:image/jpeg;base64,{{{screenshot_jpg}}}\" style=\"width:100%;border-radius:4px\"/>",
-                "defaultContent": "Loading screenshot...",
-                "everyRow": true
-              },
-              "fieldConfig": {
-                "defaults": {},
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
       "panel-23": {
         "kind": "Panel",
         "spec": {
@@ -1459,7 +1299,7 @@
                         "editorMode": "code",
                         "queryType": "range",
                         "expr": "{service_name=\"cannonball-se\"} | session_label=\"$session\" | screenshot_jpg != \"\" | line_format \"{{.screenshot_jpg}}\"",
-                        "direction": "forward"
+                        "direction": "backward"
                       }
                     },
                     "refId": "A",
@@ -1476,6 +1316,20 @@
                       "renameByName": {
                         "Line": "screenshot_jpg"
                       }
+                    }
+                  }
+                },
+                {
+                  "group": "sortBy",
+                  "kind": "Transformation",
+                  "spec": {
+                    "options": {
+                      "sort": [
+                        {
+                          "field": "Time",
+                          "desc": true
+                        }
+                      ]
                     }
                   }
                 },
@@ -2340,7 +2194,7 @@
         "kind": "Panel",
         "spec": {
           "id": 38,
-          "title": "Overall Rank",
+          "title": "Rank: Overall",
           "description": "This game's rank by final score among all games in the dashboard time range (1 = highest score).",
           "links": [],
           "data": {
@@ -3060,7 +2914,7 @@
         "kind": "Panel",
         "spec": {
           "id": 39,
-          "title": "Longest time played",
+          "title": "Rank: Game duration",
           "description": "Rank by game duration among all games in the dashboard time range (1 = longest).",
           "links": [],
           "data": {
@@ -3579,7 +3433,7 @@
         "kind": "Panel",
         "spec": {
           "id": 40,
-          "title": "Most overtakes",
+          "title": "Rank: Most overtakes",
           "description": "Rank by total overtakes among all games in the dashboard time range (1 = most).",
           "links": [],
           "data": {
@@ -4098,7 +3952,7 @@
         "kind": "Panel",
         "spec": {
           "id": 41,
-          "title": "Average speed",
+          "title": "Rank: Average speed",
           "description": "Rank by average speed (km/h) among all games in the dashboard time range (1 = fastest).",
           "links": [],
           "data": {
@@ -4617,7 +4471,7 @@
         "kind": "Panel",
         "spec": {
           "id": 42,
-          "title": "Longest clean streak",
+          "title": "Rank: Clean streak",
           "description": "Rank by longest clean-driving streak among all games in the dashboard time range (1 = longest).",
           "links": [],
           "data": {
@@ -5243,7 +5097,7 @@
         "kind": "Panel",
         "spec": {
           "id": 47,
-          "title": "Fastest overtake rank",
+          "title": "Rank: Fastest overtake",
           "description": "Rank by fastest overtake speed among all games in the dashboard time range (1 = fastest).",
           "links": [],
           "data": {
@@ -7476,7 +7330,7 @@
                       "spec": {
                         "element": {
                           "kind": "ElementReference",
-                          "name": "panel-21"
+                          "name": "panel-20"
                         },
                         "height": 13,
                         "width": 8,
@@ -7528,7 +7382,7 @@
                       "spec": {
                         "element": {
                           "kind": "ElementReference",
-                          "name": "panel-39"
+                          "name": "panel-40"
                         },
                         "height": 5,
                         "width": 5,
@@ -7593,7 +7447,7 @@
                       "spec": {
                         "element": {
                           "kind": "ElementReference",
-                          "name": "panel-40"
+                          "name": "panel-39"
                         },
                         "height": 5,
                         "width": 5,
@@ -7826,46 +7680,6 @@
                 }
               },
               "title": "Incidents"
-            }
-          },
-          {
-            "kind": "RowsLayoutRow",
-            "spec": {
-              "collapse": false,
-              "layout": {
-                "kind": "GridLayout",
-                "spec": {
-                  "items": [
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "panel-20"
-                        },
-                        "height": 13,
-                        "width": 16,
-                        "x": 0,
-                        "y": 0
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "panel-22"
-                        },
-                        "height": 13,
-                        "width": 8,
-                        "x": 16,
-                        "y": 0
-                      }
-                    }
-                  ]
-                }
-              },
-              "title": "Route"
             }
           },
           {

@@ -44,8 +44,6 @@ SPECIAL = {
     # Title tweaks (+ emoji) on live-board-inherited panels — Recent-Games-only,
     # so the live/Now Playing board keeps its own plain titles.
     20: {"title": "🗺️ Route taken (map)"},
-    21: {"title": "📷 Final frame (game over)"},
-    22: {"title": "🗺️ Course map"},
     23: {"title": "📷 Key moments"},
     4: {"description": "Number of times the car went off-road (game.off_road events) in the selected game.",
         "thresholds": [{"color": "green", "value": None},   # 0-5
@@ -763,7 +761,7 @@ def rank_panel(pid, x, y, title, all_games_expr, selected_expr, description):
 
 def score_rank_panel(x, y):
     return rank_panel(
-        38, x, y, "Overall Rank",
+        38, x, y, "Rank: Overall",
         f'max by (session_label) (max_over_time({SEL} | event="game.session.end" | unwrap final_score [$__range]))',
         f'max(max_over_time({SCOPED} | event="game.session.end" | unwrap final_score [$__range]))',
         "This game's rank by final score among all games in the dashboard time range (1 = highest score).")
@@ -954,6 +952,9 @@ def build_picker(live):
             p["gridPos"]["y"] -= gap
     # Drop the "Selected game" header (id 1) — adds no value; nothing depends on it.
     d["panels"] = [p for p in d["panels"] if p.get("id") != 1]
+    # Drop the Final frame (id 21) + Course map (id 22) single-shot screenshots —
+    # removed in the v2 layout (Route map moved into the Overview row; Route row gone).
+    d["panels"] = [p for p in d["panels"] if p.get("id") not in (21, 22)]
     d["panels"].append(total_events_panel(TABLE_H))
     d["panels"].append(music_panel(4, TABLE_H))
     # Fill the rest of the header row with session totals.
@@ -1077,35 +1078,43 @@ def build_picker(live):
                 "matchFieldName": "edge_id", "matchPattern": "${id}",
                 "rules": [{"kind": "strokeColor", "colorFieldName": "taken", "thresholdId": "edge-green"}]}]
             break
-    # Final frame (id 21) + Course map (id 22): these screenshots load a beat after
-    # the rest, so show a "loading" placeholder rather than a "no screenshot" message;
-    # and make the panels tall enough for the ~640x512 image (width:100%) not to clip.
+    # Key moments (id 23): reverse the screenshot flow so the most recent (game-over)
+    # frame is first. The live board reads them oldest-first (Loki direction "forward");
+    # flip to "backward" for the picker only.
     for p in d["panels"]:
-        if p.get("id") in (21, 22):
-            p["options"]["defaultContent"] = "Loading screenshot..."
-            p["gridPos"]["h"] = 16
+        if p.get("id") == 23:
+            for t in p.get("targets", []):
+                t["direction"] = "backward"
+            # Loki returns the frame time-ascending regardless of query direction, so
+            # also sort rows by Time DESC — inserted BEFORE the field-filter that drops
+            # Time — to force the newest (game-over) screenshot to render first.
+            txs = p.get("transformations", [])
+            idx = next((i for i, t in enumerate(txs) if t.get("id") == "filterFieldsByName"), len(txs))
+            txs.insert(idx, {"id": "sortBy", "options": {"sort": [{"field": "Time", "desc": True}]}})
+            p["transformations"] = txs
+            break
     # More rank tiles in a throwaway new row (layout TBD) — same rank_panel pattern
     # as Overall Rank, each "higher = 1st".
     rank_y = max(p["gridPos"]["y"] + p["gridPos"]["h"] for p in d["panels"])
     d["panels"].append(rank_panel(
-        39, 0, rank_y, "Longest time played",
+        39, 0, rank_y, "Rank: Game duration",
         f'(max by (session_label) (max_over_time({SEL} | event="game.session.end" | unwrap end_epoch_ms [$__range])) '
         f'- max by (session_label) (max_over_time({SEL} | event="game.session.start" | unwrap start_epoch_ms [$__range]))) / 1000',
         f'(max(max_over_time({SCOPED} | event="game.session.end" | unwrap end_epoch_ms [$__range])) '
         f'- max(max_over_time({SCOPED} | event="game.session.start" | unwrap start_epoch_ms [$__range]))) / 1000',
         "Rank by game duration among all games in the dashboard time range (1 = longest)."))
     d["panels"].append(rank_panel(
-        40, 4, rank_y, "Most overtakes",
+        40, 4, rank_y, "Rank: Most overtakes",
         f'sum by (session_label) (count_over_time({SEL} | event="game.vehicle_overtake" [$__range]))',
         f'sum(count_over_time({SCOPED} | event="game.vehicle_overtake" [$__range]))',
         "Rank by total overtakes among all games in the dashboard time range (1 = most)."))
     d["panels"].append(rank_panel(
-        41, 8, rank_y, "Average speed",
+        41, 8, rank_y, "Rank: Average speed",
         f'avg by (session_label) (avg_over_time({SEL} | unwrap speed_kph [$__range]))',
         f'avg(avg_over_time({SCOPED} | unwrap speed_kph [$__range]))',
         "Rank by average speed (km/h) among all games in the dashboard time range (1 = fastest)."))
     d["panels"].append(rank_panel(
-        42, 12, rank_y, "Longest clean streak",
+        42, 12, rank_y, "Rank: Clean streak",
         f'max by (session_label) (max_over_time({SEL} | event="game.session.end" | unwrap longest_clean_seconds [$__range]))',
         f'max(max_over_time({SCOPED} | event="game.session.end" | unwrap longest_clean_seconds [$__range]))',
         "Rank by longest clean-driving streak among all games in the dashboard time range (1 = longest)."))
@@ -1114,7 +1123,7 @@ def build_picker(live):
         "Top speed (km/h) at which an overtake happened in the selected game.",
         f'max(max_over_time({SCOPED} | event="game.vehicle_overtake" | unwrap speed_kph [$__range]))'))
     d["panels"].append(rank_panel(
-        47, 20, rank_y, "Fastest overtake rank",
+        47, 20, rank_y, "Rank: Fastest overtake",
         f'max by (session_label) (max_over_time({SEL} | event="game.vehicle_overtake" | unwrap speed_kph [$__range]))',
         f'max(max_over_time({SCOPED} | event="game.vehicle_overtake" | unwrap speed_kph [$__range]))',
         "Rank by fastest overtake speed among all games in the dashboard time range (1 = fastest)."))
