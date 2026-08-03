@@ -14,6 +14,11 @@ import json, pathlib, sys
 HERE = pathlib.Path(__file__).parent
 LIVE = HERE / "live_game_dashboard.json"
 PICKER = HERE / "recent_games_dashboard.json"
+# Data-driven layout: the v2 spec.layout (RowsLayout) captured from the Grafana UI.
+# Arrange in the UI, then `gcx dashboards get cannonball-recent-games` and save its
+# spec.layout here (see dashboards/README/push.sh). Panel CONTENT stays in this
+# generator; only positions + rows/tabs live in layout.json.
+LAYOUT_FILE = HERE / "layout.json"
 
 SEL = '{service_name="cannonball-se"}'
 SCOPED = f'{SEL} | session_label="$session"'
@@ -36,6 +41,12 @@ SCORE_COLORS = ["#7e57c2", "#673ab7", "#5e35b1", "#4527a0", "#311b92"]
 # panels whose live wording ("latest", "follows it") is wrong on a pick-a-game board.
 SPECIAL = {
     16: {"description": "player_initials of the selected game."},
+    # Title tweaks (+ emoji) on live-board-inherited panels — Recent-Games-only,
+    # so the live/Now Playing board keeps its own plain titles.
+    20: {"title": "🗺️ Route taken (map)"},
+    21: {"title": "📷 Final frame (game over)"},
+    22: {"title": "🗺️ Course map"},
+    23: {"title": "📷 Key moments"},
     4: {"description": "Number of times the car went off-road (game.off_road events) in the selected game.",
         "thresholds": [{"color": "green", "value": None},   # 0-5
                        {"color": "orange", "value": 6},     # 6-12
@@ -476,7 +487,7 @@ def stage_time_bar_panel(y):
     return {
         "id": 37,
         "type": "barchart",
-        "title": "Time per stage",
+        "title": "⏱️ Time per stage",
         "description": "Total game time split by stage — each segment is the wall-clock seconds spent on that stage (stage_duration_seconds on game.stage.end, incl. the final stage to game over).",
         "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
         "gridPos": {"x": 0, "y": y, "w": 24, "h": 6},
@@ -582,7 +593,7 @@ def checkpoint_buffer_panel(pid, x, y):
     # bargauge won't render a label when only one series is returned). Low = red,
     # high = green. A is hidden; it just feeds the expression.
     return {
-        "id": pid, "type": "bargauge", "title": "Checkpoint time buffer",
+        "id": pid, "type": "bargauge", "title": "⏱️ Checkpoint time buffer",
         "description": "Seconds left on the clock at each checkpoint (game.stage.end time_remaining_seconds), stages 1-5. Uncompleted stages show 0.",
         "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
         "gridPos": {"x": x, "y": y, "w": 12, "h": 8},
@@ -736,7 +747,7 @@ def music_panel(x, y):
     return {
         "id": 33,
         "type": "stat",
-        "title": "Music",
+        "title": "🎵 Music",
         "description": "music_selection for the selected game (numeric for now; track-name mappings TBD).",
         "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
         "gridPos": {"x": x, "y": y, "w": 4, "h": 5},
@@ -1189,12 +1200,27 @@ def _v2_element(p):
     }}
 
 
-def _v2_layout_item(p):
-    g = p["gridPos"]
-    return {"kind": "GridLayoutItem", "spec": {
-        "x": g["x"], "y": g["y"], "width": g["w"], "height": g["h"],
-        "element": {"kind": "ElementReference", "name": f"panel-{p['id']}"},
-    }}
+def _load_layout(element_names):
+    # Return the v2 layout object (RowsLayout) from layout.json. Panel gridPos in
+    # build_picker is now ignored for v2 — layout is owned by layout.json, captured
+    # from the UI. Safety net: any generated panel missing from the saved layout is
+    # appended to a trailing "Unplaced" row so a newly-added panel never silently
+    # vanishes before it's arranged in the UI.
+    layout = json.loads(LAYOUT_FILE.read_text())
+    placed = set()
+    for row in layout.get("spec", {}).get("rows", []):
+        for it in row["spec"]["layout"]["spec"]["items"]:
+            placed.add(it["spec"]["element"]["name"])
+    missing = [n for n in element_names if n not in placed]
+    if missing:
+        print(f"  NOTE: {len(missing)} panel(s) not placed in layout.json -> appended "
+              f"to an 'Unplaced' row (arrange in the UI, then re-pull): {missing}", file=sys.stderr)
+        items = [{"kind": "GridLayoutItem",
+                  "spec": {"element": {"kind": "ElementReference", "name": n}}} for n in missing]
+        layout.setdefault("spec", {}).setdefault("rows", []).append(
+            {"kind": "RowsLayoutRow", "spec": {"title": "Unplaced", "collapse": False,
+             "layout": {"kind": "GridLayout", "spec": {"items": items}}}})
+    return layout
 
 
 def _v2_variables(tlist):
@@ -1226,8 +1252,7 @@ def to_v2(v1):
             "description": v1.get("description", ""),
             "editable": v1.get("editable", True),
             "elements": {f"panel-{p['id']}": _v2_element(p) for p in v1["panels"]},
-            "layout": {"kind": "GridLayout",
-                       "spec": {"items": [_v2_layout_item(p) for p in v1["panels"]]}},
+            "layout": _load_layout([f"panel-{p['id']}" for p in v1["panels"]]),
             "links": v1.get("links", []),
             "liveNow": v1.get("liveNow", True),
             "preload": v1.get("preload", True),
@@ -1256,9 +1281,10 @@ def main():
                    if 'session_label="$session"' in t.get("expr", ""))
     picker = to_v2(picker_v1)  # remap to the v2 manifest
     PICKER.write_text(json.dumps(picker, indent=2) + "\n")
+    rows = picker["spec"]["layout"]["spec"]["rows"]
     print(f"Generated {PICKER.name} (v2 schema) from {LIVE.name}: "
           f"{len(picker['spec']['elements'])} panels, "
-          f"{len(picker['spec']['layout']['spec']['items'])} layout items, "
+          f"{len(rows)} layout rows ({', '.join(r['spec']['title'] for r in rows)}), "
           f"{n_expr} session-scoped query rewrites, {n_scoped} targets filtered by session_label.")
 
 if __name__ == "__main__":
