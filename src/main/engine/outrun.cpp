@@ -61,6 +61,8 @@ Outrun::Outrun()
     outputs = new OOutputs();
     gameover_screenshot_delay = 0;
     map_screenshot_taken = false;
+    goal_screenshot_delay = 0;
+    goal_screenshot_taken = false;
 }
 
 Outrun::~Outrun()
@@ -440,7 +442,14 @@ void Outrun::main_switch()
             omusic.play_music();
 
             if (!freeze_timer)
-                ostats.time_counter = ostats.TIME[config.engine.dip_time * 40]; // Set time to begin level with
+            {
+                // Set time to begin level with. dip_time 0 = Very Easy (max clock);
+                // 1..4 map to the ROM TIME table's Easy..Very Hard blocks (dip_time-1).
+                if (config.engine.dip_time == 0)
+                    ostats.time_counter = 0x99;
+                else
+                    ostats.time_counter = ostats.TIME[(config.engine.dip_time - 1) * 40];
+            }
             else
                 ostats.time_counter = 0x30;
 
@@ -482,14 +491,21 @@ void Outrun::main_switch()
                 std::string mode = (cannonball_mode == MODE_TTRIAL) ? "time_trial" : 
                                    (cannonball_mode == MODE_CONT) ? "continuous" : "original";
                 TelemetryManager::instance().start_game_session(mode, omusic.get_music_selected(), oname.get_initials());
+                // Capture the start-line frame: car sat at the lights, countdown just hit GO.
+                std::string start_screenshot_b64 = video.capture_screenshot_base64();
                 TelemetryManager::instance().log_game_event("game.session.start",
                     TelemetryManager::SEV_INFO,
                     {
                         {"game_mode", mode},
-                        {"player_initials", oname.get_initials()}
+                        {"player_initials", oname.get_initials()},
+                        {"gearbox_mode", (config.controls.gear == config.controls.GEAR_AUTO) ? "automatic" : "manual"},
+                        {"screenshot_jpg", start_screenshot_b64}
                     },
                     {
-                        {"music_selection", (int64_t)omusic.get_music_selected()}
+                        {"music_selection", (int64_t)omusic.get_music_selected()},
+                        // Epoch-ms start time so dashboards can topk() the newest session
+                        // and auto-scope every panel to the latest game's trace_id.
+                        {"start_epoch_ms", TelemetryManager::now_epoch_ms()}
                     }
                 );
 
@@ -525,11 +541,27 @@ void Outrun::main_switch()
             oroad.road_load_end   |= BIT_0;             // Instruct CPU 1 to load end road section
             ostats.game_completed |= BIT_0;             // Denote game completed
             obonus.bonus_timer = 3600;                  // Safety Timer Added in Rev. A Roms
+            // Arm the "reached the goal" screenshot. The car drives the whole bonus
+            // road first; only once it parks at the finish does bonus_control reach
+            // BONUS_SEQ0 (the flag-waving end sequence). This delay is the settle
+            // time AFTER arrival so the celebration is on screen.
+            goal_screenshot_delay = 45;                 // ~0.75s @ 60fps; tune on Pi
+            goal_screenshot_taken = false;
             game_state = GS_BONUS;
 
             [[fallthrough]];
 
         case GS_BONUS:
+            // Once the car has parked at the goal (end-sequence animation running),
+            // let the flag/crowd celebration settle then grab the frame. Reuse
+            // gameover_screenshot_b64 so game.session.end carries it for completed
+            // games (the GAME OVER path never captures on a completion).
+            if (!goal_screenshot_taken && obonus.bonus_control >= OBonus::BONUS_SEQ0
+                && --goal_screenshot_delay <= 0)
+            {
+                goal_screenshot_taken = true;
+                gameover_screenshot_b64 = video.capture_screenshot_base64();
+            }
             if (--obonus.bonus_timer < 0)
             {
                 obonus.bonus_control = OBonus::BONUS_DISABLE;
@@ -568,7 +600,10 @@ void Outrun::main_switch()
                 ohud.blit_text_new(31, 18, Utils::to_string((int) ttrial.crashes).c_str(), OHud::GREEN);
             }
             osoundint.queue_sound(sound::NEW_COMMAND);
-            gameover_screenshot_delay = 2;  // wait for GAME OVER text to render
+            // Only capture the GAME OVER frame when the player did NOT complete the
+            // game. On a completion we already grabbed the car parked at the goal in
+            // GS_BONUS and must not overwrite it here.
+            gameover_screenshot_delay = (ostats.game_completed & BIT_0) ? 0 : 2;
             game_state = GS_GAMEOVER;
             [[fallthrough]];
 
@@ -700,7 +735,13 @@ void Outrun::main_switch()
                 // Save score and final stage before reinit resets them
                 int64_t final_score = TelemetryManager::bcd_score_to_decimal(ostats.score);
                 int final_stage = ostats.cur_stage + 1;
+                // Wall-clock seconds on the final stage (start -> game over). The final
+                // stage never hits a mid-game transition, so this is its only duration.
+                int64_t final_stage_duration = TelemetryManager::instance().get_current_stage_duration_seconds();
                 std::string completion = (ostats.game_completed & BIT_0) ? "completed" : "timeout";
+                // Numeric form of completion so dashboards can unwrap/last_over_time it
+                // (1 = completed, 2 = timed out). Drives the 3-state Session panel.
+                int64_t completion_code = (ostats.game_completed & BIT_0) ? 1 : 2;
                 
                 oinitengine.init(cannonball_mode == MODE_TTRIAL ? ttrial.level : 0);
                 //ROM:0000B716                 bclr    #0,(byte_260550).l
@@ -708,6 +749,17 @@ void Outrun::main_switch()
                 // End post-game span and game session
                 TelemetryManager::instance().end_post_game_span();
                 TelemetryManager::instance().log_game_event("game.post_game.end", TelemetryManager::SEV_INFO);
+                // Emit the final stage's stage.end (it has no mid-game transition) so
+                // time-per-stage dashboards cover every stage and sum to the game duration.
+                TelemetryManager::instance().log_game_event("game.stage.end",
+                    TelemetryManager::SEV_INFO,
+                    {},
+                    {
+                        {"stage_number", (int64_t)final_stage},
+                        {"score_end", final_score},
+                        {"stage_duration_seconds", final_stage_duration}
+                    }
+                );
                 // Log session.end BEFORE ending the session span, so the record still carries
                 // trace_id/span_id (every per-session dashboard query relies on it).
                 TelemetryManager::instance().log_game_event("game.session.end",
@@ -720,7 +772,11 @@ void Outrun::main_switch()
                         {"final_score", final_score},
                         {"final_stage", (int64_t)final_stage},
                         // Longest continuous clean-driving stretch (wall-clock seconds).
-                        {"longest_clean_seconds", TelemetryManager::instance().get_longest_clean_seconds()}
+                        {"longest_clean_seconds", TelemetryManager::instance().get_longest_clean_seconds()},
+                        // End time (epoch ms) so the dashboard can tell IN PROGRESS from FINISHED
+                        // by comparing the latest start vs latest end, at any time range.
+                        {"end_epoch_ms", TelemetryManager::now_epoch_ms()},
+                        {"completion_code", completion_code}
                     }
                 );
                 TelemetryManager::instance().end_game_session(final_score, completion, final_stage);

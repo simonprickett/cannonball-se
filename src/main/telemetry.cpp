@@ -11,6 +11,7 @@
 #include <iomanip>
 #include <chrono>
 #include <algorithm>
+#include <ctime>
 
 #include "opentelemetry/sdk/trace/tracer_provider.h"
 #include "opentelemetry/sdk/trace/batch_span_processor.h"
@@ -36,6 +37,9 @@ struct TelemetryImpl {
     opentelemetry::nostd::shared_ptr<opentelemetry::sdk::logs::LoggerProvider> log_provider;
     opentelemetry::nostd::shared_ptr<opentelemetry::logs::Logger> logger;
     std::string current_player_initials;
+    // Human-readable, time-sortable session id ("YYYY-MM-DD HH:MM:SS.mmm INITIALS MODE").
+    // Attached to every in-session log so dashboards can offer a newest-first session dropdown.
+    std::string current_session_label;
     // Clean-driving streak tracking (wall-clock). Reset at session start, updated on each
     // crash/off-road, folded with the tail when read at session end.
     std::chrono::steady_clock::time_point last_incident_time{};
@@ -227,6 +231,21 @@ void TelemetryManager::start_game_session(const std::string& game_mode, int musi
         // Store player initials for attaching to all in-session logs
         impl_->current_player_initials = player_initials;
 
+        // Build a readable, time-sortable session label for the dashboard session picker.
+        {
+            auto now = std::chrono::system_clock::now();
+            std::time_t tt = std::chrono::system_clock::to_time_t(now);
+            int ms = (int)(std::chrono::duration_cast<std::chrono::milliseconds>(
+                        now.time_since_epoch()).count() % 1000);
+            std::tm tmv{};
+            localtime_r(&tt, &tmv);
+            std::ostringstream lbl;
+            lbl << std::put_time(&tmv, "%Y-%m-%d %H:%M:%S")
+                << '.' << std::setfill('0') << std::setw(3) << ms
+                << ' ' << player_initials;
+            impl_->current_session_label = lbl.str();
+        }
+
         // Reset clean-driving streak tracking for the new session
         impl_->last_incident_time = std::chrono::steady_clock::now();
         impl_->longest_clean_seconds = 0;
@@ -238,6 +257,23 @@ void TelemetryManager::start_game_session(const std::string& game_mode, int musi
             impl_->game_session_span->SetAttribute("game_mode", game_mode);
             impl_->game_session_span->SetAttribute("music_selection", music_selection);
             impl_->game_session_span->SetAttribute("player_initials", player_initials);
+            // Also a span attribute (not just a log attribute) so Tempo can enumerate it as a
+            // searchable tag. Time-sortable, so a Tempo label_values variable sorted descending
+            // surfaces the newest game first; the Loki panels then filter by this same value.
+            impl_->game_session_span->SetAttribute("session_label", impl_->current_session_label);
+
+            // The game_session span stays open until game-over, so it isn't exported to Tempo
+            // during play — which would stop the in-progress game appearing in the session
+            // picker. Emit a short-lived child marker span that carries session_label and ends
+            // immediately, so it exports within the batch interval (~5s) and the live game
+            // becomes selectable almost right away.
+            opentelemetry::trace::StartSpanOptions marker_opts;
+            marker_opts.parent = impl_->game_session_span->GetContext();
+            auto marker = impl_->tracer->StartSpan("session_marker", marker_opts);
+            if (marker) {
+                marker->SetAttribute("session_label", impl_->current_session_label);
+                marker->End();
+            }
         }
     } catch (const std::exception& e) {
         std::cerr << "TelemetryManager: Error starting game session: " << e.what() << std::endl;
@@ -277,7 +313,16 @@ int64_t TelemetryManager::get_longest_clean_seconds() const {
     return std::max(impl_->longest_clean_seconds, tail);
 }
 
+int64_t TelemetryManager::now_epoch_ms() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+}
+
 void TelemetryManager::start_stage_span(int stage_num, int64_t score_start) {
+    // Record wall-clock start even if tracing is disabled, so stage_duration_seconds
+    // (a Loki log attribute) is correct regardless of the trace pipeline.
+    stage_start_epoch_ms_ = now_epoch_ms();
+
     if (!initialized_ || !impl_->tracer || !impl_->game_session_span) return;
 
     try {
@@ -306,12 +351,18 @@ void TelemetryManager::start_stage_span(int stage_num, int64_t score_start) {
     }
 }
 
+int64_t TelemetryManager::get_current_stage_duration_seconds() const {
+    if (stage_start_epoch_ms_ <= 0) return -1;
+    return (now_epoch_ms() - stage_start_epoch_ms_) / 1000;
+}
+
 void TelemetryManager::end_stage_span(int time_remaining_seconds, int64_t score_end) {
     if (!initialized_ || !impl_->stage_span) return;
 
     try {
         impl_->stage_span->SetAttribute("time_remaining_seconds", time_remaining_seconds);
         impl_->stage_span->SetAttribute("score_end", score_end);
+        impl_->stage_span->SetAttribute("stage_duration_seconds", get_current_stage_duration_seconds());
         impl_->stage_span->End();
         impl_->stage_span = nullptr;
     } catch (const std::exception& e) {
@@ -494,6 +545,10 @@ void TelemetryManager::log_game_event(
 
         if (!impl_->current_player_initials.empty()) {
             log_record->SetAttribute("player_initials", impl_->current_player_initials);
+        }
+
+        if (!impl_->current_session_label.empty()) {
+            log_record->SetAttribute("session_label", impl_->current_session_label);
         }
 
         for (const auto& kv : string_attrs) {

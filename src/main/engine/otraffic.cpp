@@ -39,7 +39,10 @@ static void decode_sega_color(uint16_t c, int& r, int& g, int& b)
 
 // Return the dominant color name for a sprite palette index.
 // Each entry in PALETTE_EXPANSION is 8 uint32s = 16 colors (two per uint32, big-endian).
-// We find the most saturated non-shadow, non-highlight color and match it to a name.
+// We find the most saturated non-shadow, non-highlight color, then name it by HUE
+// (plus a brightness test to split brown from orange and pink from purple). Hue-based
+// naming is far more robust than RGB nearest-neighbour, which used to mis-file dark
+// reds as brown and left pink/orange one rounding error away from flipping.
 static const char* pal_src_to_color(uint8_t pal_src)
 {
     int max_pal = (int)(sizeof(PALETTE_EXPANSION) / sizeof(PALETTE_EXPANSION[0])) / 8;
@@ -64,27 +67,24 @@ static const char* pal_src_to_color(uint8_t pal_src)
 
     if (best_sat < 30) return "grey";
 
-    struct NamedColor { const char* name; int r, g, b; };
-    static const NamedColor COLORS[] = {
-        { "red",    210,  30,  30 },
-        { "orange", 210, 120,  20 },
-        { "yellow", 200, 200,  20 },
-        { "green",   20, 180,  20 },
-        { "cyan",    20, 200, 200 },
-        { "blue",    20,  20, 200 },
-        { "purple", 150,  20, 180 },
-        { "pink",   220,  80, 150 },
-        { "brown",  150,  80,  30 },
-    };
+    // HSV hue (degrees, 0-360) and value (0-1) of the dominant body color.
+    int mx = std::max({best_r, best_g, best_b});
+    int delta = best_sat;                        // mx - mn (guaranteed > 0 here)
+    double hue;
+    if (mx == best_r)      hue = 60.0 * ((double)(best_g - best_b) / delta);
+    else if (mx == best_g) hue = 60.0 * (2.0 + (double)(best_b - best_r) / delta);
+    else                   hue = 60.0 * (4.0 + (double)(best_r - best_g) / delta);
+    if (hue < 0.0) hue += 360.0;
+    double value = mx / 255.0;
 
-    const char* best_name = "grey";
-    int best_dist = INT_MAX;
-    for (const auto& nc : COLORS) {
-        int dr = best_r - nc.r, dg = best_g - nc.g, db = best_b - nc.b;
-        int dist = dr*dr + dg*dg + db*db;
-        if (dist < best_dist) { best_dist = dist; best_name = nc.name; }
-    }
-    return best_name;
+    if (hue < 15.0 || hue >= 345.0) return "red";
+    if (hue < 45.0)  return value < 0.65 ? "brown" : "orange"; // brown = dark orange
+    if (hue < 72.0)  return "yellow";
+    if (hue < 165.0) return "green";
+    if (hue < 200.0) return "cyan";
+    if (hue < 250.0) return "blue";
+    if (hue < 292.0) return "purple";
+    return value >= 0.55 ? "pink" : "purple";                  // pink = light magenta
 }
 
 OTraffic otraffic;

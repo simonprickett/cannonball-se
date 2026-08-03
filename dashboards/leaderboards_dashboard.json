@@ -1,0 +1,726 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_LOKI",
+      "label": "Loki",
+      "description": "Loki data source holding cannonball-se game event logs",
+      "type": "datasource",
+      "pluginId": "loki",
+      "pluginName": "Loki"
+    }
+  ],
+  "__requires": [
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "13.0.0"
+    },
+    {
+      "type": "datasource",
+      "id": "loki",
+      "name": "Loki",
+      "version": "1.0.0"
+    }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Per-run leaderboards (Hall of Fame) for Cannonball-SE. Each board ranks the top 10 game runs (one row per session / trace_id, labelled by player_initials) by a metric, over the selected time range. NOTE: player_initials is not a unique identity \u2014 the same initials from different people collapse together, which is why ranking is per-run. Tables are best-effort sorted descending; click a column header to re-sort. Bounded by Loki retention and the time picker.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "type": "table",
+      "title": "\ud83c\udfc6 Top Scores",
+      "description": "Highest final_score per game run.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          },
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "topk(10, max by (trace_id, player_initials) (max_over_time({service_name=\"cannonball-se\"} | event=\"game.session.end\" | player_initials=~\"$player\" | unwrap final_score [$__range])))"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "tsNs": true,
+              "trace_id": true,
+              "id": true,
+              "labels": true,
+              "Line": true
+            },
+            "renameByName": {
+              "player_initials": "Player",
+              "Value": "Score"
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "Score",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "\ud83d\udca8 Fastest Average Speed",
+      "description": "Mean speed_kph per run (sampled at logged events, not a true whole-lap mean).",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 2,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          },
+          "unit": "velocitykmh",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "topk(10, avg by (trace_id, player_initials) (avg_over_time({service_name=\"cannonball-se\"} | player_initials=~\"$player\" | unwrap speed_kph [$__range])))"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "tsNs": true,
+              "trace_id": true,
+              "id": true,
+              "labels": true,
+              "Line": true
+            },
+            "renameByName": {
+              "player_initials": "Player",
+              "Value": "Avg kph"
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "Avg kph",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "\ud83d\ude97 Most Overtakes",
+      "description": "Vehicles overtaken per run.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 9
+      },
+      "id": 3,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          },
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "topk(10, sum by (trace_id, player_initials) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.vehicle_overtake\" | player_initials=~\"$player\" [$__range])))"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "tsNs": true,
+              "trace_id": true,
+              "id": true,
+              "labels": true,
+              "Line": true
+            },
+            "renameByName": {
+              "player_initials": "Player",
+              "Value": "Overtakes"
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "Overtakes",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "\ud83d\udca5 Most Crashes",
+      "description": "Crashes per run (hall of shame).",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 9
+      },
+      "id": 4,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          },
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "topk(10, sum by (trace_id, player_initials) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.crash\" | player_initials=~\"$player\" [$__range])))"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "tsNs": true,
+              "trace_id": true,
+              "id": true,
+              "labels": true,
+              "Line": true
+            },
+            "renameByName": {
+              "player_initials": "Player",
+              "Value": "Crashes"
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "Crashes",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "\ud83d\udede Most Off-Road",
+      "description": "Off-road incidents per run.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 18
+      },
+      "id": 5,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          },
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "topk(10, sum by (trace_id, player_initials) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.off_road\" | player_initials=~\"$player\" [$__range])))"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "tsNs": true,
+              "trace_id": true,
+              "id": true,
+              "labels": true,
+              "Line": true
+            },
+            "renameByName": {
+              "player_initials": "Player",
+              "Value": "Off-road"
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "Off-road",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "\ud83d\udd25 Fastest Crash",
+      "description": "Highest speed_kph at the moment of a crash.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 18
+      },
+      "id": 6,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          },
+          "unit": "velocitykmh",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "topk(10, max by (trace_id, player_initials) (max_over_time({service_name=\"cannonball-se\"} | event=\"game.crash\" | player_initials=~\"$player\" | unwrap speed_kph [$__range])))"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "tsNs": true,
+              "trace_id": true,
+              "id": true,
+              "labels": true,
+              "Line": true
+            },
+            "renameByName": {
+              "player_initials": "Player",
+              "Value": "Crash kph"
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "Crash kph",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "\ud83c\udfc1 Furthest Reached",
+      "description": "Highest stage_number reached (ties are common \u2014 many runs reach the final stage).",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 27
+      },
+      "id": 7,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          },
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "topk(10, max by (trace_id, player_initials) (max_over_time({service_name=\"cannonball-se\"} | player_initials=~\"$player\" | unwrap stage_number [$__range])))"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "tsNs": true,
+              "trace_id": true,
+              "id": true,
+              "labels": true,
+              "Line": true
+            },
+            "renameByName": {
+              "player_initials": "Player",
+              "Value": "Stage"
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "Stage",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "\ud83e\uddca Longest Clean Streak",
+      "description": "Longest continuous time (s) without a crash or off-road, per run. Sourced from the longest_clean_seconds attribute on game.session.end (computed wall-clock in TelemetryManager).",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 27
+      },
+      "id": 8,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          },
+          "unit": "s",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "topk(10, max by (trace_id, player_initials) (max_over_time({service_name=\"cannonball-se\"} | event=\"game.session.end\" | player_initials=~\"$player\" | unwrap longest_clean_seconds [$__range])))"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "tsNs": true,
+              "trace_id": true,
+              "id": true,
+              "labels": true,
+              "Line": true
+            },
+            "renameByName": {
+              "player_initials": "Player",
+              "Value": "Clean secs"
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "Clean secs",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "refresh": "5m",
+  "schemaVersion": 39,
+  "tags": [
+    "cannonball-se",
+    "loki",
+    "game",
+    "leaderboard"
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "DS_LOKI",
+        "label": "Loki data source",
+        "type": "datasource",
+        "query": "loki",
+        "current": {},
+        "hide": 2,
+        "refresh": 1,
+        "regex": ""
+      },
+      {
+        "name": "player",
+        "label": "Player initials (regex)",
+        "description": "Filter to one player's runs. Leave as .* for everyone.",
+        "type": "textbox",
+        "query": ".*",
+        "current": {
+          "text": ".*",
+          "value": ".*"
+        },
+        "hide": 0
+      }
+    ]
+  },
+  "time": {
+    "from": "now-90d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Cannonball-SE \u2014 Leaderboards",
+  "uid": "cannonball-leaderboards",
+  "version": 1,
+  "weekStart": ""
+}

@@ -1,0 +1,1473 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_LOKI",
+      "label": "Loki",
+      "description": "Loki data source holding cannonball-se game event logs",
+      "type": "datasource",
+      "pluginId": "loki",
+      "pluginName": "Loki"
+    }
+  ],
+  "__requires": [
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "13.0.0"
+    },
+    {
+      "type": "datasource",
+      "id": "loki",
+      "name": "Loki",
+      "version": "1.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "grafana-graphviz-panel",
+      "name": "Graphviz",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "marcusolsson-dynamictext-panel",
+      "name": "Dynamic Text",
+      "version": ""
+    }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Hands-off live view that always follows the current/most-recent Cannonball-SE game \u2014 no session picker. Identity, session state, stage reached and the game-over/map screenshots use last_over_time / newest and are correct at any range. The aggregation panels (counts, by-type charts, route map, timeline, stage strip, top/avg speed) are time-window scoped, so keep the range short (default now-15m) so it holds one game. For exact/historical selection use the 'Last Game' dashboard instead. Requires grafana-graphviz-panel and dalvany-image-panel.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "liveNow": true,
+  "panels": [
+    {
+      "type": "logs",
+      "title": "Latest game",
+      "description": "The most recently started game \u2014 this board always follows it, no picker.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 5
+      },
+      "id": 1,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "range",
+          "maxLines": 1,
+          "expr": "{service_name=\"cannonball-se\"} | event=\"game.session.start\" | line_format \"{{.session_label}}  mode={{.game_mode}}\""
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Game state",
+      "description": "Is a game being played right now? Latest start newer than latest end = IN PROGRESS; otherwise the cabinet is in ATTRACT MODE. The last game's outcome (Completed / Timed Out) is on the Session result and Final score panels.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 4,
+        "h": 4
+      },
+      "id": 2,
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "IN PROGRESS",
+                  "color": "green",
+                  "index": 0
+                },
+                "0": {
+                  "text": "ATTRACT MODE",
+                  "color": "blue",
+                  "index": 1
+                }
+              }
+            }
+          ],
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "(max(last_over_time({service_name=\"cannonball-se\"} | event=\"game.session.start\" | unwrap start_epoch_ms [$__range])) or vector(0)) > bool (max(last_over_time({service_name=\"cannonball-se\"} | event=\"game.session.end\" | unwrap end_epoch_ms [$__range])) or vector(0))"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Stage reached",
+      "description": "Highest stage_number seen across any event in this session. Works for in-progress games (does not rely on final_stage from the end event).",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 5,
+        "w": 8,
+        "h": 4
+      },
+      "id": 14,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "max": 5,
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "1",
+                  "color": "#e53935",
+                  "index": 0
+                },
+                "2": {
+                  "text": "2",
+                  "color": "#fb8c00",
+                  "index": 1
+                },
+                "3": {
+                  "text": "3",
+                  "color": "#fdd835",
+                  "index": 2
+                },
+                "4": {
+                  "text": "4",
+                  "color": "#7cb342",
+                  "index": 3
+                },
+                "5": {
+                  "text": "5",
+                  "color": "#1e88e5",
+                  "index": 4
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "transparent"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "max(last_over_time({service_name=\"cannonball-se\"} | event=\"game.stage.start\" | unwrap stage_number [$__range]))"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Off-road",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 5,
+        "w": 8,
+        "h": 4
+      },
+      "id": 4,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "orange"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "sum(count_over_time({service_name=\"cannonball-se\"} | event=\"game.off_road\" [$__range]))"
+        }
+      ]
+    },
+    {
+      "type": "gauge",
+      "title": "Avg speed",
+      "description": "Mean speed_kph across this session's events. NOTE: speed_kph is only logged on crash / off-road / stage-start / route / overtake events, so this is a sampled average weighted toward eventful moments, not a true whole-lap mean.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 9,
+        "w": 8,
+        "h": 6
+      },
+      "id": 15,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "velocitykmh",
+          "min": 0,
+          "max": 300,
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#e57373",
+                "value": null
+              },
+              {
+                "color": "#ffb74d",
+                "value": 100
+              },
+              {
+                "color": "#fff176",
+                "value": 180
+              },
+              {
+                "color": "#81c784",
+                "value": 250
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "barShape": "flat",
+        "barWidthFactor": 0.5,
+        "effects": {
+          "barGlow": false,
+          "centerGlow": false,
+          "gradient": false
+        },
+        "endpointMarker": "point",
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "segmentCount": 1,
+        "segmentSpacing": 0.3,
+        "shape": "gauge",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto",
+        "sparkline": false,
+        "style": "circle",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "avg(avg_over_time({service_name=\"cannonball-se\"} | unwrap speed_kph [$__range]))"
+        }
+      ]
+    },
+    {
+      "type": "gauge",
+      "title": "Top speed",
+      "description": "Highest speed_kph seen across any event in this session.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 9,
+        "w": 8,
+        "h": 6
+      },
+      "id": 6,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "velocitykmh",
+          "min": 0,
+          "max": 300,
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#e57373",
+                "value": null
+              },
+              {
+                "color": "#ffb74d",
+                "value": 100
+              },
+              {
+                "color": "#fff176",
+                "value": 180
+              },
+              {
+                "color": "#81c784",
+                "value": 250
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "barShape": "flat",
+        "barWidthFactor": 0.5,
+        "effects": {
+          "barGlow": false,
+          "centerGlow": false,
+          "gradient": false
+        },
+        "endpointMarker": "point",
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "segmentCount": 1,
+        "segmentSpacing": 0.3,
+        "shape": "gauge",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto",
+        "sparkline": false,
+        "style": "circle",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "max(max_over_time({service_name=\"cannonball-se\"} | unwrap speed_kph [$__range]))"
+        }
+      ]
+    },
+    {
+      "type": "gauge",
+      "title": "Score",
+      "description": "Most recent score \u2014 updates live during the game via in-game events.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 8,
+        "h": 6
+      },
+      "id": 7,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "max": 6000000,
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#e57373",
+                "value": null
+              },
+              {
+                "color": "#ffb74d",
+                "value": 1500000
+              },
+              {
+                "color": "#fff176",
+                "value": 3000000
+              },
+              {
+                "color": "#81c784",
+                "value": 4500000
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "barShape": "flat",
+        "barWidthFactor": 0.5,
+        "effects": {
+          "barGlow": false,
+          "centerGlow": false,
+          "gradient": false
+        },
+        "endpointMarker": "point",
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "segmentCount": 1,
+        "segmentSpacing": 0.3,
+        "shape": "circle",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto",
+        "sparkline": false,
+        "style": "circle",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "max(last_over_time({service_name=\"cannonball-se\"} | unwrap score [$__range]))"
+        }
+      ]
+    },
+    {
+      "type": "bargauge",
+      "title": "Crashes by type",
+      "description": "Crash count grouped by crash_type (bump / spin / flip) for the selected session.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 15,
+        "w": 8,
+        "h": 8
+      },
+      "id": 3,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "shades",
+            "fixedColor": "#e57373"
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "bump": {
+                  "text": "Bump",
+                  "index": 0
+                },
+                "flip": {
+                  "text": "Flip",
+                  "index": 1
+                },
+                "spin": {
+                  "text": "Spin",
+                  "index": 2
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "lcd",
+        "orientation": "horizontal",
+        "valueMode": "color",
+        "showUnfilled": true,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "legendFormat": "{{crash_type}}",
+          "expr": "sum by (crash_type) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.crash\" [$__range]))"
+        }
+      ]
+    },
+    {
+      "type": "bargauge",
+      "title": "Overtakes by vehicle",
+      "description": "Overtake count grouped by vehicle (porsche, corvette, bmw, beetle, pickup, truck).",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 15,
+        "w": 8,
+        "h": 8
+      },
+      "id": 5,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "shades",
+            "fixedColor": "#ffb74d"
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "truck": {
+                  "text": "Truck",
+                  "index": 0
+                },
+                "beetle": {
+                  "text": "Beetle",
+                  "index": 1
+                },
+                "corvette": {
+                  "text": "Corvette",
+                  "index": 2
+                },
+                "pickup": {
+                  "text": "Pickup",
+                  "index": 3
+                },
+                "bmw": {
+                  "text": "BMW",
+                  "index": 4
+                },
+                "porsche": {
+                  "text": "Porsche",
+                  "index": 5
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "lcd",
+        "orientation": "horizontal",
+        "valueMode": "color",
+        "showUnfilled": true,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "legendFormat": "{{vehicle}}",
+          "expr": "sum by (vehicle) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.vehicle_overtake\" [$__range]))"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "Value #A",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "type": "logs",
+      "title": "Session result (end event)",
+      "description": "The game.session.end line for the selected session \u2014 completion status, final score and stage. Blank while a game is in progress.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 23,
+        "w": 12,
+        "h": 5
+      },
+      "id": 8,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "range",
+          "maxLines": 1,
+          "expr": "{service_name=\"cannonball-se\"} | event=\"game.session.end\" | line_format \"result={{.completion_status}}  final_score={{.final_score}}  final_stage={{.final_stage}}  clean={{.longest_clean_seconds}}s\""
+        }
+      ]
+    },
+    {
+      "type": "logs",
+      "title": "Crashes this game",
+      "description": "Every game.crash for the selected session, with stage, crash type and speed.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 23,
+        "w": 12,
+        "h": 8
+      },
+      "id": 10,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "range",
+          "expr": "{service_name=\"cannonball-se\"} | event=\"game.crash\" | line_format \"Stage {{.stage_number}}: {{.crash_type}} @ {{.speed_kph}}kph (score {{.score}})\""
+        }
+      ]
+    },
+    {
+      "type": "logs",
+      "title": "Full event timeline (this game)",
+      "description": "Every event for the selected session in time order \u2014 the complete story of one game.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 31,
+        "w": 24,
+        "h": 8
+      },
+      "id": 11,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Ascending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "range",
+          "expr": "{service_name=\"cannonball-se\"} | line_format \"{{.event}}  stage={{.stage_number}}  speed={{.speed_kph}}  score={{.score}}\""
+        }
+      ]
+    },
+    {
+      "type": "grafana-graphviz-panel",
+      "title": "Route taken (map)",
+      "description": "The OutRun map. Nodes visited by the selected session are populated with a visit count via the panel's node-id matching (node id = stage_id). Every stage 1-5 emits game.stage.start, including Coconut Beach (stage_id 0), so the whole route populates. Tip: add a Node override coloured by the injected value to fully highlight the path.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 39,
+        "w": 18,
+        "h": 14
+      },
+      "id": 20,
+      "options": {
+        "inputMode": "code",
+        "dotDiagram": "digraph OutRun {\n  rankdir=LR;\n  bgcolor=\"transparent\";\n  node [shape=box, style=\"rounded,filled\", fontname=\"Helvetica\", fontsize=11, color=\"#33333322\", penwidth=1.5];\n  edge [arrowsize=0.7, color=\"#9e9e9e\", penwidth=1.2];\n\n  // Stage 1\n  \"0\"  [label=\"Coconut Beach\\n${visits}\",   fillcolor=\"#e53935\", fontcolor=\"white\"];\n\n  // Stage 2  (top = most-left = higher id)\n  \"9\"  [label=\"Gateway\\n${visits}\",         fillcolor=\"#fb8c00\", fontcolor=\"white\"];\n  \"8\"  [label=\"Devil's Canyon\\n${visits}\",  fillcolor=\"#fb8c00\", fontcolor=\"white\"];\n\n  // Stage 3\n  \"18\" [label=\"Desert\\n${visits}\",          fillcolor=\"#fdd835\", fontcolor=\"black\"];\n  \"17\" [label=\"Alps\\n${visits}\",            fillcolor=\"#fdd835\", fontcolor=\"black\"];\n  \"16\" [label=\"Cloudy Mountain\\n${visits}\", fillcolor=\"#fdd835\", fontcolor=\"black\"];\n\n  // Stage 4\n  \"27\" [label=\"Wilderness\\n${visits}\",      fillcolor=\"#7cb342\", fontcolor=\"white\"];\n  \"26\" [label=\"Old Capital\\n${visits}\",     fillcolor=\"#7cb342\", fontcolor=\"white\"];\n  \"25\" [label=\"Wheat Field\\n${visits}\",     fillcolor=\"#7cb342\", fontcolor=\"white\"];\n  \"24\" [label=\"Seaside Town\\n${visits}\",    fillcolor=\"#7cb342\", fontcolor=\"white\"];\n\n  // Stage 5 (goals)\n  \"36\" [label=\"Vineyard\\n${visits}\",        fillcolor=\"#1e88e5\", fontcolor=\"white\"];\n  \"35\" [label=\"Death Valley\\n${visits}\",    fillcolor=\"#1e88e5\", fontcolor=\"white\"];\n  \"34\" [label=\"Desolation Hill\\n${visits}\", fillcolor=\"#1e88e5\", fontcolor=\"white\"];\n  \"33\" [label=\"Autobahn\\n${visits}\",        fillcolor=\"#1e88e5\", fontcolor=\"white\"];\n  \"32\" [label=\"Lakeside\\n${visits}\",        fillcolor=\"#1e88e5\", fontcolor=\"white\"];\n\n  // Keep each stage in its own column\n  { rank=same; \"9\"; \"8\"; }\n  { rank=same; \"18\"; \"17\"; \"16\"; }\n  { rank=same; \"27\"; \"26\"; \"25\"; \"24\"; }\n  { rank=same; \"36\"; \"35\"; \"34\"; \"33\"; \"32\"; }\n\n  // Pin vertical order within a column: top = higher id (= more left turns)\n  \"9\"  -> \"8\"  [style=invis];\n  \"18\" -> \"17\" -> \"16\" [style=invis];\n  \"27\" -> \"26\" -> \"25\" -> \"24\" [style=invis];\n  \"36\" -> \"35\" -> \"34\" -> \"33\" -> \"32\" [style=invis];\n\n  // Route edges: down/right keeps position, up/left = position+1 (higher id)\n  \"0\"  -> \"8\";  \"0\"  -> \"9\";\n  \"8\"  -> \"16\"; \"8\"  -> \"17\";\n  \"9\"  -> \"17\"; \"9\"  -> \"18\";\n  \"16\" -> \"24\"; \"16\" -> \"25\";\n  \"17\" -> \"25\"; \"17\" -> \"26\";\n  \"18\" -> \"26\"; \"18\" -> \"27\";\n  \"24\" -> \"32\"; \"24\" -> \"33\";\n  \"25\" -> \"33\"; \"25\" -> \"34\";\n  \"26\" -> \"34\"; \"26\" -> \"35\";\n  \"27\" -> \"35\"; \"27\" -> \"36\";\n}",
+        "layoutEngine": "dot",
+        "rankDirection": "LR",
+        "splineType": "true",
+        "nodeOverrides": [],
+        "edgeOverrides": [],
+        "namedThresholds": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "expr": "sum by (stage_id) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.stage.start\" [$__range]))"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "stage_id": "id",
+              "Value": "visits"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "marcusolsson-dynamictext-panel",
+      "title": "Final frame (game over)",
+      "description": "The game.session.end screenshot for the selected session. Caption shows completion status.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 53,
+        "w": 9,
+        "h": 11
+      },
+      "id": 21,
+      "options": {
+        "content": "<img src=\"data:image/jpeg;base64,{{{screenshot_jpg}}}\" style=\"width:100%;border-radius:4px\"/>",
+        "defaultContent": "No screenshot for this game.",
+        "everyRow": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "range",
+          "expr": "{service_name=\"cannonball-se\"} | event=\"game.session.end\" | screenshot_jpg != \"\" | line_format \"{{.screenshot_jpg}}\"",
+          "maxLines": 1
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Line": "screenshot_jpg"
+            }
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "screenshot_jpg"
+              ]
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "type": "marcusolsson-dynamictext-panel",
+      "title": "Course map",
+      "description": "The game.map_screen capture for the selected session (route overview).",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 9,
+        "y": 53,
+        "w": 9,
+        "h": 11
+      },
+      "id": 22,
+      "options": {
+        "content": "<img src=\"data:image/jpeg;base64,{{{screenshot_jpg}}}\" style=\"width:100%;border-radius:4px\"/>",
+        "defaultContent": "No screenshot for this game.",
+        "everyRow": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "range",
+          "expr": "{service_name=\"cannonball-se\"} | event=\"game.map_screen\" | screenshot_jpg != \"\" | line_format \"{{.screenshot_jpg}}\"",
+          "maxLines": 1
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Line": "screenshot_jpg"
+            }
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "screenshot_jpg"
+              ]
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "type": "marcusolsson-dynamictext-panel",
+      "title": "Screenshots (in order)",
+      "description": "Every screenshot captured during the game, in the order it occurred (oldest first).",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 39,
+        "w": 6,
+        "h": 25
+      },
+      "id": 23,
+      "options": {
+        "content": "<img src=\"data:image/jpeg;base64,{{{screenshot_jpg}}}\" style=\"width:100%;height:auto;border-radius:4px;margin-bottom:6px\"/>",
+        "defaultContent": "No screenshot for this game.",
+        "everyRow": true,
+        "renderMode": "everyRow",
+        "styles": ""
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "range",
+          "expr": "{service_name=\"cannonball-se\"} | screenshot_jpg != \"\" | line_format \"{{.screenshot_jpg}}\"",
+          "direction": "forward"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Line": "screenshot_jpg"
+            }
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "screenshot_jpg"
+              ]
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Player",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 4,
+        "y": 5,
+        "w": 4,
+        "h": 4
+      },
+      "id": 16,
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "dark-blue"
+          },
+          "noValue": "WAITING"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "Player",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "range",
+          "expr": "{service_name=\"cannonball-se\"} | event=\"game.session.start\" | line_format \"{{.player_initials}}\"",
+          "maxLines": 1
+        }
+      ],
+      "description": "player_initials of the most recently started game.",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "tsNs": true,
+              "id": true,
+              "labels": true,
+              "labelTypes": true
+            },
+            "renameByName": {
+              "Line": "Player"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "bargauge",
+      "title": "Overtakes by color",
+      "description": "Overtake count grouped by the overtaken vehicle's color.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 15,
+        "w": 8,
+        "h": 8
+      },
+      "id": 17,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#9e9e9e"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#9e9e9e",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "grey"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#9e9e9e"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Grey"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "red"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f2495c"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Red"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "orange"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#ff9830"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Orange"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "yellow"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#fade2a"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Yellow"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "green"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#73bf69"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Green"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cyan"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#37d3d3"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Cyan"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "blue"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#3274d9"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Blue"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "purple"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#b877d9"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Purple"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "pink"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#ff7fbf"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Pink"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "brown"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#b08c5a"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Brown"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "displayMode": "lcd",
+        "orientation": "horizontal",
+        "valueMode": "color",
+        "showUnfilled": true,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "editorMode": "code",
+          "queryType": "instant",
+          "legendFormat": "{{color}}",
+          "expr": "sum by (color) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.vehicle_overtake\" [$__range]))"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "rowsToFields",
+          "options": {
+            "mappings": [
+              {
+                "fieldName": "color",
+                "handlerKey": "field.name"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": [
+    "cannonball-se",
+    "loki",
+    "game",
+    "live"
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "DS_LOKI",
+        "label": "Loki data source",
+        "type": "datasource",
+        "query": "loki",
+        "current": {},
+        "hide": 2,
+        "refresh": 1,
+        "regex": ""
+      }
+    ]
+  },
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Cannonball-SE \u2014 Now Playing",
+  "uid": "cannonball-now-playing",
+  "version": 2,
+  "weekStart": ""
+}

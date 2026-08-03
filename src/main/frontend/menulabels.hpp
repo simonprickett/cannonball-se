@@ -149,6 +149,8 @@ const static char* ENTRY_CALLBACK_RATE      = "CALLBACK RATE ";        // JJP - 
 
 const static char* COLOR_LABELS[5] = { "RED", "BLUE", "YELLOW", "GREEN", "CYAN" };
 const static char* DIP_DIFFICULTY[4] = { "EASY", "NORMAL", "HARD", "HARDEST" };
+// Game Time difficulty adds a "VERY EASY" level (max time) in front for testing.
+const static char* DIP_TIME_DIFFICULTY[5] = { "VERY EASY", "EASY", "NORMAL", "HARD", "HARDEST" };
 const static char* GEAR_LABELS[4] = {"MANUAL", "MANUAL CABINET", "MANUAL 2 BUTTONS", "AUTOMATIC"};
 const static char* FPS_LABELS[3] = { "30 FPS", "ORIGINAL", "60 FPS" };
 const static char* ANALOG_LABELS[3] = { "OFF", "ON", "ON WHEEL ONLY" };

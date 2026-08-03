@@ -1299,6 +1299,27 @@ void OFerrari::do_gear_low(int16_t &d1)
     {
         gear_value = false;
         gear_counter = 4;
+
+        // Telemetry: shift down (High -> Low). Only in a real game, never in
+        // attract/demo mode (the demo AI shifts gears too).
+        if (outrun.game_state == GS_INGAME)
+        {
+            TelemetryManager::instance().add_event("gear_shift", {
+                {"direction", "down"}
+            }, {
+                {"speed_kph", oinitengine.car_increment >> 16},
+                {"score", TelemetryManager::bcd_score_to_decimal(ostats.score)}
+            });
+            TelemetryManager::instance().log_game_event("game.gear_shift",
+                TelemetryManager::SEV_INFO,
+                {{"direction", "down"}},
+                {
+                    {"speed_kph", (int64_t)(oinitengine.car_increment >> 16)},
+                    {"score", TelemetryManager::bcd_score_to_decimal(ostats.score)},
+                    {"stage_number", (int64_t)(ostats.cur_stage + 1)}
+                }
+            );
+        }
         return;
     }
 
@@ -1325,6 +1346,27 @@ void OFerrari::do_gear_high(int16_t &d1)
     {
         gear_value = true;
         gear_counter = 4;
+
+        // Telemetry: shift up (Low -> High). Only in a real game, never in
+        // attract/demo mode (the demo AI shifts gears too).
+        if (outrun.game_state == GS_INGAME)
+        {
+            TelemetryManager::instance().add_event("gear_shift", {
+                {"direction", "up"}
+            }, {
+                {"speed_kph", oinitengine.car_increment >> 16},
+                {"score", TelemetryManager::bcd_score_to_decimal(ostats.score)}
+            });
+            TelemetryManager::instance().log_game_event("game.gear_shift",
+                TelemetryManager::SEV_INFO,
+                {{"direction", "up"}},
+                {
+                    {"speed_kph", (int64_t)(oinitengine.car_increment >> 16)},
+                    {"score", TelemetryManager::bcd_score_to_decimal(ostats.score)},
+                    {"stage_number", (int64_t)(ostats.cur_stage + 1)}
+                }
+            );
+        }
         return;
     }
 
