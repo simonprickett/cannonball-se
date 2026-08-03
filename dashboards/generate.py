@@ -118,7 +118,7 @@ def recent_games_panel():
     return {
         "id": 30,
         "type": "table",
-        "title": "Recent games — click a row to view",
+        "title": "Game Selector",
         "description": ("Every game seen in the current time range, newest first "
                         "(session_label sorts lexically by its timestamp prefix). Click a "
                         "row to load that game into the panels below. Widen the time range "
@@ -593,7 +593,7 @@ def speed_gauge_panel(pid, x, y, w, h, title, description, expr):
                     "effects": {"barGlow": False, "centerGlow": False, "gradient": False},
                     "endpointMarker": "point", "minVizHeight": 75, "minVizWidth": 75,
                     "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False},
-                    "segmentCount": 1, "segmentSpacing": 0.3, "shape": "gauge",
+                    "segmentCount": 63, "segmentSpacing": 0.3, "shape": "gauge",  # 63 = dashed arc
                     "showThresholdLabels": False, "showThresholdMarkers": True, "sizing": "auto",
                     "sparkline": False, "style": "circle", "textMode": "auto"},
         "fieldConfig": {"defaults": {"unit": "velocitykmh", "min": 0, "max": 300, "decimals": 0,
@@ -680,7 +680,7 @@ def score_progression_panel(y):
         return (f'(max by (player_initials) (max_over_time({SCOPED} | event="game.stage.end" | stage_number="{n}" | unwrap score_end [$__range])) '
                 f'- max by (player_initials) (max_over_time({SCOPED} | event="game.stage.start" | stage_number="{n}" | unwrap score_start [$__range])))')
     return {
-        "id": 45, "type": "barchart", "title": "Score progression",
+        "id": 45, "type": "barchart", "title": "Score per stage",
         "description": "Share of the final score earned in each stage — each segment is that stage's % of total points (score_end - score_start per stage). Percent-stacked to 100%; hover for exact points and %.",
         "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
         "gridPos": {"x": 0, "y": y, "w": 24, "h": 6},
@@ -909,6 +909,25 @@ def route_map_dot():
     )
 
 
+def duplicate_panel(src, new_id, title=None):
+    # An IDENTICAL copy of panel `src` that re-uses the source's already-fetched query
+    # results via Grafana's "-- Dashboard --" datasource (referenced by panelId), so
+    # Loki runs the source's query only ONCE no matter how many copies exist. viz +
+    # fieldConfig + transformations are copied verbatim; `withTransforms` is omitted so
+    # the copy receives the source's RAW query results and re-applies the (copied)
+    # transforms to reshape them identically. The transpiler maps the dashboard
+    # datasource (type "datasource" / uid "-- Dashboard --" + panelId) with no changes.
+    dup = json.loads(json.dumps(src))  # deep copy (viz, fieldConfig, transformations)
+    dup["id"] = new_id
+    if title is not None:
+        dup["title"] = title
+    dup["datasource"] = {"type": "datasource", "uid": "-- Dashboard --"}
+    dup["targets"] = [{"refId": "A",
+                       "datasource": {"type": "datasource", "uid": "-- Dashboard --"},
+                       "panelId": src["id"]}]
+    return dup
+
+
 def build_picker(live):
     d = json.loads(json.dumps(live))  # deep copy
 
@@ -1105,7 +1124,7 @@ def build_picker(live):
         f'- max(max_over_time({SCOPED} | event="game.session.start" | unwrap start_epoch_ms [$__range]))) / 1000',
         "Rank by game duration among all games in the dashboard time range (1 = longest)."))
     d["panels"].append(rank_panel(
-        40, 4, rank_y, "Rank: Most overtakes",
+        40, 4, rank_y, "Rank: Overtaking",
         f'sum by (session_label) (count_over_time({SEL} | event="game.vehicle_overtake" [$__range]))',
         f'sum(count_over_time({SCOPED} | event="game.vehicle_overtake" [$__range]))',
         "Rank by total overtakes among all games in the dashboard time range (1 = most)."))
@@ -1147,13 +1166,24 @@ def build_picker(live):
     # Per-stage breakdowns (new bottom row, layout TBD): incidents (crashes+off-road,
     # stacked) + overtakes.
     r4 = max(p["gridPos"]["y"] + p["gridPos"]["h"] for p in d["panels"])
-    d["panels"].append(incidents_by_stage_panel(51, 0, r4, 12))
-    d["panels"].append(overtakes_by_stage_panel(52, 12, r4, 12))
+    incidents51 = incidents_by_stage_panel(51, 0, r4, 12)
+    d["panels"].append(incidents51)
+    overtakes52 = overtakes_by_stage_panel(52, 12, r4, 12)
+    d["panels"].append(overtakes52)
+    # Duplicate of Overtakes-by-stage (id52) shown in the Stage Progression row too —
+    # re-uses id52's query results (no extra Loki query). Positioned via layout.json.
+    d["panels"].append(duplicate_panel(overtakes52, 56))
     # Up-shift speeds (companion to Down-shift speeds; meaningful in manual mode) +
     # Crashes by stage (crash-type breakdown, stacked).
     r5 = max(p["gridPos"]["y"] + p["gridPos"]["h"] for p in d["panels"])
     d["panels"].append(upshift_speed_hist_panel(53, 0, r5, 12))
-    d["panels"].append(crashes_by_stage_panel(54, 12, r5, 12))
+    crashes54 = crashes_by_stage_panel(54, 12, r5, 12)
+    d["panels"].append(crashes54)
+    # Duplicates of Incidents-by-stage (id51) + Crashes-by-stage (id54) shown in the
+    # Stage Progression row too — reuse the sources' query results (no extra Loki
+    # queries). Positioned via layout.json.
+    d["panels"].append(duplicate_panel(incidents51, 57))
+    d["panels"].append(duplicate_panel(crashes54, 58))
     # Events by stage (all-event count) — placed in the Stage Progression row via layout.json.
     r6 = max(p["gridPos"]["y"] + p["gridPos"]["h"] for p in d["panels"])
     d["panels"].append(events_by_stage_panel(55, 0, r6, 12))

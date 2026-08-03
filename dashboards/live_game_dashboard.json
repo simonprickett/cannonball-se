@@ -164,7 +164,7 @@
       ]
     },
     {
-      "type": "stat",
+      "type": "gauge",
       "title": "Stage reached",
       "description": "Highest stage_number seen across any event in this session. Works for in-progress games (does not rely on final_stage from the end event).",
       "datasource": {
@@ -180,59 +180,84 @@
       "id": 14,
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
-          "min": 0,
-          "max": 5,
           "color": {
             "mode": "thresholds"
           },
           "mappings": [
             {
-              "type": "value",
               "options": {
                 "1": {
-                  "text": "1",
                   "color": "#e53935",
-                  "index": 0
+                  "index": 0,
+                  "text": "1"
                 },
                 "2": {
-                  "text": "2",
                   "color": "#fb8c00",
-                  "index": 1
+                  "index": 1,
+                  "text": "2"
                 },
                 "3": {
-                  "text": "3",
                   "color": "#fdd835",
-                  "index": 2
+                  "index": 2,
+                  "text": "3"
                 },
                 "4": {
-                  "text": "4",
                   "color": "#7cb342",
-                  "index": 3
+                  "index": 3,
+                  "text": "4"
                 },
                 "5": {
-                  "text": "5",
                   "color": "#1e88e5",
-                  "index": 4
+                  "index": 4,
+                  "text": "5"
                 }
-              }
+              },
+              "type": "value"
             }
           ],
+          "max": 5,
+          "min": 0,
           "thresholds": {
-            "mode": "absolute",
+            "mode": "percentage",
             "steps": [
               {
-                "value": null,
-                "color": "transparent"
+                "color": "red",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 20
+              },
+              {
+                "color": "yellow",
+                "value": 40
+              },
+              {
+                "color": "green",
+                "value": 60
+              },
+              {
+                "color": "blue",
+                "value": 80
               }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": []
       },
       "options": {
-        "colorMode": "background",
-        "graphMode": "none",
+        "barShape": "flat",
+        "barWidthFactor": 0.54,
+        "effects": {
+          "barGlow": false,
+          "centerGlow": false,
+          "gradient": false
+        },
+        "endpointMarker": "point",
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -240,7 +265,14 @@
           "fields": "",
           "values": false
         },
-        "textMode": "value"
+        "segmentCount": 63,
+        "segmentSpacing": 0.3,
+        "shape": "gauge",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto",
+        "sparkline": true,
+        "textMode": "auto"
       },
       "targets": [
         {
@@ -371,7 +403,7 @@
           "fields": "",
           "values": false
         },
-        "segmentCount": 1,
+        "segmentCount": 63,
         "segmentSpacing": 0.3,
         "shape": "gauge",
         "showThresholdLabels": false,
@@ -461,7 +493,7 @@
           "fields": "",
           "values": false
         },
-        "segmentCount": 1,
+        "segmentCount": 63,
         "segmentSpacing": 0.3,
         "shape": "gauge",
         "showThresholdLabels": false,
@@ -503,7 +535,7 @@
         "defaults": {
           "unit": "none",
           "min": 0,
-          "max": 6000000,
+          "max": 35000000,
           "decimals": 0,
           "color": {
             "mode": "thresholds"
@@ -533,11 +565,11 @@
         "overrides": []
       },
       "options": {
-        "barShape": "flat",
+        "barShape": "rounded",
         "barWidthFactor": 0.5,
         "effects": {
-          "barGlow": false,
-          "centerGlow": false,
+          "barGlow": true,
+          "centerGlow": true,
           "gradient": false
         },
         "endpointMarker": "point",
@@ -551,7 +583,7 @@
           "fields": "",
           "values": false
         },
-        "segmentCount": 1,
+        "segmentCount": 100,
         "segmentSpacing": 0.3,
         "shape": "circle",
         "showThresholdLabels": false,

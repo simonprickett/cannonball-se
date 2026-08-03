@@ -38,7 +38,7 @@
         "kind": "Panel",
         "spec": {
           "id": 30,
-          "title": "Recent games \u2014 click a row to view",
+          "title": "Game Selector",
           "description": "Every game seen in the current time range, newest first (session_label sorts lexically by its timestamp prefix). Click a row to load that game into the panels below. Widen the time range to browse further back \u2014 Loki keeps full history, with none of the Tempo tag-values cap the old picker suffered.",
           "links": [],
           "data": {
@@ -286,12 +286,21 @@
           },
           "vizConfig": {
             "kind": "VizConfig",
-            "group": "stat",
+            "group": "gauge",
             "version": "",
             "spec": {
               "options": {
-                "colorMode": "background",
-                "graphMode": "none",
+                "barShape": "flat",
+                "barWidthFactor": 0.54,
+                "effects": {
+                  "barGlow": false,
+                  "centerGlow": false,
+                  "gradient": false
+                },
+                "endpointMarker": "point",
+                "minVizHeight": 75,
+                "minVizWidth": 75,
+                "orientation": "auto",
                 "reduceOptions": {
                   "calcs": [
                     "lastNotNull"
@@ -299,57 +308,80 @@
                   "fields": "",
                   "values": false
                 },
-                "textMode": "value"
+                "segmentCount": 63,
+                "segmentSpacing": 0.3,
+                "shape": "gauge",
+                "showThresholdLabels": false,
+                "showThresholdMarkers": true,
+                "sizing": "auto",
+                "sparkline": true,
+                "textMode": "auto"
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "short",
-                  "min": 0,
-                  "max": 5,
                   "color": {
                     "mode": "thresholds"
                   },
                   "mappings": [
                     {
-                      "type": "value",
                       "options": {
                         "1": {
-                          "text": "1",
                           "color": "#e53935",
-                          "index": 0
+                          "index": 0,
+                          "text": "1"
                         },
                         "2": {
-                          "text": "2",
                           "color": "#fb8c00",
-                          "index": 1
+                          "index": 1,
+                          "text": "2"
                         },
                         "3": {
-                          "text": "3",
                           "color": "#fdd835",
-                          "index": 2
+                          "index": 2,
+                          "text": "3"
                         },
                         "4": {
-                          "text": "4",
                           "color": "#7cb342",
-                          "index": 3
+                          "index": 3,
+                          "text": "4"
                         },
                         "5": {
-                          "text": "5",
                           "color": "#1e88e5",
-                          "index": 4
+                          "index": 4,
+                          "text": "5"
                         }
-                      }
+                      },
+                      "type": "value"
                     }
                   ],
+                  "max": 5,
+                  "min": 0,
                   "thresholds": {
-                    "mode": "absolute",
+                    "mode": "percentage",
                     "steps": [
                       {
-                        "value": null,
-                        "color": "transparent"
+                        "color": "red",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 20
+                      },
+                      {
+                        "color": "yellow",
+                        "value": 40
+                      },
+                      {
+                        "color": "green",
+                        "value": 60
+                      },
+                      {
+                        "color": "blue",
+                        "value": 80
                       }
                     ]
-                  }
+                  },
+                  "unit": "short"
                 },
                 "overrides": []
               }
@@ -500,7 +532,7 @@
                   "fields": "",
                   "values": false
                 },
-                "segmentCount": 1,
+                "segmentCount": 63,
                 "segmentSpacing": 0.3,
                 "shape": "gauge",
                 "showThresholdLabels": false,
@@ -607,7 +639,7 @@
                   "fields": "",
                   "values": false
                 },
-                "segmentCount": 1,
+                "segmentCount": 63,
                 "segmentSpacing": 0.3,
                 "shape": "gauge",
                 "showThresholdLabels": false,
@@ -696,11 +728,11 @@
             "version": "",
             "spec": {
               "options": {
-                "barShape": "flat",
+                "barShape": "rounded",
                 "barWidthFactor": 0.5,
                 "effects": {
-                  "barGlow": false,
-                  "centerGlow": false,
+                  "barGlow": true,
+                  "centerGlow": true,
                   "gradient": false
                 },
                 "endpointMarker": "point",
@@ -714,7 +746,7 @@
                   "fields": "",
                   "values": false
                 },
-                "segmentCount": 1,
+                "segmentCount": 100,
                 "segmentSpacing": 0.3,
                 "shape": "circle",
                 "showThresholdLabels": false,
@@ -728,7 +760,7 @@
                 "defaults": {
                   "unit": "none",
                   "min": 0,
-                  "max": 6000000,
+                  "max": 35000000,
                   "decimals": 0,
                   "color": {
                     "mode": "thresholds"
@@ -3433,7 +3465,7 @@
         "kind": "Panel",
         "spec": {
           "id": 40,
-          "title": "Rank: Most overtakes",
+          "title": "Rank: Overtaking",
           "description": "Rank by total overtakes among all games in the dashboard time range (1 = most).",
           "links": [],
           "data": {
@@ -5046,7 +5078,7 @@
                   "fields": "",
                   "values": false
                 },
-                "segmentCount": 1,
+                "segmentCount": 63,
                 "segmentSpacing": 0.3,
                 "shape": "gauge",
                 "showThresholdLabels": false,
@@ -6099,7 +6131,7 @@
         "kind": "Panel",
         "spec": {
           "id": 45,
-          "title": "Score progression",
+          "title": "Score per stage",
           "description": "Share of the final score earned in each stage \u2014 each segment is that stage's % of total points (score_end - score_start per stage). Percent-stacked to 100%; hover for exact points and %.",
           "links": [],
           "data": {
@@ -6857,6 +6889,87 @@
           }
         }
       },
+      "panel-56": {
+        "kind": "Panel",
+        "spec": {
+          "id": 56,
+          "title": "Overtakes by stage",
+          "description": "Vehicles overtaken in each stage (game.vehicle_overtake), stages 1-5.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "datasource",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "-- Dashboard --"
+                      },
+                      "spec": {
+                        "panelId": 52
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "barchart",
+            "version": "",
+            "spec": {
+              "options": {
+                "orientation": "horizontal",
+                "xField": "stage",
+                "showValue": "never",
+                "barWidth": 0.95,
+                "groupWidth": 0.7,
+                "fullHighlight": false,
+                "stacking": "none",
+                "legend": {
+                  "showLegend": false
+                },
+                "tooltip": {
+                  "mode": "single",
+                  "sort": "none"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "short",
+                  "decimals": 0,
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "#7e57c2"
+                  },
+                  "custom": {
+                    "fillOpacity": 90,
+                    "gradientMode": "opacity",
+                    "lineWidth": 1,
+                    "axisPlacement": "auto",
+                    "axisLabel": "Overtakes",
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  },
+                  "mappings": []
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
       "panel-53": {
         "kind": "Panel",
         "spec": {
@@ -7007,6 +7120,241 @@
                       }
                     },
                     "refId": "B",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "barchart",
+            "version": "",
+            "spec": {
+              "options": {
+                "orientation": "horizontal",
+                "xField": "stage",
+                "stacking": "normal",
+                "showValue": "never",
+                "barWidth": 0.95,
+                "groupWidth": 0.7,
+                "fullHighlight": true,
+                "legend": {
+                  "showLegend": true,
+                  "displayMode": "list",
+                  "placement": "bottom"
+                },
+                "tooltip": {
+                  "mode": "multi",
+                  "sort": "none"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "short",
+                  "decimals": 0,
+                  "custom": {
+                    "fillOpacity": 90,
+                    "gradientMode": "opacity",
+                    "lineWidth": 1,
+                    "axisPlacement": "auto",
+                    "axisLabel": "Crashes",
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  },
+                  "mappings": []
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Bump"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#ffd54f"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Spin"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#ff9800"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Flip"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#c62828"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "panel-57": {
+        "kind": "Panel",
+        "spec": {
+          "id": 57,
+          "title": "Incidents by stage",
+          "description": "Crashes and off-road events in each stage (game.crash + game.off_road), stages 1-5, stacked.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "datasource",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "-- Dashboard --"
+                      },
+                      "spec": {
+                        "panelId": 51
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "barchart",
+            "version": "",
+            "spec": {
+              "options": {
+                "orientation": "horizontal",
+                "xField": "stage",
+                "stacking": "normal",
+                "showValue": "never",
+                "barWidth": 0.95,
+                "groupWidth": 0.7,
+                "fullHighlight": true,
+                "legend": {
+                  "showLegend": true,
+                  "displayMode": "list",
+                  "placement": "bottom"
+                },
+                "tooltip": {
+                  "mode": "multi",
+                  "sort": "none"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "short",
+                  "decimals": 0,
+                  "custom": {
+                    "fillOpacity": 90,
+                    "gradientMode": "opacity",
+                    "lineWidth": 1,
+                    "axisPlacement": "auto",
+                    "axisLabel": "Incidents",
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  },
+                  "mappings": []
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Crashes"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#ff2975"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Off-road"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "#ff7043"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "panel-58": {
+        "kind": "Panel",
+        "spec": {
+          "id": 58,
+          "title": "Crashes by stage",
+          "description": "Crashes in each stage by type (game.crash crash_type: bump/spin/flip), stages 1-5, stacked bump\u2192spin\u2192flip.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "datasource",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "-- Dashboard --"
+                      },
+                      "spec": {
+                        "panelId": 54
+                      }
+                    },
+                    "refId": "A",
                     "hidden": false
                   }
                 }
@@ -7529,6 +7877,33 @@
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-55"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-56"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-57"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-58"
                         }
                       }
                     }

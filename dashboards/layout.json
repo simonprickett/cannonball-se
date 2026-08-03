@@ -320,6 +320,33 @@
                       "name": "panel-55"
                     }
                   }
+                },
+                {
+                  "kind": "AutoGridLayoutItem",
+                  "spec": {
+                    "element": {
+                      "kind": "ElementReference",
+                      "name": "panel-56"
+                    }
+                  }
+                },
+                {
+                  "kind": "AutoGridLayoutItem",
+                  "spec": {
+                    "element": {
+                      "kind": "ElementReference",
+                      "name": "panel-57"
+                    }
+                  }
+                },
+                {
+                  "kind": "AutoGridLayoutItem",
+                  "spec": {
+                    "element": {
+                      "kind": "ElementReference",
+                      "name": "panel-58"
+                    }
+                  }
                 }
               ],
               "maxColumnCount": 3,
