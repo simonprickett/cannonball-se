@@ -38,7 +38,7 @@
         "kind": "Panel",
         "spec": {
           "id": 30,
-          "title": "Game Selector",
+          "title": "\ud83d\udd79\ufe0f Game Selector",
           "description": "Every game seen in the current time range, newest first (session_label sorts lexically by its timestamp prefix). Click a row to load that game into the panels below. Widen the time range to browse further back \u2014 Loki keeps full history, with none of the Tempo tag-values cap the old picker suffered.",
           "links": [],
           "data": {
@@ -157,7 +157,7 @@
         "kind": "Panel",
         "spec": {
           "id": 2,
-          "title": "Game state",
+          "title": "\ud83c\udfc1 Game state",
           "description": "completion_code of the selected session: 1 = COMPLETED, 2 = TIMED OUT, null = IN PROGRESS (no end yet).",
           "links": [],
           "data": {
@@ -252,7 +252,7 @@
         "kind": "Panel",
         "spec": {
           "id": 14,
-          "title": "Stage reached",
+          "title": "\u2705 Stage reached",
           "description": "Highest stage_number reached in the selected session.",
           "links": [],
           "data": {
@@ -393,7 +393,7 @@
         "kind": "Panel",
         "spec": {
           "id": 4,
-          "title": "Off-road",
+          "title": "\ud83d\ude33 Off-road",
           "description": "Number of times the car went off-road (game.off_road events) in the selected game.",
           "links": [],
           "data": {
@@ -476,7 +476,7 @@
         "kind": "Panel",
         "spec": {
           "id": 15,
-          "title": "Avg speed",
+          "title": "\u23f1\ufe0f Avg speed",
           "description": "Mean speed_kph across this session's events. NOTE: speed_kph is only logged on crash / off-road / stage-start / route / overtake events, so this is a sampled average weighted toward eventful moments, not a true whole-lap mean.",
           "links": [],
           "data": {
@@ -583,7 +583,7 @@
         "kind": "Panel",
         "spec": {
           "id": 6,
-          "title": "Top speed",
+          "title": "\u23f1\ufe0f Top speed",
           "description": "Highest speed_kph seen across any event in this session.",
           "links": [],
           "data": {
@@ -690,7 +690,7 @@
         "kind": "Panel",
         "spec": {
           "id": 7,
-          "title": "Score",
+          "title": "\ud83d\udcaf Score",
           "description": "Latest score for the selected game \u2014 updates through the game via in-game events (crashes, overtakes, route choices).",
           "links": [],
           "data": {
@@ -797,7 +797,7 @@
         "kind": "Panel",
         "spec": {
           "id": 3,
-          "title": "Crashes by type",
+          "title": "\ud83e\udd15 Crashes by type",
           "description": "Crash count grouped by crash_type (bump / spin / flip) for the selected session.",
           "links": [],
           "data": {
@@ -895,7 +895,7 @@
         "kind": "Panel",
         "spec": {
           "id": 5,
-          "title": "Overtakes by vehicle",
+          "title": "\ud83d\ude98\ud83d\ude98 Overtakes by vehicle",
           "description": "Overtake count grouped by vehicle (porsche, corvette, bmw, beetle, pickup, truck).",
           "links": [],
           "data": {
@@ -1021,7 +1021,7 @@
         "kind": "Panel",
         "spec": {
           "id": 10,
-          "title": "Fastest crash",
+          "title": "\ud83e\udd15 Fastest crash",
           "description": "Speed (km/h) of the fastest crash in the selected game \u2014 max speed_kph over game.crash events.",
           "links": [],
           "data": {
@@ -1406,7 +1406,7 @@
         "kind": "Panel",
         "spec": {
           "id": 16,
-          "title": "Player",
+          "title": "\ud83d\ude03 Player",
           "description": "player_initials of the selected game.",
           "links": [],
           "data": {
@@ -1493,7 +1493,7 @@
         "kind": "Panel",
         "spec": {
           "id": 17,
-          "title": "Overtakes by color",
+          "title": "\ud83d\ude98\ud83d\ude98 Overtakes by color",
           "description": "Overtake count grouped by the overtaken vehicle's color.",
           "links": [],
           "data": {
@@ -1785,7 +1785,7 @@
         "kind": "Panel",
         "spec": {
           "id": 31,
-          "title": "Total events",
+          "title": "\ud83d\udcc8 Total events",
           "description": "Total game events (log lines) captured for the selected game.",
           "links": [],
           "data": {
@@ -1957,7 +1957,7 @@
         "kind": "Panel",
         "spec": {
           "id": 34,
-          "title": "Total crashes",
+          "title": "\ud83e\udd15 Total crashes",
           "description": "Total crashes in the selected game.",
           "links": [],
           "data": {
@@ -2044,7 +2044,7 @@
         "kind": "Panel",
         "spec": {
           "id": 35,
-          "title": "Total overtakes",
+          "title": "\ud83d\ude98\ud83d\ude98 Total overtakes",
           "description": "Total vehicles overtaken in the selected game.",
           "links": [],
           "data": {
@@ -2131,7 +2131,7 @@
         "kind": "Panel",
         "spec": {
           "id": 36,
-          "title": "Game duration",
+          "title": "\u23f1\ufe0f Game duration",
           "description": "Wall-clock duration of the selected game (session.end epoch minus session.start epoch).",
           "links": [],
           "data": {
@@ -2226,7 +2226,7 @@
         "kind": "Panel",
         "spec": {
           "id": 38,
-          "title": "Rank: Overall",
+          "title": "\ud83c\udfc1 Rank: Overall",
           "description": "This game's rank by final score among all games in the dashboard time range (1 = highest score).",
           "links": [],
           "data": {
@@ -2745,7 +2745,7 @@
         "kind": "Panel",
         "spec": {
           "id": 48,
-          "title": "Gearbox",
+          "title": "\ud83d\udd79\ufe0f Gearbox",
           "description": "Transmission mode of the selected game (gearbox_mode on game.session.start): Auto or Manual.",
           "links": [],
           "data": {
@@ -2854,7 +2854,7 @@
         "kind": "Panel",
         "spec": {
           "id": 32,
-          "title": "Longest clean streak",
+          "title": "\u23f1\ufe0f Longest clean streak",
           "description": "Longest continuous stretch of clean driving (no crash / off-road) in the selected game, in seconds.",
           "links": [],
           "data": {
@@ -2946,7 +2946,7 @@
         "kind": "Panel",
         "spec": {
           "id": 39,
-          "title": "Rank: Game duration",
+          "title": "\u23f1\ufe0f Rank: Game duration",
           "description": "Rank by game duration among all games in the dashboard time range (1 = longest).",
           "links": [],
           "data": {
@@ -3465,7 +3465,7 @@
         "kind": "Panel",
         "spec": {
           "id": 40,
-          "title": "Rank: Overtaking",
+          "title": "\ud83d\ude98\ud83d\ude98 Rank: Overtaking",
           "description": "Rank by total overtakes among all games in the dashboard time range (1 = most).",
           "links": [],
           "data": {
@@ -3984,7 +3984,7 @@
         "kind": "Panel",
         "spec": {
           "id": 41,
-          "title": "Rank: Average speed",
+          "title": "\u23f1\ufe0f Rank: Average speed",
           "description": "Rank by average speed (km/h) among all games in the dashboard time range (1 = fastest).",
           "links": [],
           "data": {
@@ -4503,7 +4503,7 @@
         "kind": "Panel",
         "spec": {
           "id": 42,
-          "title": "Rank: Clean streak",
+          "title": "\u23f1\ufe0f Rank: Clean streak",
           "description": "Rank by longest clean-driving streak among all games in the dashboard time range (1 = longest).",
           "links": [],
           "data": {
@@ -5022,7 +5022,7 @@
         "kind": "Panel",
         "spec": {
           "id": 46,
-          "title": "Fastest overtake",
+          "title": "\ud83d\ude98\ud83d\ude98 Fastest overtake",
           "description": "Top speed (km/h) at which an overtake happened in the selected game.",
           "links": [],
           "data": {
@@ -5129,7 +5129,7 @@
         "kind": "Panel",
         "spec": {
           "id": 47,
-          "title": "Rank: Fastest overtake",
+          "title": "\ud83d\ude98\ud83d\ude98 Rank: Fastest overtake",
           "description": "Rank by fastest overtake speed among all games in the dashboard time range (1 = fastest).",
           "links": [],
           "data": {
@@ -5923,7 +5923,7 @@
         "kind": "Panel",
         "spec": {
           "id": 43,
-          "title": "Overtake speeds",
+          "title": "\ud83d\ude98\ud83d\ude98 Overtake speeds",
           "description": "Overtakes bucketed by speed (10 km/h bins) in the selected game.",
           "links": [],
           "data": {
@@ -6131,7 +6131,7 @@
         "kind": "Panel",
         "spec": {
           "id": 45,
-          "title": "Score per stage",
+          "title": "\ud83d\udcaf Score per stage",
           "description": "Share of the final score earned in each stage \u2014 each segment is that stage's % of total points (score_end - score_start per stage). Percent-stacked to 100%; hover for exact points and %.",
           "links": [],
           "data": {
@@ -6406,7 +6406,7 @@
         "kind": "Panel",
         "spec": {
           "id": 49,
-          "title": "Gear shifts per stage",
+          "title": "\ud83d\udd79\ufe0f Gear shifts per stage",
           "description": "Up/down gear shifts in each stage (game.gear_shift), stages 1-5. In automatic mode a shift is a crossing of the ~160 km/h auto threshold, so this tracks braking/slowdowns per stage; in manual mode it is driver input.",
           "links": [],
           "data": {
@@ -6537,7 +6537,7 @@
         "kind": "Panel",
         "spec": {
           "id": 50,
-          "title": "Down-shift speeds",
+          "title": "\ud83d\udd79\ufe0f\u23f1\ufe0f Down-shift speeds",
           "description": "Down-shifts bucketed by speed (10 km/h bins) in the selected game. In automatic mode a down-shift fires as speed drops back below the ~160 km/h auto threshold, so lower speeds mean harder braking.",
           "links": [],
           "data": {
@@ -6640,7 +6640,7 @@
         "kind": "Panel",
         "spec": {
           "id": 51,
-          "title": "Incidents by stage",
+          "title": "\ud83d\ude48 Incidents by stage",
           "description": "Crashes and off-road events in each stage (game.crash + game.off_road), stages 1-5, stacked.",
           "links": [],
           "data": {
@@ -6791,7 +6791,7 @@
         "kind": "Panel",
         "spec": {
           "id": 52,
-          "title": "Overtakes by stage",
+          "title": "\ud83d\ude98\ud83d\ude98 Overtakes by stage",
           "description": "Vehicles overtaken in each stage (game.vehicle_overtake), stages 1-5.",
           "links": [],
           "data": {
@@ -6893,7 +6893,7 @@
         "kind": "Panel",
         "spec": {
           "id": 56,
-          "title": "Overtakes by stage",
+          "title": "\ud83d\ude98\ud83d\ude98 Overtakes by stage",
           "description": "Vehicles overtaken in each stage (game.vehicle_overtake), stages 1-5.",
           "links": [],
           "data": {
@@ -6974,7 +6974,7 @@
         "kind": "Panel",
         "spec": {
           "id": 53,
-          "title": "Up-shift speeds",
+          "title": "\ud83d\udd79\ufe0f\u23f1\ufe0f Up-shift speeds",
           "description": "Up-shifts bucketed by speed (10 km/h bins) in the selected game. Meaningful in manual mode (driver picks the shift point); in automatic every up-shift is pinned to the ~160 km/h auto threshold, so it collapses to one bar.",
           "links": [],
           "data": {
@@ -7077,7 +7077,7 @@
         "kind": "Panel",
         "spec": {
           "id": 54,
-          "title": "Crashes by stage",
+          "title": "\ud83e\udd15 Crashes by stage",
           "description": "Crashes in each stage by type (game.crash crash_type: bump/spin/flip), stages 1-5, stacked bump\u2192spin\u2192flip.",
           "links": [],
           "data": {
@@ -7223,7 +7223,7 @@
         "kind": "Panel",
         "spec": {
           "id": 57,
-          "title": "Incidents by stage",
+          "title": "\ud83d\ude48 Incidents by stage",
           "description": "Crashes and off-road events in each stage (game.crash + game.off_road), stages 1-5, stacked.",
           "links": [],
           "data": {
@@ -7333,7 +7333,7 @@
         "kind": "Panel",
         "spec": {
           "id": 58,
-          "title": "Crashes by stage",
+          "title": "\ud83e\udd15 Crashes by stage",
           "description": "Crashes in each stage by type (game.crash crash_type: bump/spin/flip), stages 1-5, stacked bump\u2192spin\u2192flip.",
           "links": [],
           "data": {
@@ -7458,7 +7458,7 @@
         "kind": "Panel",
         "spec": {
           "id": 55,
-          "title": "Events by stage",
+          "title": "\ud83d\udcc8 Events by stage",
           "description": "Total telemetry events of any type recorded in each stage (all game.* events with a stage_number), stages 1-5.",
           "links": [],
           "data": {

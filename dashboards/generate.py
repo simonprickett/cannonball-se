@@ -1204,6 +1204,29 @@ def build_picker(live):
         if p.get("id") in STAT_ROW_IDS:
             p["gridPos"]["h"] = 5
 
+    # Emoji title prefixes (Recent-Games-only). Applied last so it covers inherited,
+    # picker-added AND duplicated panels uniformly by id. 😃 player, ✅ stage, 💯 score,
+    # 🏁 overall/state, 🚘🚘 overtaking, ⏱️ speed/duration/streak, 🕹️ gear (+⏱️ for shift
+    # speeds), 🙈 incidents, 😳 off-road, 📈 events, 🤕 crashes. (Music/Route/Key moments/
+    # per-stage already carry their own emoji from earlier edits — not listed here.)
+    TITLE_EMOJI = {
+        30: "🕹️",  # Game Selector table
+        16: "😃", 14: "✅", 7: "💯", 45: "💯",
+        2: "🏁", 38: "🏁",
+        5: "🚘🚘", 17: "🚘🚘", 35: "🚘🚘", 40: "🚘🚘", 43: "🚘🚘",
+        46: "🚘🚘", 47: "🚘🚘", 52: "🚘🚘", 56: "🚘🚘",
+        6: "⏱️", 15: "⏱️", 32: "⏱️", 36: "⏱️", 39: "⏱️", 41: "⏱️", 42: "⏱️",
+        48: "🕹️", 49: "🕹️", 50: "🕹️⏱️", 53: "🕹️⏱️",
+        51: "🙈", 57: "🙈",
+        4: "😳",
+        31: "📈", 55: "📈",
+        3: "🤕", 10: "🤕", 34: "🤕", 54: "🤕", 58: "🤕",
+    }
+    for p in d["panels"]:
+        emoji = TITLE_EMOJI.get(p.get("id"))
+        if emoji and not p.get("title", "").startswith(emoji):
+            p["title"] = f"{emoji} {p['title']}"
+
     # Variables + import inputs (Loki only — Tempo dropped)
     d["templating"] = {"list": picker_variables()}
     d["__inputs"] = [i for i in d.get("__inputs", []) if i.get("name") != "DS_TEMPO"]
