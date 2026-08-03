@@ -98,13 +98,25 @@ def picker_variables():
          "options": [{"text": "", "value": "", "selected": True}],
          "hide": 0, "skipUrlSync": False,
          "description": "session_label of the game to view. Click a row in 'Recent games' to set it, or type/paste one."},
+        # Hidden helper var: the selected game's gearbox_mode ("automatic"/"manual"),
+        # set by the picker-table data link alongside `session`. Drives the Gearbox
+        # Usage row's conditional rendering (show only when == "manual"). Empty for
+        # pre-telemetry games or a hand-typed session -> row stays hidden.
+        {"name": "gearbox", "label": "Gearbox mode", "type": "textbox",
+         "query": "", "current": {"text": "", "value": ""},
+         "options": [{"text": "", "value": "", "selected": True}],
+         "hide": 2, "skipUrlSync": False,
+         "description": "gearbox_mode of the selected game; set by the picker-table data link, drives the Gearbox Usage row conditional rendering."},
     ]
 
 
 def recent_games_panel():
-    # Loki-driven picker table: one row per game (session_label) over the
-    # dashboard time range, newest first. Each row's data link sets the
-    # `session` textbox var and reloads, scoping every panel below to that game.
+    # Loki-driven picker table: one row per game (session_label) over the dashboard
+    # time range, newest first. Driven off game.session.start so each row also carries
+    # the game's gearbox_mode. Clicking a row's data link sets BOTH the `session` and
+    # `gearbox` textbox vars and reloads — session scopes every panel; gearbox drives
+    # the Gearbox Usage row's conditional rendering (show only for manual games).
+    # gearbox_mode is kept in the frame (for the link) but hidden as a column.
     return {
         "id": 30,
         "type": "table",
@@ -121,14 +133,17 @@ def recent_games_panel():
             "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
             "editorMode": "code",
             "queryType": "instant",
-            "expr": f'sum by (session_label) (count_over_time({SEL} | session_label!="" [$__range]))',
+            # One series per game: session_label + gearbox_mode (from the single
+            # session.start event each game emits). Pre-telemetry games have no
+            # gearbox_mode label -> empty cell -> Gearbox row hidden for them.
+            "expr": f'sum by (session_label, gearbox_mode) (count_over_time({SEL} | event="game.session.start" [$__range]))',
         }],
         "options": {"showHeader": True, "cellHeight": "sm",
                     "footer": {"show": False},
                     "sortBy": [{"displayName": "Game", "desc": True}]},
         "transformations": [
             {"id": "organize", "options": {
-                # Keep only the game (session_label); drop Time and the event count.
+                # Keep the game (session_label) + gearbox_mode; drop Time and the count.
                 "excludeByName": {"Time": True, "Value": True, "Value #A": True},
                 "renameByName": {"session_label": "Game"},
             }},
@@ -141,10 +156,15 @@ def recent_games_panel():
                      {"id": "custom.width", "value": 340},
                      {"id": "links", "value": [{
                          "title": "View this game",
-                         "url": "/d/cannonball-recent-games/?var-session=${__value.raw}&${__url_time_range}",
+                         # Set session (scopes the board) AND gearbox (row conditional render).
+                         "url": "/d/cannonball-recent-games/?var-session=${__value.raw}"
+                                "&var-gearbox=${__data.fields[\"gearbox_mode\"]}&${__url_time_range}",
                          "targetBlank": False,
                      }]},
                  ]},
+                # gearbox_mode stays in the frame (the link reads it) but is hidden as a column.
+                {"matcher": {"id": "byName", "options": "gearbox_mode"},
+                 "properties": [{"id": "custom.hidden", "value": True}]},
             ],
         },
     }

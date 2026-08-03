@@ -58,7 +58,7 @@
                       "spec": {
                         "editorMode": "code",
                         "queryType": "instant",
-                        "expr": "sum by (session_label) (count_over_time({service_name=\"cannonball-se\"} | session_label!=\"\" [$__range]))"
+                        "expr": "sum by (session_label, gearbox_mode) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.session.start\" [$__range]))"
                       }
                     },
                     "refId": "A",
@@ -128,10 +128,22 @@
                         "value": [
                           {
                             "title": "View this game",
-                            "url": "/d/cannonball-recent-games/?var-session=${__value.raw}&${__url_time_range}",
+                            "url": "/d/cannonball-recent-games/?var-session=${__value.raw}&var-gearbox=${__data.fields[\"gearbox_mode\"]}&${__url_time_range}",
                             "targetBlank": false
                           }
                         ]
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "gearbox_mode"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.hidden",
+                        "value": true
                       }
                     ]
                   }
@@ -7860,6 +7872,23 @@
             "kind": "RowsLayoutRow",
             "spec": {
               "collapse": false,
+              "conditionalRendering": {
+                "kind": "ConditionalRenderingGroup",
+                "spec": {
+                  "condition": "and",
+                  "items": [
+                    {
+                      "kind": "ConditionalRenderingVariable",
+                      "spec": {
+                        "operator": "equals",
+                        "value": "manual",
+                        "variable": "gearbox"
+                      }
+                    }
+                  ],
+                  "visibility": "show"
+                }
+              },
               "layout": {
                 "kind": "GridLayout",
                 "spec": {
@@ -7955,6 +7984,21 @@
           "hide": "dontHide",
           "skipUrlSync": false,
           "description": "session_label of the game to view. Click a row in 'Recent games' to set it, or type/paste one."
+        }
+      },
+      {
+        "kind": "TextVariable",
+        "spec": {
+          "name": "gearbox",
+          "current": {
+            "text": "",
+            "value": ""
+          },
+          "query": "",
+          "label": "Gearbox mode",
+          "hide": "hideVariable",
+          "skipUrlSync": false,
+          "description": "gearbox_mode of the selected game; set by the picker-table data link, drives the Gearbox Usage row conditional rendering."
         }
       }
     ]
