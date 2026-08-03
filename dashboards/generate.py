@@ -897,7 +897,10 @@ def route_map_dot():
     return (
         'digraph OutRun {\n'
         '  rankdir=LR;\n'
-        '  bgcolor="transparent";\n'
+        # Synthwave gradient backdrop. Kept dark purple->indigo so the green/red/grey
+        # nodes stay high-contrast (no pink/magenta, which would wash out red nodes).
+        '  bgcolor="#160a2e:#3d1a6d";\n'
+        '  gradientangle=90;\n'
         '  node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11, '
         'fillcolor="#4a4a4a", fontcolor="white", color="#00000000", penwidth=1.5];\n'
         '  edge [arrowsize=0.7, color="#9e9e9e", penwidth=1.2];\n\n'
