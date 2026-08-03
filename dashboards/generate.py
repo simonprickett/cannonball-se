@@ -1116,18 +1116,150 @@ def build_picker(live):
                         "grafana-graphviz-panel and marcusolsson-dynamictext-panel.")
     return d
 
+# ---------------------------------------------------------------------------
+# v1 -> v2 transpiler (schema dashboard.grafana.app/v2)
+#
+# build_picker still assembles the board in the familiar v1 shape (all the panel
+# helpers, SQL exprs, session scoping, graphviz). This final step remaps that dict
+# to the v2 manifest that `gcx dashboards update` wants: each panel becomes
+# spec.elements["panel-<id>"], gridPos moves to a separate spec.layout, datasources
+# resolve by DISPLAY NAME inline (no ${DS_LOKI} var / push-time substitution), and a
+# few fields are renamed. See reference_v2_dashboard_schema in project memory.
+# ---------------------------------------------------------------------------
+
+NAMESPACE = "stacks-1144523"  # Grafana Cloud stack (simonprickett)
+DS_NAME = {                    # v1 datasource uid -> v2 datasource display name
+    "${DS_LOKI}": "grafanacloud-simonprickett-logs",
+    "${DS_TEMPO}": "grafanacloud-simonprickett-traces",
+}
+_VAR_HIDE = {0: "dontHide", 1: "hideLabel", 2: "hideVariable"}
+_AUTOREFRESH_INTERVALS = ["5s", "10s", "30s", "1m", "5m", "15m", "30m", "1h", "2h", "1d"]
+_ANNOTATION_BUILTIN = {  # Grafana's default built-in annotation, v2 form
+    "kind": "AnnotationQuery",
+    "spec": {
+        "builtIn": True, "enable": True, "hide": True,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "legacyOptions": {"type": "dashboard"},
+        "name": "Annotations & Alerts",
+        "query": {"kind": "DataQuery", "group": "grafana", "version": "v0",
+                  "datasource": {"name": "-- Grafana --"}, "spec": {}},
+    },
+}
+
+
+def _v2_query(t):
+    # One v1 target -> one v2 PanelQuery. Datasource resolves by display name; the
+    # remaining target keys (expr/queryType/editorMode/maxLines, or type/expression
+    # for a SQL __expr__) become the DataQuery spec verbatim.
+    ds = t.get("datasource", {})
+    uid, typ = ds.get("uid", ""), ds.get("type", "")
+    if typ == "__expr__" or uid == "__expr__":
+        group, name = "__expr__", "__expr__"
+    else:
+        group, name = (typ or "loki"), DS_NAME.get(uid, uid)
+    qspec = {k: v for k, v in t.items() if k not in ("refId", "datasource", "hide", "key")}
+    return {"kind": "PanelQuery", "spec": {
+        "query": {"kind": "DataQuery", "group": group, "version": "v0",
+                  "datasource": {"name": name}, "spec": qspec},
+        "refId": t.get("refId", "A"),
+        "hidden": bool(t.get("hide", False)),   # v1 `hide` -> v2 `hidden`
+    }}
+
+
+def _v2_transform(tr):
+    # v1 {id, options, ...} -> v2 {group:id, kind:"Transformation", spec:{options, ...}}
+    return {"group": tr.get("id"), "kind": "Transformation",
+            "spec": {k: v for k, v in tr.items() if k != "id"}}
+
+
+def _v2_element(p):
+    return {"kind": "Panel", "spec": {
+        "id": p["id"],
+        "title": p.get("title", ""),
+        "description": p.get("description", ""),
+        "links": p.get("links", []),
+        "data": {"kind": "QueryGroup", "spec": {
+            "queries": [_v2_query(t) for t in p.get("targets", [])],
+            "transformations": [_v2_transform(tr) for tr in p.get("transformations", [])],
+            "queryOptions": {},
+        }},
+        "vizConfig": {"kind": "VizConfig", "group": p["type"], "version": "",
+                      "spec": {"options": p.get("options", {}),
+                               "fieldConfig": p.get("fieldConfig", {"defaults": {}, "overrides": []})}},
+    }}
+
+
+def _v2_layout_item(p):
+    g = p["gridPos"]
+    return {"kind": "GridLayoutItem", "spec": {
+        "x": g["x"], "y": g["y"], "width": g["w"], "height": g["h"],
+        "element": {"kind": "ElementReference", "name": f"panel-{p['id']}"},
+    }}
+
+
+def _v2_variables(tlist):
+    out = []
+    for v in tlist:
+        if v.get("type") == "textbox":
+            out.append({"kind": "TextVariable", "spec": {
+                "name": v["name"],
+                "current": v.get("current", {"text": "", "value": ""}),
+                "query": v.get("query", ""),
+                "label": v.get("label", ""),
+                "hide": _VAR_HIDE.get(v.get("hide", 0), "dontHide"),
+                "skipUrlSync": v.get("skipUrlSync", False),
+                "description": v.get("description", ""),
+            }})
+        # datasource template vars are dropped in v2 (datasources referenced by name)
+    return out
+
+
+def to_v2(v1):
+    cursor = {0: "Off", 1: "Crosshair", 2: "Tooltip"}.get(v1.get("graphTooltip", 0), "Off")
+    return {
+        "apiVersion": "dashboard.grafana.app/v2",
+        "kind": "Dashboard",
+        "metadata": {"name": v1["uid"], "namespace": NAMESPACE},
+        "spec": {
+            "annotations": [_ANNOTATION_BUILTIN],
+            "cursorSync": cursor,
+            "description": v1.get("description", ""),
+            "editable": v1.get("editable", True),
+            "elements": {f"panel-{p['id']}": _v2_element(p) for p in v1["panels"]},
+            "layout": {"kind": "GridLayout",
+                       "spec": {"items": [_v2_layout_item(p) for p in v1["panels"]]}},
+            "links": v1.get("links", []),
+            "liveNow": v1.get("liveNow", True),
+            "preload": v1.get("preload", True),
+            "tags": v1.get("tags", []),
+            "timeSettings": {
+                "from": v1.get("time", {}).get("from", "now-7d"),
+                "to": v1.get("time", {}).get("to", "now"),
+                "autoRefresh": v1.get("refresh", "") or "",
+                "autoRefreshIntervals": _AUTOREFRESH_INTERVALS,
+                "hideTimepicker": False,
+                "fiscalYearStartMonth": v1.get("fiscalYearStartMonth", 0),
+            },
+            "title": v1["title"],
+            "variables": _v2_variables(v1.get("templating", {}).get("list", [])),
+        },
+    }
+
+
 def main():
     if not LIVE.exists():
         sys.exit(f"missing {LIVE}")
     live = json.loads(LIVE.read_text())
-    picker = build_picker(live)
-    PICKER.write_text(json.dumps(picker, indent=2) + "\n")
+    picker_v1 = build_picker(live)
     n_expr = sum(1 for pid in SPECIAL if "expr" in SPECIAL[pid])
-    n_scoped = sum(1 for p in picker["panels"] for t in p.get("targets", [])
+    n_scoped = sum(1 for p in picker_v1["panels"] for t in p.get("targets", [])
                    if 'session_label="$session"' in t.get("expr", ""))
-    print(f"Generated {PICKER.name} from {LIVE.name}: "
-          f"{len(picker['panels'])} panels, {n_expr} session-scoped query rewrites, "
-          f"{n_scoped} targets filtered by session_label.")
+    picker = to_v2(picker_v1)  # remap to the v2 manifest
+    PICKER.write_text(json.dumps(picker, indent=2) + "\n")
+    print(f"Generated {PICKER.name} (v2 schema) from {LIVE.name}: "
+          f"{len(picker['spec']['elements'])} panels, "
+          f"{len(picker['spec']['layout']['spec']['items'])} layout items, "
+          f"{n_expr} session-scoped query rewrites, {n_scoped} targets filtered by session_label.")
 
 if __name__ == "__main__":
     main()
