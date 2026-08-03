@@ -1357,7 +1357,7 @@
             "spec": {
               "options": {
                 "content": "<img src=\"data:image/jpeg;base64,{{{screenshot_jpg}}}\" style=\"width:100%;height:auto;border-radius:4px;margin-bottom:6px\"/>",
-                "defaultContent": "No screenshot for this game.",
+                "defaultContent": "Loading screenshots...",
                 "everyRow": true,
                 "renderMode": "everyRow",
                 "styles": ""
@@ -5617,7 +5617,7 @@
         "spec": {
           "id": 37,
           "title": "\u23f1\ufe0f Time per stage",
-          "description": "Total game time split by stage \u2014 each segment is the wall-clock seconds spent on that stage (stage_duration_seconds on game.stage.end, incl. the final stage to game over).",
+          "description": "Share of total game time spent on each stage \u2014 each segment is that stage's % of the game's total duration (stage_duration_seconds on game.stage.end, incl. the final stage to game over). Percent-stacked to 100%; hover for exact seconds and %.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -5771,7 +5771,7 @@
             "spec": {
               "options": {
                 "orientation": "horizontal",
-                "stacking": "normal",
+                "stacking": "percent",
                 "showValue": "auto",
                 "xField": "Player",
                 "groupWidth": 0.7,
@@ -5789,7 +5789,7 @@
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "s",
+                  "unit": "percentunit",
                   "color": {
                     "mode": "fixed",
                     "fixedColor": "#ffcc80"
@@ -5798,7 +5798,7 @@
                     "fillOpacity": 85,
                     "gradientMode": "hue",
                     "lineWidth": 1,
-                    "axisPlacement": "hidden",
+                    "axisPlacement": "auto",
                     "thresholdsStyle": {
                       "mode": "off"
                     }
@@ -6100,7 +6100,7 @@
         "spec": {
           "id": 45,
           "title": "Score progression",
-          "description": "Points scored in each stage (score_end - score_start on the stage events), stacked to the final score.",
+          "description": "Share of the final score earned in each stage \u2014 each segment is that stage's % of total points (score_end - score_start per stage). Percent-stacked to 100%; hover for exact points and %.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -6254,7 +6254,7 @@
             "spec": {
               "options": {
                 "orientation": "horizontal",
-                "stacking": "normal",
+                "stacking": "percent",
                 "showValue": "auto",
                 "xField": "Player",
                 "groupWidth": 0.7,
@@ -6272,7 +6272,7 @@
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "short",
+                  "unit": "percentunit",
                   "color": {
                     "mode": "fixed",
                     "fixedColor": "#7e57c2"
@@ -6281,7 +6281,7 @@
                     "fillOpacity": 85,
                     "gradientMode": "hue",
                     "lineWidth": 1,
-                    "axisPlacement": "hidden",
+                    "axisPlacement": "auto",
                     "thresholdsStyle": {
                       "mode": "off"
                     }

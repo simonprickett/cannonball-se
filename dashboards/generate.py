@@ -540,7 +540,7 @@ def stage_time_bar_panel(y):
         "id": 37,
         "type": "barchart",
         "title": "⏱️ Time per stage",
-        "description": "Total game time split by stage — each segment is the wall-clock seconds spent on that stage (stage_duration_seconds on game.stage.end, incl. the final stage to game over).",
+        "description": "Share of total game time spent on each stage — each segment is that stage's % of the game's total duration (stage_duration_seconds on game.stage.end, incl. the final stage to game over). Percent-stacked to 100%; hover for exact seconds and %.",
         "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
         "gridPos": {"x": 0, "y": y, "w": 24, "h": 6},
         # One query per stage (1..5, OutRun's max) so each becomes its own value field
@@ -561,15 +561,15 @@ def stage_time_bar_panel(y):
                                  "Value #A": "Stage 1", "Value #B": "Stage 2", "Value #C": "Stage 3",
                                  "Value #D": "Stage 4", "Value #E": "Stage 5"}}},
         ],
-        "options": {"orientation": "horizontal", "stacking": "normal", "showValue": "auto",
+        "options": {"orientation": "horizontal", "stacking": "percent", "showValue": "auto",
                     "xField": "Player",
                     "groupWidth": 0.7, "barWidth": 0.97, "fullHighlight": True,
                     "legend": {"showLegend": True, "displayMode": "list", "placement": "bottom"},
                     "tooltip": {"mode": "multi", "sort": "none"}},
-        "fieldConfig": {"defaults": {"unit": "s",
+        "fieldConfig": {"defaults": {"unit": "percentunit",
                                      "color": {"mode": "fixed", "fixedColor": STAGE_COLORS[0]},
                                      "custom": {"fillOpacity": 85, "gradientMode": "hue",
-                                                "lineWidth": 1, "axisPlacement": "hidden",
+                                                "lineWidth": 1, "axisPlacement": "auto",
                                                 "thresholdsStyle": {"mode": "off"}},
                                      "mappings": []},
                         # Ordinal single-hue ramp (light->dark) per stage — see STAGE_COLORS.
@@ -681,7 +681,7 @@ def score_progression_panel(y):
                 f'- max by (player_initials) (max_over_time({SCOPED} | event="game.stage.start" | stage_number="{n}" | unwrap score_start [$__range])))')
     return {
         "id": 45, "type": "barchart", "title": "Score progression",
-        "description": "Points scored in each stage (score_end - score_start on the stage events), stacked to the final score.",
+        "description": "Share of the final score earned in each stage — each segment is that stage's % of total points (score_end - score_start per stage). Percent-stacked to 100%; hover for exact points and %.",
         "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
         "gridPos": {"x": 0, "y": y, "w": 24, "h": 6},
         "targets": [
@@ -698,14 +698,14 @@ def score_progression_panel(y):
                                  "Value #A": "Stage 1", "Value #B": "Stage 2", "Value #C": "Stage 3",
                                  "Value #D": "Stage 4", "Value #E": "Stage 5"}}},
         ],
-        "options": {"orientation": "horizontal", "stacking": "normal", "showValue": "auto",
+        "options": {"orientation": "horizontal", "stacking": "percent", "showValue": "auto",
                     "xField": "Player", "groupWidth": 0.7, "barWidth": 0.97, "fullHighlight": True,
                     "legend": {"showLegend": True, "displayMode": "list", "placement": "bottom"},
                     "tooltip": {"mode": "multi", "sort": "none"}},
-        "fieldConfig": {"defaults": {"unit": "short",
+        "fieldConfig": {"defaults": {"unit": "percentunit",
                                      "color": {"mode": "fixed", "fixedColor": SCORE_COLORS[0]},
                                      "custom": {"fillOpacity": 85, "gradientMode": "hue",
-                                                "lineWidth": 1, "axisPlacement": "hidden",
+                                                "lineWidth": 1, "axisPlacement": "auto",
                                                 "thresholdsStyle": {"mode": "off"}},
                                      "mappings": []},
                         "overrides": [
@@ -1083,6 +1083,7 @@ def build_picker(live):
     # flip to "backward" for the picker only.
     for p in d["panels"]:
         if p.get("id") == 23:
+            p["options"]["defaultContent"] = "Loading screenshots..."
             for t in p.get("targets", []):
                 t["direction"] = "backward"
             # Loki returns the frame time-ascending regardless of query direction, so
