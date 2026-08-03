@@ -311,6 +311,15 @@
                       "name": "panel-45"
                     }
                   }
+                },
+                {
+                  "kind": "AutoGridLayoutItem",
+                  "spec": {
+                    "element": {
+                      "kind": "ElementReference",
+                      "name": "panel-55"
+                    }
+                  }
                 }
               ],
               "maxColumnCount": 3,

@@ -7239,6 +7239,108 @@
             }
           }
         }
+      },
+      "panel-55": {
+        "kind": "Panel",
+        "spec": {
+          "id": 55,
+          "title": "Events by stage",
+          "description": "Total telemetry events of any type recorded in each stage (all game.* events with a stage_number), stages 1-5.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "sum by (stage_number) (count_over_time({service_name=\"cannonball-se\"} | session_label=\"$session\" | stage_number != \"\" [$__range]))"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "__expr__",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "__expr__"
+                      },
+                      "spec": {
+                        "type": "sql",
+                        "expression": "SELECT t.label AS stage, COALESCE(a.cnt, 0) AS events FROM (SELECT '1' AS n, 'Stage 1' AS label UNION ALL SELECT '2','Stage 2' UNION ALL SELECT '3','Stage 3' UNION ALL SELECT '4','Stage 4' UNION ALL SELECT '5','Stage 5') t LEFT JOIN (SELECT stage_number, `__value__` AS cnt FROM A) a ON a.stage_number = t.n ORDER BY t.n"
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "barchart",
+            "version": "",
+            "spec": {
+              "options": {
+                "orientation": "vertical",
+                "xField": "stage",
+                "showValue": "never",
+                "barWidth": 0.95,
+                "groupWidth": 0.7,
+                "fullHighlight": false,
+                "stacking": "none",
+                "legend": {
+                  "showLegend": false
+                },
+                "tooltip": {
+                  "mode": "single",
+                  "sort": "none"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "short",
+                  "decimals": 0,
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "#26c6da"
+                  },
+                  "custom": {
+                    "fillOpacity": 90,
+                    "gradientMode": "opacity",
+                    "lineWidth": 1,
+                    "axisPlacement": "auto",
+                    "axisLabel": "Events",
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  },
+                  "mappings": []
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
       }
     },
     "layout": {
@@ -7552,6 +7654,15 @@
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-45"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-55"
                         }
                       }
                     }

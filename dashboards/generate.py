@@ -445,6 +445,40 @@ def crashes_by_stage_panel(pid, x, y, w):
     }
 
 
+def events_by_stage_panel(pid, x, y, w):
+    # Picker-only: total telemetry events of ANY type recorded in each stage (every
+    # game.* log line carrying a stage_number), stages 1-5. Same LEFT-JOIN/0-fill
+    # pivot as the other per-stage bars; VERTICAL (stage on x, count on y) like the
+    # speed histograms.
+    return {
+        "id": pid, "type": "barchart", "title": "Events by stage",
+        "description": "Total telemetry events of any type recorded in each stage (all game.* events with a stage_number), stages 1-5.",
+        "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+        "gridPos": {"x": x, "y": y, "w": w, "h": 8},
+        "targets": [
+            {"refId": "A", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+             "editorMode": "code", "queryType": "instant",
+             "expr": f'sum by (stage_number) (count_over_time({SCOPED} | stage_number != "" [$__range]))'},
+            {"refId": "B", "datasource": {"type": "__expr__", "uid": "__expr__"}, "type": "sql",
+             "expression": ("SELECT t.label AS stage, COALESCE(a.cnt, 0) AS events "
+                            "FROM (SELECT '1' AS n, 'Stage 1' AS label UNION ALL SELECT '2','Stage 2' "
+                            "UNION ALL SELECT '3','Stage 3' UNION ALL SELECT '4','Stage 4' UNION ALL SELECT '5','Stage 5') t "
+                            "LEFT JOIN (SELECT stage_number, `__value__` AS cnt FROM A) a ON a.stage_number = t.n "
+                            "ORDER BY t.n")},
+        ],
+        "options": {"orientation": "vertical", "xField": "stage", "showValue": "never",
+                    "barWidth": 0.95, "groupWidth": 0.7, "fullHighlight": False, "stacking": "none",
+                    "legend": {"showLegend": False}, "tooltip": {"mode": "single", "sort": "none"}},
+        "fieldConfig": {"defaults": {"unit": "short", "decimals": 0,
+                                     "color": {"mode": "fixed", "fixedColor": "#26c6da"},
+                                     "custom": {"fillOpacity": 90, "gradientMode": "opacity",
+                                                "lineWidth": 1, "axisPlacement": "auto",
+                                                "axisLabel": "Events", "thresholdsStyle": {"mode": "off"}},
+                                     "mappings": []},
+                        "overrides": []},
+    }
+
+
 def overtakes_by_stage_panel(pid, x, y, w):
     # Picker-only: overtakes per stage as a single-series bar (stages 1-5). Hidden Loki
     # metric counts by stage_number; SQL LEFT JOINs the fixed 5 stages and 0-fills.
@@ -1090,6 +1124,9 @@ def build_picker(live):
     r5 = max(p["gridPos"]["y"] + p["gridPos"]["h"] for p in d["panels"])
     d["panels"].append(upshift_speed_hist_panel(53, 0, r5, 12))
     d["panels"].append(crashes_by_stage_panel(54, 12, r5, 12))
+    # Events by stage (all-event count) — placed in the Stage Progression row via layout.json.
+    r6 = max(p["gridPos"]["y"] + p["gridPos"]["h"] for p in d["panels"])
+    d["panels"].append(events_by_stage_panel(55, 0, r6, 12))
 
     # Match the primary stat row (Game state / Player / Gearbox / Stage reached /
     # Off-road / Longest clean streak) to the header stat row height (5). The live
