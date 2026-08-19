@@ -1,6 +1,10 @@
 # Known Issues
 
-## Spurious OTLP log export errors (Status:204)
+## Spurious OTLP log export errors (Status:204) — RESOLVED
+
+**Status: Fixed** by upgrading the pinned opentelemetry-cpp version in `install.sh` from
+v1.14.2 to v1.28.0. Existing installs will pick up the fix the next time `install.sh` is run,
+which rebuilds the SDK from source since the pinned version has changed.
 
 ### Symptom
 

@@ -92,29 +92,50 @@ run_step "Install dependencies" sudo apt install -y \
   libcurl4-openssl-dev protobuf-compiler libprotobuf-dev
 
 # 7. Install OpenTelemetry C++ SDK
-run_step "Clone OpenTelemetry C++ SDK" bash -c '
-  cd /tmp
-  rm -rf opentelemetry-cpp
-  git clone --depth 1 --branch v1.14.2 https://github.com/open-telemetry/opentelemetry-cpp.git
-  cd opentelemetry-cpp
-  git submodule update --init --recursive
-'
-run_step "Build OpenTelemetry C++ SDK" bash -c '
-  cd /tmp/opentelemetry-cpp
-  mkdir -p build && cd build
-  cmake -DCMAKE_BUILD_TYPE=Release \
-        -DWITH_OTLP_HTTP=ON \
-        -DBUILD_TESTING=OFF \
-        -DWITH_EXAMPLES=OFF \
-        -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-        ..
-  make -j'"$NUMTHREADS"'
-'
-run_step "Install OpenTelemetry C++ SDK" bash -c '
-  cd /tmp/opentelemetry-cpp/build
-  sudo make install
-  sudo ldconfig
-'
+#
+# Pinned to a tagged release (never `main`) so the build is reproducible. See
+# KNOWN_ISSUES.md for the history of why this version was chosen.
+OTEL_CPP_VERSION="v1.28.0"
+OTEL_CPP_STAMP="/usr/local/share/cannonball-se/opentelemetry-cpp.version"
+
+if [[ -f "$OTEL_CPP_STAMP" ]] && [[ "$(cat "$OTEL_CPP_STAMP" 2>/dev/null)" == "$OTEL_CPP_VERSION" ]]; then
+  STEP_ORDER+=("Install OpenTelemetry C++ SDK")
+  STATUS["Install OpenTelemetry C++ SDK"]="Already installed ($OTEL_CPP_VERSION), skipped"
+  echo -e "\n--> OpenTelemetry C++ SDK $OTEL_CPP_VERSION already installed, skipping clone/build."
+else
+  run_step "Remove previous OpenTelemetry C++ SDK install" bash -c '
+    sudo rm -rf /usr/local/include/opentelemetry \
+                /usr/local/lib/cmake/opentelemetry-cpp \
+                /usr/local/lib/pkgconfig/opentelemetry_*.pc \
+                /usr/local/lib/libopentelemetry_*.a \
+                /usr/local/lib/libopentelemetry_*.so*
+  '
+  run_step "Clone OpenTelemetry C++ SDK" bash -c '
+    cd /tmp
+    rm -rf opentelemetry-cpp
+    git clone --depth 1 --branch '"$OTEL_CPP_VERSION"' https://github.com/open-telemetry/opentelemetry-cpp.git
+    cd opentelemetry-cpp
+    git submodule update --init --recursive
+  '
+  run_step "Build OpenTelemetry C++ SDK" bash -c '
+    cd /tmp/opentelemetry-cpp
+    mkdir -p build && cd build
+    cmake -DCMAKE_BUILD_TYPE=Release \
+          -DWITH_OTLP_HTTP=ON \
+          -DBUILD_TESTING=OFF \
+          -DWITH_EXAMPLES=OFF \
+          -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+          ..
+    make -j'"$NUMTHREADS"'
+  '
+  run_step "Install OpenTelemetry C++ SDK" bash -c '
+    cd /tmp/opentelemetry-cpp/build
+    sudo make install
+    sudo ldconfig
+    sudo mkdir -p "$(dirname "'"$OTEL_CPP_STAMP"'")"
+    echo "'"$OTEL_CPP_VERSION"'" | sudo tee "'"$OTEL_CPP_STAMP"'" > /dev/null
+  '
+fi
 
 # 8. Prepare and build CannonBall
 run_step "Prepare build directories" mkdir -p build roms
