@@ -1,31 +1,26 @@
 #!/usr/bin/env bash
 #
-# Push Cannonball-SE dashboard(s) to Grafana Cloud via the classic import API.
+# Push a v2 dashboard manifest (dashboard.grafana.app/v2) to Grafana Cloud via
+# `gcx dashboards update`.
 #
-# The repo dashboards are portable v1 exports that reference datasources through
-# ${DS_LOKI} / ${DS_TEMPO} plus __inputs. This stack's Grafana (v2 schema)
-# resolves a dashboard's datasource ref by its DISPLAY NAME, and the
-# /api/dashboards/db import copies the v1 `uid` value verbatim into that name
-# field without translating uid->name. So before importing we:
-#   1. substitute ${DS_*} with the datasource DISPLAY NAME (not the uid), and
-#   2. drop the now-unused datasource template variables + empty __inputs.
-# (Passing `inputs` in the import body or pinning the var's `current` do NOT
-# work — see dashboards/DASHBOARDS.md and project memory for the history.)
+# The committed manifest deliberately OMITS metadata.resourceVersion (a volatile
+# server token that would churn the file on every edit). `gcx dashboards update`
+# needs it for optimistic concurrency, so we fetch the current value from the
+# server and inject it right before updating. If the dashboard was changed by
+# another writer since we fetched, the update fails with a conflict — just re-run.
+#
+# (This replaces the old v1 classic /api/dashboards/db import + ${DS_*} display-name
+# substitution: v2 references datasources by name inline, so no substitution.)
 #
 # Usage:
-#   dashboards/push.sh                       # push recent_games_dashboard.json
-#   dashboards/push.sh live_game_dashboard.json recent_games_dashboard.json
-#   DS_LOKI_NAME=... DS_TEMPO_NAME=... dashboards/push.sh <file>   # other stack
+#   dashboards/push.sh                              # push recent_games_dashboard.json
+#   dashboards/push.sh recent_games_dashboard.json  # explicit file(s)
 #
 # Requires: gcx logged in to the target stack (verify with `gcx config check`)
 # and python3.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# Datasource DISPLAY NAMES on the target stack (override via env for another stack).
-DS_LOKI_NAME="${DS_LOKI_NAME:-grafanacloud-simonprickett-logs}"
-DS_TEMPO_NAME="${DS_TEMPO_NAME:-grafanacloud-simonprickett-traces}"
 
 files=("$@")
 if [ "${#files[@]}" -eq 0 ]; then
@@ -40,20 +35,21 @@ for f in "${files[@]}"; do
     continue
   fi
 
-  echo "==> pushing $(basename "$f")"
-  DS_LOKI_NAME="$DS_LOKI_NAME" DS_TEMPO_NAME="$DS_TEMPO_NAME" python3 - "$f" <<'PY' | gcx api /api/dashboards/db -d @- --jq '{status, uid, version, url}'
-import json, os, sys
+  name="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["metadata"]["name"])' "$f")"
+  echo "==> pushing $(basename "$f") -> $name"
 
-raw = open(sys.argv[1]).read()
-raw = (raw.replace('${DS_LOKI}',  os.environ['DS_LOKI_NAME'])
-          .replace('${DS_TEMPO}', os.environ['DS_TEMPO_NAME']))
-d = json.loads(raw)
+  # Current resourceVersion (optimistic-concurrency token) from the server.
+  rv="$(gcx dashboards get "$name" -o json 2>&1 | grep -v '"class":"hint"' \
+        | python3 -c 'import json,sys; print(json.load(sys.stdin)["metadata"]["resourceVersion"])')"
 
-# Drop the vestigial datasource template variables and import inputs.
-d.setdefault('templating', {}).setdefault('list', [])
-d['templating']['list'] = [v for v in d['templating']['list'] if v.get('type') != 'datasource']
-d['__inputs'] = []
+  # Inject the RV into a temp copy and update.
+  tmp="$(mktemp -t cannonball_v2.XXXXXX)"
+  trap 'rm -f "$tmp"' EXIT
+  python3 -c 'import json,sys
+d = json.load(open(sys.argv[1]))
+d.setdefault("metadata", {})["resourceVersion"] = sys.argv[2]
+json.dump(d, open(sys.argv[3], "w"))' "$f" "$rv" "$tmp"
 
-print(json.dumps({'dashboard': d, 'overwrite': True, 'folderUid': ''}))
-PY
+  gcx dashboards update "$name" -f "$tmp" 2>&1 | grep -v '"class":"hint"'
+  rm -f "$tmp"; trap - EXIT
 done

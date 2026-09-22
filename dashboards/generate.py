@@ -9,11 +9,16 @@ query scoping and variables differ.
 
 Usage:  python3 dashboards/generate.py
 """
-import json, pathlib, sys
+import json, pathlib, sys, urllib.parse
 
 HERE = pathlib.Path(__file__).parent
 LIVE = HERE / "live_game_dashboard.json"
 PICKER = HERE / "recent_games_dashboard.json"
+# Data-driven layout: the v2 spec.layout (RowsLayout) captured from the Grafana UI.
+# Arrange in the UI, then `gcx dashboards get cannonball-recent-games` and save its
+# spec.layout here (see dashboards/README/push.sh). Panel CONTENT stays in this
+# generator; only positions + rows/tabs live in layout.json.
+LAYOUT_FILE = HERE / "layout.json"
 
 SEL = '{service_name="cannonball-se"}'
 SCOPED = f'{SEL} | session_label="$session"'
@@ -36,6 +41,10 @@ SCORE_COLORS = ["#7e57c2", "#673ab7", "#5e35b1", "#4527a0", "#311b92"]
 # panels whose live wording ("latest", "follows it") is wrong on a pick-a-game board.
 SPECIAL = {
     16: {"description": "player_initials of the selected game."},
+    # Title tweaks (+ emoji) on live-board-inherited panels — Recent-Games-only,
+    # so the live/Now Playing board keeps its own plain titles.
+    20: {"title": "🗺️ Route taken (map)"},
+    23: {"title": "📷 Key moments"},
     4: {"description": "Number of times the car went off-road (game.off_road events) in the selected game.",
         "thresholds": [{"color": "green", "value": None},   # 0-5
                        {"color": "orange", "value": 6},     # 6-12
@@ -87,17 +96,29 @@ def picker_variables():
          "options": [{"text": "", "value": "", "selected": True}],
          "hide": 0, "skipUrlSync": False,
          "description": "session_label of the game to view. Click a row in 'Recent games' to set it, or type/paste one."},
+        # Hidden helper var: the selected game's gearbox_mode ("automatic"/"manual"),
+        # set by the picker-table data link alongside `session`. Drives the Gearbox
+        # Usage row's conditional rendering (show only when == "manual"). Empty for
+        # pre-telemetry games or a hand-typed session -> row stays hidden.
+        {"name": "gearbox", "label": "Gearbox mode", "type": "textbox",
+         "query": "", "current": {"text": "", "value": ""},
+         "options": [{"text": "", "value": "", "selected": True}],
+         "hide": 2, "skipUrlSync": False,
+         "description": "gearbox_mode of the selected game; set by the picker-table data link, drives the Gearbox Usage row conditional rendering."},
     ]
 
 
 def recent_games_panel():
-    # Loki-driven picker table: one row per game (session_label) over the
-    # dashboard time range, newest first. Each row's data link sets the
-    # `session` textbox var and reloads, scoping every panel below to that game.
+    # Loki-driven picker table: one row per game (session_label) over the dashboard
+    # time range, newest first. Driven off game.session.start so each row also carries
+    # the game's gearbox_mode. Clicking a row's data link sets BOTH the `session` and
+    # `gearbox` textbox vars and reloads — session scopes every panel; gearbox drives
+    # the Gearbox Usage row's conditional rendering (show only for manual games).
+    # gearbox_mode is kept in the frame (for the link) but hidden as a column.
     return {
         "id": 30,
         "type": "table",
-        "title": "Recent games — click a row to view",
+        "title": "Game Selector",
         "description": ("Every game seen in the current time range, newest first "
                         "(session_label sorts lexically by its timestamp prefix). Click a "
                         "row to load that game into the panels below. Widen the time range "
@@ -110,14 +131,17 @@ def recent_games_panel():
             "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
             "editorMode": "code",
             "queryType": "instant",
-            "expr": f'sum by (session_label) (count_over_time({SEL} | session_label!="" [$__range]))',
+            # One series per game: session_label + gearbox_mode (from the single
+            # session.start event each game emits). Pre-telemetry games have no
+            # gearbox_mode label -> empty cell -> Gearbox row hidden for them.
+            "expr": f'sum by (session_label, gearbox_mode) (count_over_time({SEL} | event="game.session.start" [$__range]))',
         }],
         "options": {"showHeader": True, "cellHeight": "sm",
                     "footer": {"show": False},
                     "sortBy": [{"displayName": "Game", "desc": True}]},
         "transformations": [
             {"id": "organize", "options": {
-                # Keep only the game (session_label); drop Time and the event count.
+                # Keep the game (session_label) + gearbox_mode; drop Time and the count.
                 "excludeByName": {"Time": True, "Value": True, "Value #A": True},
                 "renameByName": {"session_label": "Game"},
             }},
@@ -130,10 +154,15 @@ def recent_games_panel():
                      {"id": "custom.width", "value": 340},
                      {"id": "links", "value": [{
                          "title": "View this game",
-                         "url": "/d/cannonball-recent-games/?var-session=${__value.raw}&${__url_time_range}",
+                         # Set session (scopes the board) AND gearbox (row conditional render).
+                         "url": "/d/cannonball-recent-games/?var-session=${__value.raw}"
+                                "&var-gearbox=${__data.fields[\"gearbox_mode\"]}&${__url_time_range}",
                          "targetBlank": False,
                      }]},
                  ]},
+                # gearbox_mode stays in the frame (the link reads it) but is hidden as a column.
+                {"matcher": {"id": "byName", "options": "gearbox_mode"},
+                 "properties": [{"id": "custom.hidden", "value": True}]},
             ],
         },
     }
@@ -434,6 +463,40 @@ def crashes_by_stage_panel(pid, x, y, w):
     }
 
 
+def events_by_stage_panel(pid, x, y, w):
+    # Picker-only: total telemetry events of ANY type recorded in each stage (every
+    # game.* log line carrying a stage_number), stages 1-5. Same LEFT-JOIN/0-fill
+    # pivot as the other per-stage bars; VERTICAL (stage on x, count on y) like the
+    # speed histograms.
+    return {
+        "id": pid, "type": "barchart", "title": "Events by stage",
+        "description": "Total telemetry events of any type recorded in each stage (all game.* events with a stage_number), stages 1-5.",
+        "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+        "gridPos": {"x": x, "y": y, "w": w, "h": 8},
+        "targets": [
+            {"refId": "A", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+             "editorMode": "code", "queryType": "instant",
+             "expr": f'sum by (stage_number) (count_over_time({SCOPED} | stage_number != "" [$__range]))'},
+            {"refId": "B", "datasource": {"type": "__expr__", "uid": "__expr__"}, "type": "sql",
+             "expression": ("SELECT t.label AS stage, COALESCE(a.cnt, 0) AS events "
+                            "FROM (SELECT '1' AS n, 'Stage 1' AS label UNION ALL SELECT '2','Stage 2' "
+                            "UNION ALL SELECT '3','Stage 3' UNION ALL SELECT '4','Stage 4' UNION ALL SELECT '5','Stage 5') t "
+                            "LEFT JOIN (SELECT stage_number, `__value__` AS cnt FROM A) a ON a.stage_number = t.n "
+                            "ORDER BY t.n")},
+        ],
+        "options": {"orientation": "vertical", "xField": "stage", "showValue": "never",
+                    "barWidth": 0.95, "groupWidth": 0.7, "fullHighlight": False, "stacking": "none",
+                    "legend": {"showLegend": False}, "tooltip": {"mode": "single", "sort": "none"}},
+        "fieldConfig": {"defaults": {"unit": "short", "decimals": 0,
+                                     "color": {"mode": "fixed", "fixedColor": "#26c6da"},
+                                     "custom": {"fillOpacity": 90, "gradientMode": "opacity",
+                                                "lineWidth": 1, "axisPlacement": "auto",
+                                                "axisLabel": "Events", "thresholdsStyle": {"mode": "off"}},
+                                     "mappings": []},
+                        "overrides": []},
+    }
+
+
 def overtakes_by_stage_panel(pid, x, y, w):
     # Picker-only: overtakes per stage as a single-series bar (stages 1-5). Hidden Loki
     # metric counts by stage_number; SQL LEFT JOINs the fixed 5 stages and 0-fills.
@@ -476,8 +539,8 @@ def stage_time_bar_panel(y):
     return {
         "id": 37,
         "type": "barchart",
-        "title": "Time per stage",
-        "description": "Total game time split by stage — each segment is the wall-clock seconds spent on that stage (stage_duration_seconds on game.stage.end, incl. the final stage to game over).",
+        "title": "⏱️ Time per stage",
+        "description": "Share of total game time spent on each stage — each segment is that stage's % of the game's total duration (stage_duration_seconds on game.stage.end, incl. the final stage to game over). Percent-stacked to 100%; hover for exact seconds and %.",
         "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
         "gridPos": {"x": 0, "y": y, "w": 24, "h": 6},
         # One query per stage (1..5, OutRun's max) so each becomes its own value field
@@ -498,15 +561,15 @@ def stage_time_bar_panel(y):
                                  "Value #A": "Stage 1", "Value #B": "Stage 2", "Value #C": "Stage 3",
                                  "Value #D": "Stage 4", "Value #E": "Stage 5"}}},
         ],
-        "options": {"orientation": "horizontal", "stacking": "normal", "showValue": "auto",
+        "options": {"orientation": "horizontal", "stacking": "percent", "showValue": "auto",
                     "xField": "Player",
                     "groupWidth": 0.7, "barWidth": 0.97, "fullHighlight": True,
                     "legend": {"showLegend": True, "displayMode": "list", "placement": "bottom"},
                     "tooltip": {"mode": "multi", "sort": "none"}},
-        "fieldConfig": {"defaults": {"unit": "s",
+        "fieldConfig": {"defaults": {"unit": "percentunit",
                                      "color": {"mode": "fixed", "fixedColor": STAGE_COLORS[0]},
                                      "custom": {"fillOpacity": 85, "gradientMode": "hue",
-                                                "lineWidth": 1, "axisPlacement": "hidden",
+                                                "lineWidth": 1, "axisPlacement": "auto",
                                                 "thresholdsStyle": {"mode": "off"}},
                                      "mappings": []},
                         # Ordinal single-hue ramp (light->dark) per stage — see STAGE_COLORS.
@@ -530,7 +593,7 @@ def speed_gauge_panel(pid, x, y, w, h, title, description, expr):
                     "effects": {"barGlow": False, "centerGlow": False, "gradient": False},
                     "endpointMarker": "point", "minVizHeight": 75, "minVizWidth": 75,
                     "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False},
-                    "segmentCount": 1, "segmentSpacing": 0.3, "shape": "gauge",
+                    "segmentCount": 63, "segmentSpacing": 0.3, "shape": "gauge",  # 63 = dashed arc
                     "showThresholdLabels": False, "showThresholdMarkers": True, "sizing": "auto",
                     "sparkline": False, "style": "circle", "textMode": "auto"},
         "fieldConfig": {"defaults": {"unit": "velocitykmh", "min": 0, "max": 300, "decimals": 0,
@@ -582,7 +645,7 @@ def checkpoint_buffer_panel(pid, x, y):
     # bargauge won't render a label when only one series is returned). Low = red,
     # high = green. A is hidden; it just feeds the expression.
     return {
-        "id": pid, "type": "bargauge", "title": "Checkpoint time buffer",
+        "id": pid, "type": "bargauge", "title": "⏱️ Checkpoint time buffer",
         "description": "Seconds left on the clock at each checkpoint (game.stage.end time_remaining_seconds), stages 1-5. Uncompleted stages show 0.",
         "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
         "gridPos": {"x": x, "y": y, "w": 12, "h": 8},
@@ -617,8 +680,8 @@ def score_progression_panel(y):
         return (f'(max by (player_initials) (max_over_time({SCOPED} | event="game.stage.end" | stage_number="{n}" | unwrap score_end [$__range])) '
                 f'- max by (player_initials) (max_over_time({SCOPED} | event="game.stage.start" | stage_number="{n}" | unwrap score_start [$__range])))')
     return {
-        "id": 45, "type": "barchart", "title": "Score progression",
-        "description": "Points scored in each stage (score_end - score_start on the stage events), stacked to the final score.",
+        "id": 45, "type": "barchart", "title": "Score per stage",
+        "description": "Share of the final score earned in each stage — each segment is that stage's % of total points (score_end - score_start per stage). Percent-stacked to 100%; hover for exact points and %.",
         "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
         "gridPos": {"x": 0, "y": y, "w": 24, "h": 6},
         "targets": [
@@ -635,14 +698,14 @@ def score_progression_panel(y):
                                  "Value #A": "Stage 1", "Value #B": "Stage 2", "Value #C": "Stage 3",
                                  "Value #D": "Stage 4", "Value #E": "Stage 5"}}},
         ],
-        "options": {"orientation": "horizontal", "stacking": "normal", "showValue": "auto",
+        "options": {"orientation": "horizontal", "stacking": "percent", "showValue": "auto",
                     "xField": "Player", "groupWidth": 0.7, "barWidth": 0.97, "fullHighlight": True,
                     "legend": {"showLegend": True, "displayMode": "list", "placement": "bottom"},
                     "tooltip": {"mode": "multi", "sort": "none"}},
-        "fieldConfig": {"defaults": {"unit": "short",
+        "fieldConfig": {"defaults": {"unit": "percentunit",
                                      "color": {"mode": "fixed", "fixedColor": SCORE_COLORS[0]},
                                      "custom": {"fillOpacity": 85, "gradientMode": "hue",
-                                                "lineWidth": 1, "axisPlacement": "hidden",
+                                                "lineWidth": 1, "axisPlacement": "auto",
                                                 "thresholdsStyle": {"mode": "off"}},
                                      "mappings": []},
                         "overrides": [
@@ -698,7 +761,7 @@ def rank_panel(pid, x, y, title, all_games_expr, selected_expr, description):
 
 def score_rank_panel(x, y):
     return rank_panel(
-        38, x, y, "Overall Rank",
+        38, x, y, "Rank: Overall",
         f'max by (session_label) (max_over_time({SEL} | event="game.session.end" | unwrap final_score [$__range]))',
         f'max(max_over_time({SCOPED} | event="game.session.end" | unwrap final_score [$__range]))',
         "This game's rank by final score among all games in the dashboard time range (1 = highest score).")
@@ -736,7 +799,7 @@ def music_panel(x, y):
     return {
         "id": 33,
         "type": "stat",
-        "title": "Music",
+        "title": "🎵 Music",
         "description": "music_selection for the selected game (numeric for now; track-name mappings TBD).",
         "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
         "gridPos": {"x": x, "y": y, "w": 4, "h": 5},
@@ -801,6 +864,138 @@ def longest_clean_panel(x, y, w):
     }
 
 
+# Grafana Cloud stack + Tempo/Loki datasources for the "View trace"/"View logs"
+# panel's Explore links. Separate from DS_NAME (which resolves PANEL/QUERY
+# datasource refs at v1->v2 time) because these are hand-built browser URLs, not
+# query datasource refs.
+GRAFANA_BASE_URL = "https://simonprickett.grafana.net"
+TEMPO_DS_UID = "grafanacloud-traces"
+LOKI_DS_UID = "grafanacloud-logs"
+
+
+def _tempo_trace_url_template():
+    # Traces Drilldown (the "grafana-exploretraces-app" plugin, née Explore Traces) —
+    # a richer trace view (waterfall + service breakdown) than plain Explore's TraceQL
+    # link, and a simpler URL: flat query params instead of a schemaVersion/panes JSON
+    # blob. Confirmed against grafana/explore-traces source:
+    #   - `traceId` is synced via its own SceneObjectUrlSync key (not a `var-`), and
+    #     just opens a trace-detail drawer over whatever's behind it
+    #     (src/pages/Explore/TraceExploration.tsx).
+    #   - `var-ds` (VAR_DATASOURCE) is a DataSourceVariable with NO safe default —
+    #     unset, it falls back to whatever datasource the browser last used
+    #     (localStorage) — so it must be passed explicitly.
+    #   - Every other var-* (primarySignal/metric/groupBy/filters/spanListColumns/
+    #     latencyThreshold/durationPercentiles) and `actionView` has an in-app
+    #     default (PrimarySignalVariable self-inits when empty; the un-set action
+    #     view falls through to TracesByServiceScene's own default tab, "breakdown" —
+    #     the first entry in actionViewsDefinitions) — dropped for simplicity.
+    # `from`/`to` ARE kept explicit, same reasoning as the old link: Tempo's
+    # retention is shorter than Loki's, so the app's own default time range can't be
+    # trusted to cover an older game's trace.
+    #
+    # trace_id is only known at RENDER time (one per selected game), so the id is a
+    # placeholder here; because it's made only of letters/underscore, urlencode leaves
+    # it untouched and we can safely swap it for a mustache tag afterwards — the
+    # dynamictext panel substitutes the real trace_id into the URL with no further
+    # encoding needed (trace ids are plain hex, always URL-safe).
+    placeholder = "TRACE_ID_PLACEHOLDER"
+    query = urllib.parse.urlencode({
+        "from": "now-30d",
+        "to": "now",
+        "traceId": placeholder,
+        "var-ds": TEMPO_DS_UID,
+    })
+    url = f"{GRAFANA_BASE_URL}/a/grafana-exploretraces-app/explore?{query}"
+    assert placeholder in url, "placeholder got percent-encoded — check its charset"
+    return url.replace(placeholder, "{{{trace_id}}}")
+
+
+def _loki_logs_url_template():
+    # Plain Explore (not the Logs Drilldown app — session_label/trace_id are
+    # structured metadata, and drilldown apps browse indexed labels/detected
+    # fields, the same mismatch that ruled Tempo's tag-values picker out — see
+    # [[project_loki_only_picker]]/reference_v2_dashboard_schema). Same
+    # schemaVersion/panes shape as the original Tempo Explore link.
+    #
+    # Filters by trace_id, NOT session_label, even though this is the LOGS link —
+    # trace_id uniquely identifies the same game (verified: `| trace_id="<id>"`
+    # alone returns the full event set for the session) and is the only field this
+    # panel already reliably extracts. Two earlier attempts at session_label both
+    # failed live: "${session}" isn't interpolated by this panel type at all, and
+    # splitting "trace_id::session_label" out of one query via `extractFields`
+    # regex came back empty for session_label (untraced — maybe session_label's
+    # spaces/colons from its timestamp prefix, maybe the transform itself; not
+    # worth another guess when trace_id alone already does the job with the
+    # SAME single-field mechanism already proven for the trace link below).
+    placeholder = "TRACE_ID_PLACEHOLDER"
+    panes = {
+        "log": {
+            "datasource": LOKI_DS_UID,
+            "queries": [{
+                "refId": "A",
+                "datasource": {"type": "loki", "uid": LOKI_DS_UID},
+                "queryType": "range",
+                "expr": f'{SEL} | trace_id="{placeholder}"',
+            }],
+            "range": {"from": "now-30d", "to": "now"},
+        }
+    }
+    query = urllib.parse.urlencode(
+        {"schemaVersion": 1, "panes": json.dumps(panes, separators=(",", ":")), "orgId": 1})
+    url = f"{GRAFANA_BASE_URL}/explore?{query}"
+    assert placeholder in url, "placeholder got percent-encoded — check its charset"
+    return url.replace(placeholder, "{{{trace_id}}}")
+
+
+def view_trace_panel(pid, x, y, w, h):
+    # Picker-only: direct links to the selected game's trace (Tempo, via Traces
+    # Drilldown) and its raw logs (Loki, via Explore). The OTel trace is the
+    # game_session root span plus its stage_N/post_game children — see
+    # src/main/telemetry.cpp. Both links key off trace_id (see
+    # _loki_logs_url_template for why the logs link uses trace_id rather than
+    # session_label), fetched exactly like the (now-removed) Final frame/Course
+    # map screenshot panels: one Loki line -> rename to a named field ->
+    # interpolate into the dynamictext panel's HTML.
+    return {
+        "id": pid,
+        "type": "marcusolsson-dynamictext-panel",
+        "title": "🔗 View traces and logs",
+        "description": ("Opens the selected game's trace (Tempo, via Traces Drilldown) "
+                         "and its raw logs (Loki, via Explore). Tempo's trace retention "
+                         "is shorter than Loki's, so a very old game from the picker may "
+                         "404 the trace link even though its log rows (and the logs link) "
+                         "are still around."),
+        "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+        "gridPos": {"x": x, "y": y, "w": w, "h": h},
+        "options": {
+            "content": (
+                '<div style="display:flex;flex-direction:column;gap:8px;'
+                'text-align:center;font-size:16px;">'
+                f'<a href="{_tempo_trace_url_template()}" target="_blank" '
+                'rel="noopener">View trace ↗</a>'
+                f'<a href="{_loki_logs_url_template()}" target="_blank" '
+                'rel="noopener">View logs ↗</a>'
+                '</div>'
+            ),
+            "defaultContent": "No trace_id for this game.",
+            "everyRow": True,
+        },
+        "targets": [{
+            "refId": "A",
+            "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+            "editorMode": "code",
+            "queryType": "range",
+            "expr": SCOPED + ' | trace_id != "" | line_format "{{.trace_id}}"',
+            "maxLines": 1,
+        }],
+        "transformations": [
+            {"id": "organize", "options": {"renameByName": {"Line": "trace_id"}}},
+            {"id": "filterFieldsByName", "options": {"include": {"names": ["trace_id"]}}},
+        ],
+        "fieldConfig": {"defaults": {}, "overrides": []},
+    }
+
+
 # Route-map stages: columns left->right (stage 1..5); within a column, top->bottom
 # is highest id first (= most left-turns), matching the OutRun stage_lookup_off ids.
 STAGES = [
@@ -834,7 +1029,10 @@ def route_map_dot():
     return (
         'digraph OutRun {\n'
         '  rankdir=LR;\n'
-        '  bgcolor="transparent";\n'
+        # Synthwave gradient backdrop. Kept dark purple->indigo so the green/red/grey
+        # nodes stay high-contrast (no pink/magenta, which would wash out red nodes).
+        '  bgcolor="#160a2e:#3d1a6d";\n'
+        '  gradientangle=90;\n'
         '  node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11, '
         'fillcolor="#4a4a4a", fontcolor="white", color="#00000000", penwidth=1.5];\n'
         '  edge [arrowsize=0.7, color="#9e9e9e", penwidth=1.2];\n\n'
@@ -844,6 +1042,25 @@ def route_map_dot():
         + '\n'.join(edges) + '\n'
         '}'
     )
+
+
+def duplicate_panel(src, new_id, title=None):
+    # An IDENTICAL copy of panel `src` that re-uses the source's already-fetched query
+    # results via Grafana's "-- Dashboard --" datasource (referenced by panelId), so
+    # Loki runs the source's query only ONCE no matter how many copies exist. viz +
+    # fieldConfig + transformations are copied verbatim; `withTransforms` is omitted so
+    # the copy receives the source's RAW query results and re-applies the (copied)
+    # transforms to reshape them identically. The transpiler maps the dashboard
+    # datasource (type "datasource" / uid "-- Dashboard --" + panelId) with no changes.
+    dup = json.loads(json.dumps(src))  # deep copy (viz, fieldConfig, transformations)
+    dup["id"] = new_id
+    if title is not None:
+        dup["title"] = title
+    dup["datasource"] = {"type": "datasource", "uid": "-- Dashboard --"}
+    dup["targets"] = [{"refId": "A",
+                       "datasource": {"type": "datasource", "uid": "-- Dashboard --"},
+                       "panelId": src["id"]}]
+    return dup
 
 
 def build_picker(live):
@@ -889,6 +1106,9 @@ def build_picker(live):
             p["gridPos"]["y"] -= gap
     # Drop the "Selected game" header (id 1) — adds no value; nothing depends on it.
     d["panels"] = [p for p in d["panels"] if p.get("id") != 1]
+    # Drop the Final frame (id 21) + Course map (id 22) single-shot screenshots —
+    # removed in the v2 layout (Route map moved into the Overview row; Route row gone).
+    d["panels"] = [p for p in d["panels"] if p.get("id") not in (21, 22)]
     d["panels"].append(total_events_panel(TABLE_H))
     d["panels"].append(music_panel(4, TABLE_H))
     # Fill the rest of the header row with session totals.
@@ -926,6 +1146,10 @@ def build_picker(live):
             p["gridPos"]["x"], p["gridPos"]["w"] = row_widths[p["id"]]
     d["panels"].append(gearbox_mode_panel(48, 8, row_y, 4))   # between Player and Stage reached
     d["panels"].append(longest_clean_panel(20, row_y, 4))
+    # gridPos here is a placeholder — v2 layout is owned by layout.json (see
+    # _load_layout); this panel starts in the auto-appended "Unplaced" row until
+    # it's dragged into place in the UI and layout.json is re-pulled.
+    d["panels"].append(view_trace_panel(59, 0, row_y + 4, 6, 4))
     # Sort "Overtakes by color" (id 17) bars descending (wrap the already-scoped expr).
     for p in d["panels"]:
         if p.get("id") == 17:
@@ -1012,35 +1236,44 @@ def build_picker(live):
                 "matchFieldName": "edge_id", "matchPattern": "${id}",
                 "rules": [{"kind": "strokeColor", "colorFieldName": "taken", "thresholdId": "edge-green"}]}]
             break
-    # Final frame (id 21) + Course map (id 22): these screenshots load a beat after
-    # the rest, so show a "loading" placeholder rather than a "no screenshot" message;
-    # and make the panels tall enough for the ~640x512 image (width:100%) not to clip.
+    # Key moments (id 23): reverse the screenshot flow so the most recent (game-over)
+    # frame is first. The live board reads them oldest-first (Loki direction "forward");
+    # flip to "backward" for the picker only.
     for p in d["panels"]:
-        if p.get("id") in (21, 22):
-            p["options"]["defaultContent"] = "Loading screenshot..."
-            p["gridPos"]["h"] = 16
+        if p.get("id") == 23:
+            p["options"]["defaultContent"] = "Loading screenshots..."
+            for t in p.get("targets", []):
+                t["direction"] = "backward"
+            # Loki returns the frame time-ascending regardless of query direction, so
+            # also sort rows by Time DESC — inserted BEFORE the field-filter that drops
+            # Time — to force the newest (game-over) screenshot to render first.
+            txs = p.get("transformations", [])
+            idx = next((i for i, t in enumerate(txs) if t.get("id") == "filterFieldsByName"), len(txs))
+            txs.insert(idx, {"id": "sortBy", "options": {"sort": [{"field": "Time", "desc": True}]}})
+            p["transformations"] = txs
+            break
     # More rank tiles in a throwaway new row (layout TBD) — same rank_panel pattern
     # as Overall Rank, each "higher = 1st".
     rank_y = max(p["gridPos"]["y"] + p["gridPos"]["h"] for p in d["panels"])
     d["panels"].append(rank_panel(
-        39, 0, rank_y, "Longest time played",
+        39, 0, rank_y, "Rank: Game duration",
         f'(max by (session_label) (max_over_time({SEL} | event="game.session.end" | unwrap end_epoch_ms [$__range])) '
         f'- max by (session_label) (max_over_time({SEL} | event="game.session.start" | unwrap start_epoch_ms [$__range]))) / 1000',
         f'(max(max_over_time({SCOPED} | event="game.session.end" | unwrap end_epoch_ms [$__range])) '
         f'- max(max_over_time({SCOPED} | event="game.session.start" | unwrap start_epoch_ms [$__range]))) / 1000',
         "Rank by game duration among all games in the dashboard time range (1 = longest)."))
     d["panels"].append(rank_panel(
-        40, 4, rank_y, "Most overtakes",
+        40, 4, rank_y, "Rank: Overtaking",
         f'sum by (session_label) (count_over_time({SEL} | event="game.vehicle_overtake" [$__range]))',
         f'sum(count_over_time({SCOPED} | event="game.vehicle_overtake" [$__range]))',
         "Rank by total overtakes among all games in the dashboard time range (1 = most)."))
     d["panels"].append(rank_panel(
-        41, 8, rank_y, "Average speed",
+        41, 8, rank_y, "Rank: Average speed",
         f'avg by (session_label) (avg_over_time({SEL} | unwrap speed_kph [$__range]))',
         f'avg(avg_over_time({SCOPED} | unwrap speed_kph [$__range]))',
         "Rank by average speed (km/h) among all games in the dashboard time range (1 = fastest)."))
     d["panels"].append(rank_panel(
-        42, 12, rank_y, "Longest clean streak",
+        42, 12, rank_y, "Rank: Clean streak",
         f'max by (session_label) (max_over_time({SEL} | event="game.session.end" | unwrap longest_clean_seconds [$__range]))',
         f'max(max_over_time({SCOPED} | event="game.session.end" | unwrap longest_clean_seconds [$__range]))',
         "Rank by longest clean-driving streak among all games in the dashboard time range (1 = longest)."))
@@ -1049,7 +1282,7 @@ def build_picker(live):
         "Top speed (km/h) at which an overtake happened in the selected game.",
         f'max(max_over_time({SCOPED} | event="game.vehicle_overtake" | unwrap speed_kph [$__range]))'))
     d["panels"].append(rank_panel(
-        47, 20, rank_y, "Fastest overtake rank",
+        47, 20, rank_y, "Rank: Fastest overtake",
         f'max by (session_label) (max_over_time({SEL} | event="game.vehicle_overtake" | unwrap speed_kph [$__range]))',
         f'max(max_over_time({SCOPED} | event="game.vehicle_overtake" | unwrap speed_kph [$__range]))',
         "Rank by fastest overtake speed among all games in the dashboard time range (1 = fastest)."))
@@ -1072,13 +1305,27 @@ def build_picker(live):
     # Per-stage breakdowns (new bottom row, layout TBD): incidents (crashes+off-road,
     # stacked) + overtakes.
     r4 = max(p["gridPos"]["y"] + p["gridPos"]["h"] for p in d["panels"])
-    d["panels"].append(incidents_by_stage_panel(51, 0, r4, 12))
-    d["panels"].append(overtakes_by_stage_panel(52, 12, r4, 12))
+    incidents51 = incidents_by_stage_panel(51, 0, r4, 12)
+    d["panels"].append(incidents51)
+    overtakes52 = overtakes_by_stage_panel(52, 12, r4, 12)
+    d["panels"].append(overtakes52)
+    # Duplicate of Overtakes-by-stage (id52) shown in the Stage Progression row too —
+    # re-uses id52's query results (no extra Loki query). Positioned via layout.json.
+    d["panels"].append(duplicate_panel(overtakes52, 56))
     # Up-shift speeds (companion to Down-shift speeds; meaningful in manual mode) +
     # Crashes by stage (crash-type breakdown, stacked).
     r5 = max(p["gridPos"]["y"] + p["gridPos"]["h"] for p in d["panels"])
     d["panels"].append(upshift_speed_hist_panel(53, 0, r5, 12))
-    d["panels"].append(crashes_by_stage_panel(54, 12, r5, 12))
+    crashes54 = crashes_by_stage_panel(54, 12, r5, 12)
+    d["panels"].append(crashes54)
+    # Duplicates of Incidents-by-stage (id51) + Crashes-by-stage (id54) shown in the
+    # Stage Progression row too — reuse the sources' query results (no extra Loki
+    # queries). Positioned via layout.json.
+    d["panels"].append(duplicate_panel(incidents51, 57))
+    d["panels"].append(duplicate_panel(crashes54, 58))
+    # Events by stage (all-event count) — placed in the Stage Progression row via layout.json.
+    r6 = max(p["gridPos"]["y"] + p["gridPos"]["h"] for p in d["panels"])
+    d["panels"].append(events_by_stage_panel(55, 0, r6, 12))
 
     # Match the primary stat row (Game state / Player / Gearbox / Stage reached /
     # Off-road / Longest clean streak) to the header stat row height (5). The live
@@ -1092,6 +1339,29 @@ def build_picker(live):
     for p in d["panels"]:
         if p.get("id") in STAT_ROW_IDS:
             p["gridPos"]["h"] = 5
+
+    # Emoji title prefixes (Recent-Games-only). Applied last so it covers inherited,
+    # picker-added AND duplicated panels uniformly by id. 😃 player, ✅ stage, 💯 score,
+    # 🏁 overall/state, 🚘🚘 overtaking, ⏱️ speed/duration/streak, 🕹️ gear (+⏱️ for shift
+    # speeds), 🙈 incidents, 😳 off-road, 📈 events, 🤕 crashes. (Music/Route/Key moments/
+    # per-stage already carry their own emoji from earlier edits — not listed here.)
+    TITLE_EMOJI = {
+        30: "🕹️",  # Game Selector table
+        16: "😃", 14: "✅", 7: "💯", 45: "💯",
+        2: "🏁", 38: "🏁",
+        5: "🚘🚘", 17: "🚘🚘", 35: "🚘🚘", 40: "🚘🚘", 43: "🚘🚘",
+        46: "🚘🚘", 47: "🚘🚘", 52: "🚘🚘", 56: "🚘🚘",
+        6: "⏱️", 15: "⏱️", 32: "⏱️", 36: "⏱️", 39: "⏱️", 41: "⏱️", 42: "⏱️",
+        48: "🕹️", 49: "🕹️", 50: "🕹️⏱️", 53: "🕹️⏱️",
+        51: "🙈", 57: "🙈",
+        4: "😳",
+        31: "📈", 55: "📈",
+        3: "🤕", 10: "🤕", 34: "🤕", 54: "🤕", 58: "🤕",
+    }
+    for p in d["panels"]:
+        emoji = TITLE_EMOJI.get(p.get("id"))
+        if emoji and not p.get("title", "").startswith(emoji):
+            p["title"] = f"{emoji} {p['title']}"
 
     # Variables + import inputs (Loki only — Tempo dropped)
     d["templating"] = {"list": picker_variables()}
@@ -1116,18 +1386,171 @@ def build_picker(live):
                         "grafana-graphviz-panel and marcusolsson-dynamictext-panel.")
     return d
 
+# ---------------------------------------------------------------------------
+# v1 -> v2 transpiler (schema dashboard.grafana.app/v2)
+#
+# build_picker still assembles the board in the familiar v1 shape (all the panel
+# helpers, SQL exprs, session scoping, graphviz). This final step remaps that dict
+# to the v2 manifest that `gcx dashboards update` wants: each panel becomes
+# spec.elements["panel-<id>"], gridPos moves to a separate spec.layout, datasources
+# resolve by DISPLAY NAME inline (no ${DS_LOKI} var / push-time substitution), and a
+# few fields are renamed. See reference_v2_dashboard_schema in project memory.
+# ---------------------------------------------------------------------------
+
+NAMESPACE = "stacks-1144523"  # Grafana Cloud stack (simonprickett)
+DS_NAME = {                    # v1 datasource uid -> v2 datasource display name
+    "${DS_LOKI}": "grafanacloud-simonprickett-logs",
+    "${DS_TEMPO}": "grafanacloud-simonprickett-traces",
+}
+_VAR_HIDE = {0: "dontHide", 1: "hideLabel", 2: "hideVariable"}
+_AUTOREFRESH_INTERVALS = ["5s", "10s", "30s", "1m", "5m", "15m", "30m", "1h", "2h", "1d"]
+_ANNOTATION_BUILTIN = {  # Grafana's default built-in annotation, v2 form
+    "kind": "AnnotationQuery",
+    "spec": {
+        "builtIn": True, "enable": True, "hide": True,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "legacyOptions": {"type": "dashboard"},
+        "name": "Annotations & Alerts",
+        "query": {"kind": "DataQuery", "group": "grafana", "version": "v0",
+                  "datasource": {"name": "-- Grafana --"}, "spec": {}},
+    },
+}
+
+
+def _v2_query(t):
+    # One v1 target -> one v2 PanelQuery. Datasource resolves by display name; the
+    # remaining target keys (expr/queryType/editorMode/maxLines, or type/expression
+    # for a SQL __expr__) become the DataQuery spec verbatim.
+    ds = t.get("datasource", {})
+    uid, typ = ds.get("uid", ""), ds.get("type", "")
+    if typ == "__expr__" or uid == "__expr__":
+        group, name = "__expr__", "__expr__"
+    else:
+        group, name = (typ or "loki"), DS_NAME.get(uid, uid)
+    qspec = {k: v for k, v in t.items() if k not in ("refId", "datasource", "hide", "key")}
+    return {"kind": "PanelQuery", "spec": {
+        "query": {"kind": "DataQuery", "group": group, "version": "v0",
+                  "datasource": {"name": name}, "spec": qspec},
+        "refId": t.get("refId", "A"),
+        "hidden": bool(t.get("hide", False)),   # v1 `hide` -> v2 `hidden`
+    }}
+
+
+def _v2_transform(tr):
+    # v1 {id, options, ...} -> v2 {group:id, kind:"Transformation", spec:{options, ...}}
+    return {"group": tr.get("id"), "kind": "Transformation",
+            "spec": {k: v for k, v in tr.items() if k != "id"}}
+
+
+def _v2_element(p):
+    return {"kind": "Panel", "spec": {
+        "id": p["id"],
+        "title": p.get("title", ""),
+        "description": p.get("description", ""),
+        "links": p.get("links", []),
+        "data": {"kind": "QueryGroup", "spec": {
+            "queries": [_v2_query(t) for t in p.get("targets", [])],
+            "transformations": [_v2_transform(tr) for tr in p.get("transformations", [])],
+            "queryOptions": {},
+        }},
+        "vizConfig": {"kind": "VizConfig", "group": p["type"], "version": "",
+                      "spec": {"options": p.get("options", {}),
+                               "fieldConfig": p.get("fieldConfig", {"defaults": {}, "overrides": []})}},
+    }}
+
+
+def _load_layout(element_names):
+    # Return the v2 layout object (RowsLayout) from layout.json. Panel gridPos in
+    # build_picker is now ignored for v2 — layout is owned by layout.json, captured
+    # from the UI. Safety net: any generated panel missing from the saved layout is
+    # appended to a trailing "Unplaced" row so a newly-added panel never silently
+    # vanishes before it's arranged in the UI.
+    layout = json.loads(LAYOUT_FILE.read_text())
+    placed = set()
+    for row in layout.get("spec", {}).get("rows", []):
+        for it in row["spec"]["layout"]["spec"]["items"]:
+            placed.add(it["spec"]["element"]["name"])
+    missing = [n for n in element_names if n not in placed]
+    if missing:
+        print(f"  NOTE: {len(missing)} panel(s) not placed in layout.json -> appended "
+              f"to an 'Unplaced' row (arrange in the UI, then re-pull): {missing}", file=sys.stderr)
+        # GridLayout (unlike AutoGridLayout) does NOT auto-flow missing items — Grafana
+        # defaults an omitted x/y/width/height to 0, so the row renders with real panels
+        # at zero size (invisible). Stack them full-width instead so they're actually
+        # visible pre-arrangement.
+        items = [{"kind": "GridLayoutItem",
+                  "spec": {"element": {"kind": "ElementReference", "name": n},
+                           "x": 0, "y": i * 8, "width": 24, "height": 8}}
+                 for i, n in enumerate(missing)]
+        layout.setdefault("spec", {}).setdefault("rows", []).append(
+            {"kind": "RowsLayoutRow", "spec": {"title": "Unplaced", "collapse": False,
+             "layout": {"kind": "GridLayout", "spec": {"items": items}}}})
+    return layout
+
+
+def _v2_variables(tlist):
+    out = []
+    for v in tlist:
+        if v.get("type") == "textbox":
+            out.append({"kind": "TextVariable", "spec": {
+                "name": v["name"],
+                "current": v.get("current", {"text": "", "value": ""}),
+                "query": v.get("query", ""),
+                "label": v.get("label", ""),
+                "hide": _VAR_HIDE.get(v.get("hide", 0), "dontHide"),
+                "skipUrlSync": v.get("skipUrlSync", False),
+                "description": v.get("description", ""),
+            }})
+        # datasource template vars are dropped in v2 (datasources referenced by name)
+    return out
+
+
+def to_v2(v1):
+    cursor = {0: "Off", 1: "Crosshair", 2: "Tooltip"}.get(v1.get("graphTooltip", 0), "Off")
+    return {
+        "apiVersion": "dashboard.grafana.app/v2",
+        "kind": "Dashboard",
+        "metadata": {"name": v1["uid"], "namespace": NAMESPACE},
+        "spec": {
+            "annotations": [_ANNOTATION_BUILTIN],
+            "cursorSync": cursor,
+            "description": v1.get("description", ""),
+            "editable": v1.get("editable", True),
+            "elements": {f"panel-{p['id']}": _v2_element(p) for p in v1["panels"]},
+            "layout": _load_layout([f"panel-{p['id']}" for p in v1["panels"]]),
+            "links": v1.get("links", []),
+            "liveNow": v1.get("liveNow", True),
+            "preload": v1.get("preload", True),
+            "tags": v1.get("tags", []),
+            "timeSettings": {
+                "from": v1.get("time", {}).get("from", "now-7d"),
+                "to": v1.get("time", {}).get("to", "now"),
+                "autoRefresh": v1.get("refresh", "") or "",
+                "autoRefreshIntervals": _AUTOREFRESH_INTERVALS,
+                "hideTimepicker": False,
+                "fiscalYearStartMonth": v1.get("fiscalYearStartMonth", 0),
+            },
+            "title": v1["title"],
+            "variables": _v2_variables(v1.get("templating", {}).get("list", [])),
+        },
+    }
+
+
 def main():
     if not LIVE.exists():
         sys.exit(f"missing {LIVE}")
     live = json.loads(LIVE.read_text())
-    picker = build_picker(live)
-    PICKER.write_text(json.dumps(picker, indent=2) + "\n")
+    picker_v1 = build_picker(live)
     n_expr = sum(1 for pid in SPECIAL if "expr" in SPECIAL[pid])
-    n_scoped = sum(1 for p in picker["panels"] for t in p.get("targets", [])
+    n_scoped = sum(1 for p in picker_v1["panels"] for t in p.get("targets", [])
                    if 'session_label="$session"' in t.get("expr", ""))
-    print(f"Generated {PICKER.name} from {LIVE.name}: "
-          f"{len(picker['panels'])} panels, {n_expr} session-scoped query rewrites, "
-          f"{n_scoped} targets filtered by session_label.")
+    picker = to_v2(picker_v1)  # remap to the v2 manifest
+    PICKER.write_text(json.dumps(picker, indent=2) + "\n")
+    rows = picker["spec"]["layout"]["spec"]["rows"]
+    print(f"Generated {PICKER.name} (v2 schema) from {LIVE.name}: "
+          f"{len(picker['spec']['elements'])} panels, "
+          f"{len(rows)} layout rows ({', '.join(r['spec']['title'] for r in rows)}), "
+          f"{n_expr} session-scoped query rewrites, {n_scoped} targets filtered by session_label.")
 
 if __name__ == "__main__":
     main()
