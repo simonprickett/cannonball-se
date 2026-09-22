@@ -9,7 +9,7 @@ query scoping and variables differ.
 
 Usage:  python3 dashboards/generate.py
 """
-import json, pathlib, sys
+import json, pathlib, sys, urllib.parse
 
 HERE = pathlib.Path(__file__).parent
 LIVE = HERE / "live_game_dashboard.json"
@@ -864,6 +864,138 @@ def longest_clean_panel(x, y, w):
     }
 
 
+# Grafana Cloud stack + Tempo/Loki datasources for the "View trace"/"View logs"
+# panel's Explore links. Separate from DS_NAME (which resolves PANEL/QUERY
+# datasource refs at v1->v2 time) because these are hand-built browser URLs, not
+# query datasource refs.
+GRAFANA_BASE_URL = "https://simonprickett.grafana.net"
+TEMPO_DS_UID = "grafanacloud-traces"
+LOKI_DS_UID = "grafanacloud-logs"
+
+
+def _tempo_trace_url_template():
+    # Traces Drilldown (the "grafana-exploretraces-app" plugin, née Explore Traces) —
+    # a richer trace view (waterfall + service breakdown) than plain Explore's TraceQL
+    # link, and a simpler URL: flat query params instead of a schemaVersion/panes JSON
+    # blob. Confirmed against grafana/explore-traces source:
+    #   - `traceId` is synced via its own SceneObjectUrlSync key (not a `var-`), and
+    #     just opens a trace-detail drawer over whatever's behind it
+    #     (src/pages/Explore/TraceExploration.tsx).
+    #   - `var-ds` (VAR_DATASOURCE) is a DataSourceVariable with NO safe default —
+    #     unset, it falls back to whatever datasource the browser last used
+    #     (localStorage) — so it must be passed explicitly.
+    #   - Every other var-* (primarySignal/metric/groupBy/filters/spanListColumns/
+    #     latencyThreshold/durationPercentiles) and `actionView` has an in-app
+    #     default (PrimarySignalVariable self-inits when empty; the un-set action
+    #     view falls through to TracesByServiceScene's own default tab, "breakdown" —
+    #     the first entry in actionViewsDefinitions) — dropped for simplicity.
+    # `from`/`to` ARE kept explicit, same reasoning as the old link: Tempo's
+    # retention is shorter than Loki's, so the app's own default time range can't be
+    # trusted to cover an older game's trace.
+    #
+    # trace_id is only known at RENDER time (one per selected game), so the id is a
+    # placeholder here; because it's made only of letters/underscore, urlencode leaves
+    # it untouched and we can safely swap it for a mustache tag afterwards — the
+    # dynamictext panel substitutes the real trace_id into the URL with no further
+    # encoding needed (trace ids are plain hex, always URL-safe).
+    placeholder = "TRACE_ID_PLACEHOLDER"
+    query = urllib.parse.urlencode({
+        "from": "now-30d",
+        "to": "now",
+        "traceId": placeholder,
+        "var-ds": TEMPO_DS_UID,
+    })
+    url = f"{GRAFANA_BASE_URL}/a/grafana-exploretraces-app/explore?{query}"
+    assert placeholder in url, "placeholder got percent-encoded — check its charset"
+    return url.replace(placeholder, "{{{trace_id}}}")
+
+
+def _loki_logs_url_template():
+    # Plain Explore (not the Logs Drilldown app — session_label/trace_id are
+    # structured metadata, and drilldown apps browse indexed labels/detected
+    # fields, the same mismatch that ruled Tempo's tag-values picker out — see
+    # [[project_loki_only_picker]]/reference_v2_dashboard_schema). Same
+    # schemaVersion/panes shape as the original Tempo Explore link.
+    #
+    # Filters by trace_id, NOT session_label, even though this is the LOGS link —
+    # trace_id uniquely identifies the same game (verified: `| trace_id="<id>"`
+    # alone returns the full event set for the session) and is the only field this
+    # panel already reliably extracts. Two earlier attempts at session_label both
+    # failed live: "${session}" isn't interpolated by this panel type at all, and
+    # splitting "trace_id::session_label" out of one query via `extractFields`
+    # regex came back empty for session_label (untraced — maybe session_label's
+    # spaces/colons from its timestamp prefix, maybe the transform itself; not
+    # worth another guess when trace_id alone already does the job with the
+    # SAME single-field mechanism already proven for the trace link below).
+    placeholder = "TRACE_ID_PLACEHOLDER"
+    panes = {
+        "log": {
+            "datasource": LOKI_DS_UID,
+            "queries": [{
+                "refId": "A",
+                "datasource": {"type": "loki", "uid": LOKI_DS_UID},
+                "queryType": "range",
+                "expr": f'{SEL} | trace_id="{placeholder}"',
+            }],
+            "range": {"from": "now-30d", "to": "now"},
+        }
+    }
+    query = urllib.parse.urlencode(
+        {"schemaVersion": 1, "panes": json.dumps(panes, separators=(",", ":")), "orgId": 1})
+    url = f"{GRAFANA_BASE_URL}/explore?{query}"
+    assert placeholder in url, "placeholder got percent-encoded — check its charset"
+    return url.replace(placeholder, "{{{trace_id}}}")
+
+
+def view_trace_panel(pid, x, y, w, h):
+    # Picker-only: direct links to the selected game's trace (Tempo, via Traces
+    # Drilldown) and its raw logs (Loki, via Explore). The OTel trace is the
+    # game_session root span plus its stage_N/post_game children — see
+    # src/main/telemetry.cpp. Both links key off trace_id (see
+    # _loki_logs_url_template for why the logs link uses trace_id rather than
+    # session_label), fetched exactly like the (now-removed) Final frame/Course
+    # map screenshot panels: one Loki line -> rename to a named field ->
+    # interpolate into the dynamictext panel's HTML.
+    return {
+        "id": pid,
+        "type": "marcusolsson-dynamictext-panel",
+        "title": "🔗 View traces and logs",
+        "description": ("Opens the selected game's trace (Tempo, via Traces Drilldown) "
+                         "and its raw logs (Loki, via Explore). Tempo's trace retention "
+                         "is shorter than Loki's, so a very old game from the picker may "
+                         "404 the trace link even though its log rows (and the logs link) "
+                         "are still around."),
+        "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+        "gridPos": {"x": x, "y": y, "w": w, "h": h},
+        "options": {
+            "content": (
+                '<div style="display:flex;flex-direction:column;gap:8px;'
+                'text-align:center;font-size:16px;">'
+                f'<a href="{_tempo_trace_url_template()}" target="_blank" '
+                'rel="noopener">View trace ↗</a>'
+                f'<a href="{_loki_logs_url_template()}" target="_blank" '
+                'rel="noopener">View logs ↗</a>'
+                '</div>'
+            ),
+            "defaultContent": "No trace_id for this game.",
+            "everyRow": True,
+        },
+        "targets": [{
+            "refId": "A",
+            "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+            "editorMode": "code",
+            "queryType": "range",
+            "expr": SCOPED + ' | trace_id != "" | line_format "{{.trace_id}}"',
+            "maxLines": 1,
+        }],
+        "transformations": [
+            {"id": "organize", "options": {"renameByName": {"Line": "trace_id"}}},
+            {"id": "filterFieldsByName", "options": {"include": {"names": ["trace_id"]}}},
+        ],
+        "fieldConfig": {"defaults": {}, "overrides": []},
+    }
+
+
 # Route-map stages: columns left->right (stage 1..5); within a column, top->bottom
 # is highest id first (= most left-turns), matching the OutRun stage_lookup_off ids.
 STAGES = [
@@ -1014,6 +1146,10 @@ def build_picker(live):
             p["gridPos"]["x"], p["gridPos"]["w"] = row_widths[p["id"]]
     d["panels"].append(gearbox_mode_panel(48, 8, row_y, 4))   # between Player and Stage reached
     d["panels"].append(longest_clean_panel(20, row_y, 4))
+    # gridPos here is a placeholder — v2 layout is owned by layout.json (see
+    # _load_layout); this panel starts in the auto-appended "Unplaced" row until
+    # it's dragged into place in the UI and layout.json is re-pulled.
+    d["panels"].append(view_trace_panel(59, 0, row_y + 4, 6, 4))
     # Sort "Overtakes by color" (id 17) bars descending (wrap the already-scoped expr).
     for p in d["panels"]:
         if p.get("id") == 17:
@@ -1338,8 +1474,14 @@ def _load_layout(element_names):
     if missing:
         print(f"  NOTE: {len(missing)} panel(s) not placed in layout.json -> appended "
               f"to an 'Unplaced' row (arrange in the UI, then re-pull): {missing}", file=sys.stderr)
+        # GridLayout (unlike AutoGridLayout) does NOT auto-flow missing items — Grafana
+        # defaults an omitted x/y/width/height to 0, so the row renders with real panels
+        # at zero size (invisible). Stack them full-width instead so they're actually
+        # visible pre-arrangement.
         items = [{"kind": "GridLayoutItem",
-                  "spec": {"element": {"kind": "ElementReference", "name": n}}} for n in missing]
+                  "spec": {"element": {"kind": "ElementReference", "name": n},
+                           "x": 0, "y": i * 8, "width": 24, "height": 8}}
+                 for i, n in enumerate(missing)]
         layout.setdefault("spec", {}).setdefault("rows", []).append(
             {"kind": "RowsLayoutRow", "spec": {"title": "Unplaced", "collapse": False,
              "layout": {"kind": "GridLayout", "spec": {"items": items}}}})

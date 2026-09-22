@@ -2942,6 +2942,86 @@
           }
         }
       },
+      "panel-59": {
+        "kind": "Panel",
+        "spec": {
+          "id": 59,
+          "title": "\ud83d\udd17 View traces and logs",
+          "description": "Opens the selected game's trace (Tempo, via Traces Drilldown) and its raw logs (Loki, via Explore). Tempo's trace retention is shorter than Loki's, so a very old game from the picker may 404 the trace link even though its log rows (and the logs link) are still around.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "range",
+                        "expr": "{service_name=\"cannonball-se\"} | session_label=\"$session\" | trace_id != \"\" | line_format \"{{.trace_id}}\"",
+                        "maxLines": 1
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [
+                {
+                  "group": "organize",
+                  "kind": "Transformation",
+                  "spec": {
+                    "options": {
+                      "renameByName": {
+                        "Line": "trace_id"
+                      }
+                    }
+                  }
+                },
+                {
+                  "group": "filterFieldsByName",
+                  "kind": "Transformation",
+                  "spec": {
+                    "options": {
+                      "include": {
+                        "names": [
+                          "trace_id"
+                        ]
+                      }
+                    }
+                  }
+                }
+              ],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "marcusolsson-dynamictext-panel",
+            "version": "",
+            "spec": {
+              "options": {
+                "content": "<div style=\"display:flex;flex-direction:column;gap:8px;text-align:center;font-size:16px;\"><a href=\"https://simonprickett.grafana.net/a/grafana-exploretraces-app/explore?from=now-30d&to=now&traceId={{{trace_id}}}&var-ds=grafanacloud-traces\" target=\"_blank\" rel=\"noopener\">View trace \u2197</a><a href=\"https://simonprickett.grafana.net/explore?schemaVersion=1&panes=%7B%22log%22%3A%7B%22datasource%22%3A%22grafanacloud-logs%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22type%22%3A%22loki%22%2C%22uid%22%3A%22grafanacloud-logs%22%7D%2C%22queryType%22%3A%22range%22%2C%22expr%22%3A%22%7Bservice_name%3D%5C%22cannonball-se%5C%22%7D+%7C+trace_id%3D%5C%22{{{trace_id}}}%5C%22%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22now-30d%22%2C%22to%22%3A%22now%22%7D%7D%7D&orgId=1\" target=\"_blank\" rel=\"noopener\">View logs \u2197</a></div>",
+                "defaultContent": "No trace_id for this game.",
+                "everyRow": true
+              },
+              "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
       "panel-39": {
         "kind": "Panel",
         "spec": {
@@ -8125,6 +8205,32 @@
                 }
               },
               "title": "Gearbox Usage"
+            }
+          },
+          {
+            "kind": "RowsLayoutRow",
+            "spec": {
+              "collapse": false,
+              "layout": {
+                "kind": "AutoGridLayout",
+                "spec": {
+                  "columnWidthMode": "standard",
+                  "maxColumnCount": 3,
+                  "rowHeightMode": "standard",
+                  "items": [
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-59"
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              "title": "\ud83d\udcc8\ud83d\udcdc Traces and logs"
             }
           }
         ]

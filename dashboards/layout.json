@@ -567,6 +567,32 @@
           },
           "title": "Gearbox Usage"
         }
+      },
+      {
+        "kind": "RowsLayoutRow",
+        "spec": {
+          "collapse": false,
+          "layout": {
+            "kind": "AutoGridLayout",
+            "spec": {
+              "columnWidthMode": "standard",
+              "maxColumnCount": 3,
+              "rowHeightMode": "standard",
+              "items": [
+                {
+                  "kind": "AutoGridLayoutItem",
+                  "spec": {
+                    "element": {
+                      "kind": "ElementReference",
+                      "name": "panel-59"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "title": "📈📜 Traces and logs"
+        }
       }
     ]
   }
