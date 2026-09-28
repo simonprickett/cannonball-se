@@ -128,7 +128,7 @@ void TelemetryManager::init(const std::string& otlp_endpoint, const std::string&
 
             if (debug) {
                 std::cout << "Auth configured: instance_id=" << instance_id << ", token_length=" << auth_token.length() << std::endl;
-                std::cout << "Authorization header: Basic " << encoded << std::endl;
+                std::cout << "Authorization header: **CONFIGURED**" << std::endl;
             }
         } else if (debug) {
             std::cout << "Auth token configured: NO" << std::endl;
