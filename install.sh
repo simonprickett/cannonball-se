@@ -123,6 +123,7 @@ else
     cmake -DCMAKE_BUILD_TYPE=Release \
           -DWITH_OTLP_HTTP=ON \
           -DBUILD_TESTING=OFF \
+          -DWITH_BENCHMARK=OFF \
           -DWITH_EXAMPLES=OFF \
           -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
           ..
