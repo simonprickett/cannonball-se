@@ -110,7 +110,7 @@ This may take 10 minutes or longer, so be prepared for that and have patience!
 
 - Enter your password when asked — this is so that the script can sudo actions for you.
 - You'll see lots of compiler warnings while Cannonball SE itself is compiling — don't worry about these.
-- When asked to choose from available audio devices, select the option corresponding to `vc4-hdmi-0`. This will likely be option 1.
+- If asked to choose from available audio devices, select the option corresponding to `vc4-hdmi-0`. This will likely be option 1.
 - When asked if you want to view the man page, enter N to skip it.
 
 `install.sh` should now have completed successfully. Verify you have a binary:
