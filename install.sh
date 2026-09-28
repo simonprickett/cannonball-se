@@ -143,7 +143,7 @@ run_step "Prepare build directories" mkdir -p build roms
 run_step "Configure Project with CMake" cmake -S cmake -B build
 run_step "Compile" cmake --build build --parallel $NUMTHREADS
 #cd build && cmake ../cmake && make -j"$NUMTHREADS"'
-run_step "Create default config file" bash -c 'cp res/config.xml .'
+run_step "Create default config file" bash -c '[ -f config.xml ] || cp res/config.xml .'
 
 # 9. List and select audio device
 env_command="build/cannonball-se -list-audio-devices"
