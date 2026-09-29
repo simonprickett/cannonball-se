@@ -64,13 +64,13 @@
         <!-- A list of SDL audio devices will be shown on screen when cannonball is started. Devices often list more than one
              device, e.g. HDMI Audio and any USB sound device. Enter the number under playback_device corresponding to the device
              listed by the game. -->
-        <playback_device>0</playback_device>
+        <playback_device>1</playback_device>
         <!-- Callback Rate - either 0 (8ms) or 1 (16ms). 16ms will double the audio latency but may reduce dropouts on some systems. -->
         <callback_rate>0</callback_rate>
         <!-- Custom Music: Put .WAV, .MP3, or .YM files in res/ folder named as:
              [01–99]_Track_Display_Name.[wav|mp3|ym] - e.g. 04_AHA_Take_On_Me.mp3
              Indexes 01–03 will replace the built‑in tracks (01=Magical Sound Shower), higher indexes add tracks. -->
-        <wave_volume>4</wave_volume>
+        <wave_volume>5</wave_volume>
     </sound>
     <!-- 
          Controls Settings
@@ -209,7 +209,7 @@
         <grippy_tyres>0</grippy_tyres>
         <bumper>0</bumper>
         <turbo>0</turbo>
-        <car_color>3</car_color>
+        <car_color>0</car_color>
     </engine>
     <!-- Settings for Time Trial Mode -->
     <time_trial>

@@ -113,7 +113,7 @@ The OpenTelemetry C++ SDK is installed automatically by `install.sh`. Manual ins
 - CMake 3.20+
 - libcurl
 - protobuf-compiler and libprotobuf-dev
-- OpenTelemetry C++ SDK v1.14.2 with OTLP HTTP exporter and logs support
+- OpenTelemetry C++ SDK v1.28.0 with OTLP HTTP exporter and logs support
 
 ### Configuration
 
