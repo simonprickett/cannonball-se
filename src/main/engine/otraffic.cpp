@@ -558,7 +558,7 @@ void OTraffic::update_props(oentry* sprite)
                         }
                     );
 
-                    std::cout << Utils::get_timestamp_ms() << ": " << "SIMON: OVERTOOK " << color_name << " " << vehicle_name << " (type " << sprite_type << ", palette " << static_cast<int>(sprite->pal_src) << ")" << std::endl;
+                    //std::cout << Utils::get_timestamp_ms() << ": " << "SIMON: OVERTOOK " << color_name << " " << vehicle_name << " (type " << sprite_type << ", palette " << static_cast<int>(sprite->pal_src) << ")" << std::endl;
                 }
             } 
             else
