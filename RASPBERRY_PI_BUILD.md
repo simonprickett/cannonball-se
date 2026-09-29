@@ -13,6 +13,7 @@ These instructions are for setting up and building on a Raspberry Pi 4.
 - HDMI display (optional: sound)
 - Appropriate cable to connect the Pi 4's Micro HDMI to the HDMI display
 - Any required adapter to write the Micro SD card from your laptop/desktop (e.g. a USB Micro SD card reader or a Micro SD to regular SD card adapter)
+- HDMI to USB converter (optional). This can be used with software such as "Camera Window" for macOS to bring the Pi's display, and hence the game, into the same screen that's showing the Grafana dashboard.
 
 ## Flash the OS
 
