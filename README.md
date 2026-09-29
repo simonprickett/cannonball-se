@@ -37,6 +37,8 @@ CannonBall‑SE requires a copy of the original **OutRun revision B** ROM set.
 
 Use the included script 'install.sh' to install prerequisites, build the project, and set device permissions automatically. On a Pi4 or Intel machine, this will only take a few minutes.
 
+For a full step-by-step Raspberry Pi 4 setup guide, from flashing the OS through to running the game, see [RASPBERRY_PI_BUILD.md](RASPBERRY_PI_BUILD.md).
+
 ```bash
 # 1) Fetch sources
 git clone https://github.com/J1mbo/cannonball-se.git
