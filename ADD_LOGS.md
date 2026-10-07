@@ -140,6 +140,8 @@ Each event below should be logged with structured attributes:
 | `game.crash` | WARN | `crash_type` | `speed_kph`, `score`, `stage_number` | - | bump/spin/flip |
 | `game.off_road` | WARN | - | `speed_kph`, `score`, `stage_number` | - | Wheels off track |
 | `game.vehicle_overtake` | INFO | `vehicle_type`, `vehicle`, `palette` | `speed_kph`, `score`, `stage_number` | - | Traffic overtake |
+| `game.startup` | INFO | - | `car_pal` | - | Process start, once. `car_pal` = configured car colour (`config.xml` `<engine><car_color>`, 0-4) |
+| `game.heartbeat` | INFO | - | `heartbeat_epoch_ms` | - | Emitted ~every 10s while idle in attract mode, so dashboards can tell "idle, healthy" apart from "frozen/crashed" |
 
 **Additional Computed Attributes** (automatically added to all logs):
 - `trace_id` (hex string from span context - **also serves as session_id**)

@@ -982,6 +982,10 @@ void Outrun::init_attract()
 
 void Outrun::tick_attract()
 {
+    // Lets dashboards tell "idle in attract, healthy" apart from "frozen/crashed" —
+    // nothing else is logged while sitting here. Throttled internally to ~once/10s.
+    TelemetryManager::instance().maybe_log_heartbeat();
+
     ohud.draw_credits();
     ohud.draw_copyright_text();
     ohud.draw_insert_coin();

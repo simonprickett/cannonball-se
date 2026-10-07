@@ -775,6 +775,11 @@ int main(int argc, char* argv[]) {
         // Initialize telemetry
         TelemetryManager::instance().init(config.telemetry.otlp_endpoint, config.telemetry.instance_id, config.telemetry.auth_token, config.telemetry.debug);
 
+        // One-time startup marker, carrying the configured car colour (config.xml's
+        // <engine><car_color>, 0-4) since dashboards have no other visibility into it.
+        TelemetryManager::instance().log_game_event("game.startup", TelemetryManager::SEV_INFO,
+            {}, {{"car_pal", (int64_t)config.engine.car_pal}});
+
         ok = roms.load_revb_roms(config.sound.fix_samples);
 
         if (cannonball::singlecore_detect || cannonball::singlecore_mode) {
