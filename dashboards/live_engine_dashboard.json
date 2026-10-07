@@ -901,7 +901,7 @@
         "spec": {
           "id": 217,
           "title": "Car colour",
-          "description": "Configured car palette index (config.xml <engine><car_color>, 0-4) from the most recent game.startup on the selected host \u2014 numeric for now, name mapping TBD.",
+          "description": "Configured car colour (config.xml <engine><car_color>, car_pal 0-4) from the most recent game.startup on the selected host.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -938,6 +938,9 @@
             "version": "",
             "spec": {
               "options": {
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "center",
                 "reduceOptions": {
                   "calcs": [
                     "lastNotNull"
@@ -945,20 +948,45 @@
                   "fields": "",
                   "values": false
                 },
-                "colorMode": "value",
-                "graphMode": "none",
-                "justifyMode": "auto",
-                "textMode": "auto",
-                "wideLayout": true,
-                "showPercentChange": false
+                "textMode": "value"
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "short",
-                  "mappings": [],
+                  "mappings": [
+                    {
+                      "type": "value",
+                      "options": {
+                        "0": {
+                          "text": "Red",
+                          "color": "red",
+                          "index": 0
+                        },
+                        "1": {
+                          "text": "Blue",
+                          "color": "blue",
+                          "index": 1
+                        },
+                        "2": {
+                          "text": "Yellow",
+                          "color": "yellow",
+                          "index": 2
+                        },
+                        "3": {
+                          "text": "Green",
+                          "color": "green",
+                          "index": 3
+                        },
+                        "4": {
+                          "text": "Turquoise",
+                          "color": "#40e0d0",
+                          "index": 4
+                        }
+                      }
+                    }
+                  ],
                   "color": {
                     "mode": "fixed",
-                    "fixedColor": "blue"
+                    "fixedColor": "text"
                   }
                 },
                 "overrides": []

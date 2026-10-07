@@ -1327,6 +1327,44 @@ def _latest_duration_panel(pid, x, y, w, h):
     }
 
 
+CAR_COLORS = {  # car_pal (0-4) -> (label, background colour), from the user
+    0: ("Red", "red"),
+    1: ("Blue", "blue"),
+    2: ("Yellow", "yellow"),
+    3: ("Green", "green"),
+    4: ("Turquoise", "#40e0d0"),
+}
+
+
+def _car_colour_panel(pid, x, y, w, h):
+    # car_pal from the most recent game.startup, mapped to its actual in-game
+    # colour as the panel's BACKGROUND (fixedColor:"text" + colorMode:"background"
+    # tells Grafana to paint the background with whatever colour is attached to
+    # the matched value mapping — same mechanism as the Engine State/Alive panels).
+    return {
+        "id": pid, "type": "stat", "title": "Car colour",
+        "description": ("Configured car colour (config.xml <engine><car_color>, car_pal 0-4) "
+                        "from the most recent game.startup on the selected host."),
+        "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+        "gridPos": {"x": x, "y": y, "w": w, "h": h},
+        "targets": [{
+            "refId": "A", "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+            "editorMode": "code", "queryType": "instant",
+            "expr": f'max(last_over_time({HOST_SCOPED} | event="game.startup" | unwrap car_pal [$__range]))',
+        }],
+        "fieldConfig": {"defaults": {
+            "mappings": [{"type": "value", "options": {
+                str(n): {"text": label, "color": color, "index": n}
+                for n, (label, color) in CAR_COLORS.items()
+            }}],
+            "color": {"mode": "fixed", "fixedColor": "text"},
+        }, "overrides": []},
+        "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center",
+                    "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False},
+                    "textMode": "value"},
+    }
+
+
 def _coins_per_hour_panel(pid, x, y, w, h):
     # Hourly-bucketed bar chart. `or vector(0)` is doing real work here, not just
     # guarding a single empty query: a Loki/Prometheus-style range query evaluates
@@ -1517,10 +1555,7 @@ def build_live_engine():
         _avg_duration_panel(216, 18, y0 + 5, 6, 5),
 
         # Row 3 — config snapshot, from the one-time game.startup event
-        _stat(217, 0, y0 + 10, 6, 5, "Car colour",
-              "Configured car palette index (config.xml <engine><car_color>, 0-4) from the "
-              "most recent game.startup on the selected host — numeric for now, name mapping TBD.",
-              f'max(last_over_time({HOST_SCOPED} | event="game.startup" | unwrap car_pal [$__range]))'),
+        _car_colour_panel(217, 0, y0 + 10, 6, 5),
         _line_stat(218, 6, y0 + 10, 6, "Gearbox mode",
                    "Configured transmission mode (automatic/manual) from the most recent "
                    "game.startup on the selected host.",
