@@ -113,7 +113,15 @@ void Outrun::boot()
 void Outrun::tick(bool tick_frame)
 {
     this->tick_frame = tick_frame;
-    
+
+    // Lets dashboards tell "alive" apart from "frozen/crashed" during ANY quiet
+    // stretch with no other telemetry — attract mode, the start sequence, name
+    // entry, or just sitting still mid-game without crashing/overtaking. One call
+    // site covers every state this function runs for (only the separate options
+    // menu, STATE_MENU, doesn't reach here — not part of normal cabinet play).
+    // Throttled internally to ~once/10s, so calling it unconditionally is cheap.
+    TelemetryManager::instance().maybe_log_heartbeat();
+
     if (tick_frame)
     {
         tick_counter++;
@@ -982,10 +990,6 @@ void Outrun::init_attract()
 
 void Outrun::tick_attract()
 {
-    // Lets dashboards tell "idle in attract, healthy" apart from "frozen/crashed" —
-    // nothing else is logged while sitting here. Throttled internally to ~once/10s.
-    TelemetryManager::instance().maybe_log_heartbeat();
-
     ohud.draw_credits();
     ohud.draw_copyright_text();
     ohud.draw_insert_coin();

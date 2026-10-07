@@ -230,7 +230,7 @@
         "spec": {
           "id": 205,
           "title": "Alive",
-          "description": "Has the selected host logged a heartbeat or any game event in the last 30 seconds? Independent of the time picker above. OFFLINE until the game.heartbeat telemetry change is built onto the cabinet.",
+          "description": "Has the selected host logged a heartbeat or any game event in the last 60 seconds? Independent of the time picker above. OFFLINE until the game.heartbeat telemetry change is built onto the cabinet.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -249,7 +249,7 @@
                       "spec": {
                         "editorMode": "code",
                         "queryType": "instant",
-                        "expr": "sum(count_over_time({service_name=\"cannonball-se\"} | host_name=\"$host\" [30s])) or vector(0)"
+                        "expr": "sum(count_over_time({service_name=\"cannonball-se\"} | host_name=\"$host\" [60s])) or vector(0)"
                       }
                     },
                     "refId": "A",
@@ -646,7 +646,7 @@
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "dateTimeAsLocal",
+                  "unit": "dateTimeFromNow",
                   "mappings": [],
                   "color": {
                     "mode": "fixed",
@@ -663,8 +663,8 @@
         "kind": "Panel",
         "spec": {
           "id": 214,
-          "title": "Current game duration",
-          "description": "Time elapsed since the most recently started game began, on the selected host in the selected time range \u2014 keeps ticking live while a game is in progress.",
+          "title": "Latest game duration",
+          "description": "How long the most recently started game has lasted: counts up live from its start time while still in progress (latest start newer than latest end), otherwise end minus start \u2014 for the selected host in the selected time range.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -683,10 +683,49 @@
                       "spec": {
                         "editorMode": "code",
                         "queryType": "instant",
-                        "expr": "max(last_over_time({service_name=\"cannonball-se\"} | host_name=\"$host\" | event=\"game.session.start\" | unwrap start_epoch_ms [$__range]))"
+                        "expr": "max(last_over_time({service_name=\"cannonball-se\"} | host_name=\"$host\" | event=\"game.session.start\" | unwrap start_epoch_ms [$__range])) or vector(0)"
                       }
                     },
                     "refId": "A",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "max(last_over_time({service_name=\"cannonball-se\"} | host_name=\"$host\" | event=\"game.session.end\" | unwrap end_epoch_ms [$__range])) or vector(0)"
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "__expr__",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "__expr__"
+                      },
+                      "spec": {
+                        "type": "sql",
+                        "expression": "SELECT CASE WHEN (SELECT `__value__` FROM A) > (SELECT `__value__` FROM B) THEN ($__to - (SELECT `__value__` FROM A)) / 1000.0 ELSE ((SELECT `__value__` FROM B) - (SELECT `__value__` FROM A)) / 1000.0 END AS duration_seconds"
+                      }
+                    },
+                    "refId": "C",
                     "hidden": false
                   }
                 }
@@ -717,7 +756,8 @@
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "dateTimeFromNow",
+                  "unit": "s",
+                  "decimals": 0,
                   "mappings": [],
                   "color": {
                     "mode": "fixed",
@@ -735,7 +775,7 @@
         "spec": {
           "id": 216,
           "title": "Average game duration",
-          "description": "Mean game length (session.end minus session.start) across games for the selected host, in the selected time range.",
+          "description": "Mean game length (session.end minus session.start) across completed games for the selected host, in the selected time range, with a sparkline of each game's duration.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -793,10 +833,97 @@
                       },
                       "spec": {
                         "type": "sql",
-                        "expression": "SELECT AVG((b.`__value__` - a.`__value__`)/1000.0) AS avg_duration_seconds FROM A a JOIN B b ON a.session_label = b.session_label"
+                        "expression": "SELECT b.`__value__` AS end_epoch_ms, (b.`__value__` - a.`__value__`)/1000.0 AS duration_seconds FROM A a JOIN B b ON a.session_label = b.session_label ORDER BY end_epoch_ms"
                       }
                     },
                     "refId": "C",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [
+                {
+                  "group": "convertFieldType",
+                  "kind": "Transformation",
+                  "spec": {
+                    "options": {
+                      "conversions": [
+                        {
+                          "targetField": "end_epoch_ms",
+                          "destinationType": "time"
+                        }
+                      ]
+                    }
+                  }
+                }
+              ],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "reduceOptions": {
+                  "calcs": [
+                    "mean"
+                  ],
+                  "fields": "/^duration_seconds$/",
+                  "values": false
+                },
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "textMode": "auto",
+                "wideLayout": true,
+                "showPercentChange": false
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "s",
+                  "decimals": 0,
+                  "mappings": [],
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "blue"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-217": {
+        "kind": "Panel",
+        "spec": {
+          "id": 217,
+          "title": "Car colour",
+          "description": "Configured car palette index (config.xml <engine><car_color>, 0-4) from the most recent game.startup on the selected host \u2014 numeric for now, name mapping TBD.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "max(last_over_time({service_name=\"cannonball-se\"} | host_name=\"$host\" | event=\"game.startup\" | unwrap car_pal [$__range]))"
+                      }
+                    },
+                    "refId": "A",
                     "hidden": false
                   }
                 }
@@ -827,8 +954,7 @@
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "s",
-                  "decimals": 0,
+                  "unit": "short",
                   "mappings": [],
                   "color": {
                     "mode": "fixed",
@@ -841,12 +967,273 @@
           }
         }
       },
+      "panel-218": {
+        "kind": "Panel",
+        "spec": {
+          "id": 218,
+          "title": "Gearbox mode",
+          "description": "Configured transmission mode (automatic/manual) from the most recent game.startup on the selected host.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "range",
+                        "maxLines": 1,
+                        "expr": "{service_name=\"cannonball-se\"} | host_name=\"$host\" | event=\"game.startup\" | line_format \"{{.gearbox_mode}}\""
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [
+                {
+                  "group": "organize",
+                  "kind": "Transformation",
+                  "spec": {
+                    "options": {
+                      "excludeByName": {
+                        "Time": true,
+                        "tsNs": true,
+                        "id": true,
+                        "labels": true,
+                        "labelTypes": true
+                      },
+                      "renameByName": {
+                        "Line": "Gearbox mode"
+                      }
+                    }
+                  }
+                }
+              ],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "colorMode": "background",
+                "graphMode": "none",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "Gearbox mode",
+                  "values": false
+                },
+                "textMode": "value"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "dark-blue"
+                  },
+                  "noValue": "\u2014"
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-219": {
+        "kind": "Panel",
+        "spec": {
+          "id": 219,
+          "title": "Difficulty",
+          "description": "Configured game-time DIP-switch difficulty from the most recent game.startup on the selected host.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "range",
+                        "maxLines": 1,
+                        "expr": "{service_name=\"cannonball-se\"} | host_name=\"$host\" | event=\"game.startup\" | line_format \"{{.difficulty}}\""
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [
+                {
+                  "group": "organize",
+                  "kind": "Transformation",
+                  "spec": {
+                    "options": {
+                      "excludeByName": {
+                        "Time": true,
+                        "tsNs": true,
+                        "id": true,
+                        "labels": true,
+                        "labelTypes": true
+                      },
+                      "renameByName": {
+                        "Line": "Difficulty"
+                      }
+                    }
+                  }
+                }
+              ],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "colorMode": "background",
+                "graphMode": "none",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "Difficulty",
+                  "values": false
+                },
+                "textMode": "value"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "dark-blue"
+                  },
+                  "noValue": "\u2014"
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-223": {
+        "kind": "Panel",
+        "spec": {
+          "id": 223,
+          "title": "Traffic difficulty",
+          "description": "Configured traffic DIP-switch difficulty from the most recent game.startup on the selected host.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "range",
+                        "maxLines": 1,
+                        "expr": "{service_name=\"cannonball-se\"} | host_name=\"$host\" | event=\"game.startup\" | line_format \"{{.traffic_difficulty}}\""
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [
+                {
+                  "group": "organize",
+                  "kind": "Transformation",
+                  "spec": {
+                    "options": {
+                      "excludeByName": {
+                        "Time": true,
+                        "tsNs": true,
+                        "id": true,
+                        "labels": true,
+                        "labelTypes": true
+                      },
+                      "renameByName": {
+                        "Line": "Traffic difficulty"
+                      }
+                    }
+                  }
+                }
+              ],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "colorMode": "background",
+                "graphMode": "none",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "Traffic difficulty",
+                  "values": false
+                },
+                "textMode": "value"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "dark-blue"
+                  },
+                  "noValue": "\u2014"
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
       "panel-240": {
         "kind": "Panel",
         "spec": {
           "id": 240,
           "title": "Coins per hour",
-          "description": "game.coin_inserted events bucketed by hour, for the selected host in the selected time range.",
+          "description": "game.coin_inserted events bucketed by hour (24 buckets/day for the default today range; empty hours show 0, not a gap), for the selected host.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -866,7 +1253,7 @@
                         "editorMode": "code",
                         "queryType": "range",
                         "intervalMs": 3600000,
-                        "expr": "sum(count_over_time({service_name=\"cannonball-se\"} | host_name=\"$host\" | event=\"game.coin_inserted\" [1h]))"
+                        "expr": "sum(count_over_time({service_name=\"cannonball-se\"} | host_name=\"$host\" | event=\"game.coin_inserted\" [1h])) or vector(0)"
                       }
                     },
                     "refId": "A",
@@ -880,23 +1267,18 @@
           },
           "vizConfig": {
             "kind": "VizConfig",
-            "group": "barchart",
+            "group": "timeseries",
             "version": "",
             "spec": {
               "options": {
-                "orientation": "vertical",
-                "xField": "Time",
-                "showValue": "auto",
-                "barWidth": 0.8,
-                "groupWidth": 0.7,
-                "fullHighlight": false,
-                "stacking": "none",
-                "legend": {
-                  "showLegend": false
-                },
                 "tooltip": {
                   "mode": "single",
                   "sort": "none"
+                },
+                "legend": {
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": false
                 }
               },
               "fieldConfig": {
@@ -908,11 +1290,20 @@
                     "fixedColor": "blue"
                   },
                   "custom": {
-                    "fillOpacity": 90,
-                    "gradientMode": "opacity",
+                    "drawStyle": "bars",
+                    "barAlignment": 0,
                     "lineWidth": 1,
+                    "fillOpacity": 90,
+                    "gradientMode": "none",
+                    "spanNulls": false,
+                    "showPoints": "never",
+                    "pointSize": 5,
                     "axisPlacement": "auto",
                     "axisLabel": "Coins",
+                    "stacking": {
+                      "mode": "none",
+                      "group": "A"
+                    },
                     "thresholdsStyle": {
                       "mode": "off"
                     }
@@ -1257,6 +1648,58 @@
             "spec": {
               "x": 0,
               "y": 16,
+              "width": 6,
+              "height": 5,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-217"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 6,
+              "y": 16,
+              "width": 6,
+              "height": 5,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-218"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 12,
+              "y": 16,
+              "width": 6,
+              "height": 5,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-219"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 18,
+              "y": 16,
+              "width": 6,
+              "height": 5,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-223"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 0,
+              "y": 21,
               "width": 24,
               "height": 8,
               "element": {
@@ -1269,7 +1712,7 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 0,
-              "y": 24,
+              "y": 29,
               "width": 24,
               "height": 6,
               "element": {
@@ -1282,7 +1725,7 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 0,
-              "y": 30,
+              "y": 35,
               "width": 24,
               "height": 6,
               "element": {
@@ -1295,7 +1738,7 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 0,
-              "y": 36,
+              "y": 41,
               "width": 24,
               "height": 10,
               "element": {

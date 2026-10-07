@@ -775,10 +775,20 @@ int main(int argc, char* argv[]) {
         // Initialize telemetry
         TelemetryManager::instance().init(config.telemetry.otlp_endpoint, config.telemetry.instance_id, config.telemetry.auth_token, config.telemetry.debug);
 
-        // One-time startup marker, carrying the configured car colour (config.xml's
-        // <engine><car_color>, 0-4) since dashboards have no other visibility into it.
-        TelemetryManager::instance().log_game_event("game.startup", TelemetryManager::SEV_INFO,
-            {}, {{"car_pal", (int64_t)config.engine.car_pal}});
+        // One-time startup marker, carrying config dashboards have no other visibility
+        // into: car colour, gearbox mode, and the time/traffic DIP-switch difficulties.
+        // Label arrays/clamping mirror menu.cpp's DIP_TIME_DIFFICULTY/DIP_DIFFICULTY
+        // (menulabels.hpp) and config.cpp's load-time freeze_timer/disable_traffic logic.
+        {
+            static const char* DIP_TIME_LABELS[5] = {"VERY EASY", "EASY", "NORMAL", "HARD", "HARDEST"};
+            static const char* DIP_TRAFFIC_LABELS[4] = {"EASY", "NORMAL", "HARD", "HARDEST"};
+            std::string difficulty = config.engine.freeze_timer ? "INFINITE" : DIP_TIME_LABELS[config.engine.dip_time];
+            std::string traffic_difficulty = config.engine.disable_traffic ? "DISABLED" : DIP_TRAFFIC_LABELS[config.engine.dip_traffic];
+            std::string gearbox_mode = (config.controls.gear == config.controls.GEAR_AUTO) ? "automatic" : "manual";
+            TelemetryManager::instance().log_game_event("game.startup", TelemetryManager::SEV_INFO,
+                {{"gearbox_mode", gearbox_mode}, {"difficulty", difficulty}, {"traffic_difficulty", traffic_difficulty}},
+                {{"car_pal", (int64_t)config.engine.car_pal}});
+        }
 
         ok = roms.load_revb_roms(config.sound.fix_samples);
 

@@ -85,7 +85,7 @@ Both must be installed (declared in each dashboard's `__requires`):
 | `game.route_chosen` | `direction`, `stage` | (reference; route is reconstructed from `stage_id`) |
 | `game.high_score` | `position`, `initials`, `score` | Aggregate high-score table |
 | `game.coin_inserted` | `credits` | Coin economics (count, revenue, credits available) |
-| `game.startup` | `car_pal` | Car colour (Live Engine) |
+| `game.startup` | `car_pal`, `gearbox_mode`, `difficulty`, `traffic_difficulty` | Config snapshot panels (Live Engine) |
 | `game.heartbeat` | `heartbeat_epoch_ms` | Aliveness check (Live Engine), alongside any other event |
 
 ## The route map (`stage_id`)
