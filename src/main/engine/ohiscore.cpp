@@ -229,13 +229,16 @@ void OHiScore::check_name_entry()
         state = STATE_DONE;
     }
     // High Score WITH pre-stored initials - auto-populate
-    else if (!oname.get_initials().empty() && oname.get_initials().length() >= 3)
+    // Any non-empty initials skip re-entry (not just a full 3 characters -
+    // plenty of players only have 1-2). Missing slots pad with 0x20, the same
+    // blank-tile code do_input() already writes when ending entry early.
+    else if (!oname.get_initials().empty())
     {
         // Convert stored initials from string to tile values
         const std::string& initials = oname.get_initials();
-        scores[score_pos].initial1 = (uint8_t)initials[0];
-        scores[score_pos].initial2 = (uint8_t)initials[1];
-        scores[score_pos].initial3 = (uint8_t)initials[2];
+        scores[score_pos].initial1 = (uint8_t)(initials.size() > 0 ? initials[0] : 0x20);
+        scores[score_pos].initial2 = (uint8_t)(initials.size() > 1 ? initials[1] : 0x20);
+        scores[score_pos].initial3 = (uint8_t)(initials.size() > 2 ? initials[2] : 0x20);
 
         // Display the auto-populated score entry
         ohud.blit_text1(TEXT1_YOURSCORE);

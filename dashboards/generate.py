@@ -1365,47 +1365,52 @@ def _car_colour_panel(pid, x, y, w, h):
     }
 
 
-def _coins_per_hour_panel(pid, x, y, w, h):
-    # Hourly-bucketed bar chart. `or vector(0)` is doing real work here, not just
-    # guarding a single empty query: a Loki/Prometheus-style range query evaluates
-    # its expression independently AT EACH STEP, and `count_over_time` yields NO
-    # point (not a zero) for a step whose window has no matching lines — so without
-    # the `or vector(0)` fallback, empty hours are simply missing bars, not 0-height
-    # ones. Confirmed via `gcx logs metrics ... --step 1h`: with the fallback, every
-    # hour gets an explicit point (0,0,0,...,3), none missing. `intervalMs` forces
-    # the step to exactly 1h -> 24 buckets/day; boundaries align to the clock hour
-    # because $__from is itself clock-aligned for the board's default "today"
-    # (now/d) range (a manually widened, non-aligned range shifts them off the hour,
-    # same as any Loki range query).
+def _revenue_per_hour_panel(pid, x, y, w, h):
+    # One discrete bar per hour (e.g. 14:00-15:00), revenue in USD @ $0.25/coin.
+    # `or vector(0)` matters here, not just as an empty-query guard: a
+    # Loki/Prometheus-style range query evaluates its expression independently
+    # AT EACH STEP, and `count_over_time` yields NO point (not a zero) for a
+    # step with no matching lines — without the fallback, empty hours are
+    # missing bars, not 0-height ones. Confirmed via `gcx logs metrics ...
+    # --step 1h`: with it, every hour gets an explicit point. The $/coin
+    # multiplication happens directly in LogQL (vector * scalar), no SQL expr
+    # needed. `intervalMs` forces the step to exactly 1h -> 24 buckets/day;
+    # boundaries land on the clock hour because $__from is itself clock-aligned
+    # for the board's default "today" (now/d) range.
     #
-    # Panel type is "timeseries" with bars draw style, NOT "barchart" — barchart
-    # sizes each x-value as a wide discrete category slot and overflows into a
-    # horizontal scrollbar once there are more than a handful of points (24 hourly
-    # buckets blew way past panel width, auto-scrolled to show only the last 2
-    # bars). timeseries+bars is Grafana's actual tool for a continuous time axis:
-    # it compresses bar width to fit, no scrolling, zero-value points render as
-    # proper zero-height bars.
+    # Panel type is "timeseries" with bars draw style, NOT "barchart" — tried
+    # barchart first (its gapped-category look is closer to "one bar per hour"
+    # in principle) but it overflows into a horizontal scrollbar once point
+    # count passes roughly 15-20, and the default "today" range already has
+    # that many hourly buckets by mid-afternoon — confirmed live, not just a
+    # wide-range test artifact. Tried `barWidthFactor` to force a gap between
+    # bars; it had no visible effect on this panel type (not a real option
+    # for timeseries bars, apparently — that's a barchart-only control).
+    # User's explicit call once shown the tradeoff: keep timeseries (never
+    # overflows/breaks, regardless of time of day) over barchart's true gaps.
+    # Hour boundaries are still marked by the x-axis gridlines, just not by a
+    # gap in the fill — the standard look for a Grafana "events per hour" panel.
     return {
-        "id": pid, "type": "timeseries", "title": "Coins per hour",
-        "description": ("game.coin_inserted events bucketed by hour (24 buckets/day for the "
-                        "default today range; empty hours show 0, not a gap), for the selected "
-                        "host."),
+        "id": pid, "type": "timeseries", "title": "Revenue per hour",
+        "description": ("Revenue (game.coin_inserted events × $0.25/coin) bucketed by hour "
+                        "(24 buckets/day for the default today range; empty hours show $0, not "
+                        "a gap), for the selected host."),
         "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
         "gridPos": {"x": x, "y": y, "w": w, "h": h},
         "targets": [
             {"refId": "A", "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
              "editorMode": "code", "queryType": "range", "intervalMs": 3600000,
-             "expr": f'sum(count_over_time({HOST_SCOPED} | event="game.coin_inserted" [1h])) or vector(0)'},
+             "expr": f'sum(count_over_time({HOST_SCOPED} | event="game.coin_inserted" [1h])) * {COIN_PRICE_USD} or vector(0)'},
         ],
         "options": {"tooltip": {"mode": "single", "sort": "none"},
                     "legend": {"displayMode": "list", "placement": "bottom", "showLegend": False}},
-        "fieldConfig": {"defaults": {"unit": "short", "decimals": 0,
-                                     "color": {"mode": "fixed", "fixedColor": "blue"},
+        "fieldConfig": {"defaults": {"unit": "currencyUSD", "decimals": 2,
+                                     "color": {"mode": "fixed", "fixedColor": "green"},
                                      "custom": {"drawStyle": "bars", "barAlignment": 0,
                                                 "lineWidth": 1, "fillOpacity": 90,
                                                 "gradientMode": "none", "spanNulls": False,
                                                 "showPoints": "never", "pointSize": 5,
-                                                "axisPlacement": "auto", "axisLabel": "Coins",
+                                                "axisPlacement": "auto", "axisLabel": "Revenue",
                                                 "stacking": {"mode": "none", "group": "A"},
                                                 "thresholdsStyle": {"mode": "off"}},
                                      "mappings": []},
@@ -1517,20 +1522,35 @@ def build_live_engine():
             "id": 201, "type": "stat", "title": "Engine state",
             "description": ("Is a game being played right now on the selected host? Latest "
                             "game.session.start newer than latest game.session.end = PLAYING; "
-                            "otherwise the cabinet is in ATTRACT MODE. Same logic as the Now "
-                            "Playing board, scoped to $host."),
+                            "otherwise ATTRACT MODE — UNLESS the host hasn't logged anything in "
+                            "the last 60s (same check as Alive), in which case UNKNOWN: an "
+                            "abandoned/killed session (power cut, process killed mid-game) never "
+                            "logs game.session.end, so without this fallback a dead cabinet's "
+                            "last game would show PLAYING forever. Confirmed live 2026-10-07 — "
+                            "a session cut short by stopping the Pi stayed PLAYING indefinitely."),
             "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
             "gridPos": {"x": 0, "y": y0, "w": 6, "h": 5},
             "targets": [{
                 "refId": "A", "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
                 "editorMode": "code", "queryType": "instant",
-                "expr": (f'(max(last_over_time({HOST_SCOPED} | event="game.session.start" | unwrap start_epoch_ms [$__range])) or vector(0)) '
-                         f'> bool (max(last_over_time({HOST_SCOPED} | event="game.session.end" | unwrap end_epoch_ms [$__range])) or vector(0))'),
+                # alive = 1 if the host logged anything in the last 60s, else 0.
+                # playing = 1 if the latest session.start is newer than the latest
+                # session.end, else 0 (the original PLAYING/ATTRACT MODE logic).
+                # result = (1-alive)*2 + alive*playing -> 2 (UNKNOWN) when not alive,
+                # otherwise falls through to plain 0/1 — arithmetic ternary, no `if`
+                # in LogQL. alive's [60s] window matches _alive_panel exactly.
+                "expr": (
+                    '(1 - ((sum(count_over_time(' + HOST_SCOPED + ' [60s])) or vector(0)) > bool 0)) * 2 '
+                    '+ ((sum(count_over_time(' + HOST_SCOPED + ' [60s])) or vector(0)) > bool 0) '
+                    f'* ((max(last_over_time({HOST_SCOPED} | event="game.session.start" | unwrap start_epoch_ms [$__range])) or vector(0)) '
+                    f'> bool (max(last_over_time({HOST_SCOPED} | event="game.session.end" | unwrap end_epoch_ms [$__range])) or vector(0)))'
+                ),
             }],
             "fieldConfig": {"defaults": {
                 "mappings": [{"type": "value", "options": {
                     "1": {"text": "PLAYING", "color": "green", "index": 0},
                     "0": {"text": "ATTRACT MODE", "color": "blue", "index": 1},
+                    "2": {"text": "UNKNOWN", "color": "#808080", "index": 2},
                 }}],
                 "color": {"mode": "fixed", "fixedColor": "text"},
             }, "overrides": []},
@@ -1570,7 +1590,7 @@ def build_live_engine():
                    "game.startup", "traffic_difficulty", sel=HOST_SCOPED),
 
         # Row 4 — usage patterns
-        _coins_per_hour_panel(240, 0, y0 + 15, 24, 8),
+        _revenue_per_hour_panel(240, 0, y0 + 15, 24, 8),
 
         # Row 5 — music track popularity
         _music_plays_panel(250, 0, y0 + 23, 24, 6),

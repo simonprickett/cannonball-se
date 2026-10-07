@@ -146,7 +146,7 @@
         "spec": {
           "id": 201,
           "title": "Engine state",
-          "description": "Is a game being played right now on the selected host? Latest game.session.start newer than latest game.session.end = PLAYING; otherwise the cabinet is in ATTRACT MODE. Same logic as the Now Playing board, scoped to $host.",
+          "description": "Is a game being played right now on the selected host? Latest game.session.start newer than latest game.session.end = PLAYING; otherwise ATTRACT MODE \u2014 UNLESS the host hasn't logged anything in the last 60s (same check as Alive), in which case UNKNOWN: an abandoned/killed session (power cut, process killed mid-game) never logs game.session.end, so without this fallback a dead cabinet's last game would show PLAYING forever. Confirmed live 2026-10-07 \u2014 a session cut short by stopping the Pi stayed PLAYING indefinitely.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -165,7 +165,7 @@
                       "spec": {
                         "editorMode": "code",
                         "queryType": "instant",
-                        "expr": "(max(last_over_time({service_name=\"cannonball-se\"} | host_name=\"$host\" | event=\"game.session.start\" | unwrap start_epoch_ms [$__range])) or vector(0)) > bool (max(last_over_time({service_name=\"cannonball-se\"} | host_name=\"$host\" | event=\"game.session.end\" | unwrap end_epoch_ms [$__range])) or vector(0))"
+                        "expr": "(1 - ((sum(count_over_time({service_name=\"cannonball-se\"} | host_name=\"$host\" [60s])) or vector(0)) > bool 0)) * 2 + ((sum(count_over_time({service_name=\"cannonball-se\"} | host_name=\"$host\" [60s])) or vector(0)) > bool 0) * ((max(last_over_time({service_name=\"cannonball-se\"} | host_name=\"$host\" | event=\"game.session.start\" | unwrap start_epoch_ms [$__range])) or vector(0)) > bool (max(last_over_time({service_name=\"cannonball-se\"} | host_name=\"$host\" | event=\"game.session.end\" | unwrap end_epoch_ms [$__range])) or vector(0)))"
                       }
                     },
                     "refId": "A",
@@ -210,6 +210,11 @@
                           "text": "ATTRACT MODE",
                           "color": "blue",
                           "index": 1
+                        },
+                        "2": {
+                          "text": "UNKNOWN",
+                          "color": "#808080",
+                          "index": 2
                         }
                       }
                     }
@@ -1260,8 +1265,8 @@
         "kind": "Panel",
         "spec": {
           "id": 240,
-          "title": "Coins per hour",
-          "description": "game.coin_inserted events bucketed by hour (24 buckets/day for the default today range; empty hours show 0, not a gap), for the selected host.",
+          "title": "Revenue per hour",
+          "description": "Revenue (game.coin_inserted events \u00d7 $0.25/coin) bucketed by hour (24 buckets/day for the default today range; empty hours show $0, not a gap), for the selected host.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -1281,7 +1286,7 @@
                         "editorMode": "code",
                         "queryType": "range",
                         "intervalMs": 3600000,
-                        "expr": "sum(count_over_time({service_name=\"cannonball-se\"} | host_name=\"$host\" | event=\"game.coin_inserted\" [1h])) or vector(0)"
+                        "expr": "sum(count_over_time({service_name=\"cannonball-se\"} | host_name=\"$host\" | event=\"game.coin_inserted\" [1h])) * 0.25 or vector(0)"
                       }
                     },
                     "refId": "A",
@@ -1311,11 +1316,11 @@
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "short",
-                  "decimals": 0,
+                  "unit": "currencyUSD",
+                  "decimals": 2,
                   "color": {
                     "mode": "fixed",
-                    "fixedColor": "blue"
+                    "fixedColor": "green"
                   },
                   "custom": {
                     "drawStyle": "bars",
@@ -1327,7 +1332,7 @@
                     "showPoints": "never",
                     "pointSize": 5,
                     "axisPlacement": "auto",
-                    "axisLabel": "Coins",
+                    "axisLabel": "Revenue",
                     "stacking": {
                       "mode": "none",
                       "group": "A"
