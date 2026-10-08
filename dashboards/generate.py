@@ -1469,7 +1469,7 @@ def host_selector_panel():
                         "by default). Click a row to scope the whole board to that cabinet — "
                         "useful once more than one is deployed."),
         "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
-        "gridPos": {"x": 0, "y": 0, "w": 24, "h": HOST_TABLE_H},
+        "gridPos": {"x": 0, "y": 0, "w": 8, "h": HOST_TABLE_H},
         "targets": [{
             "refId": "A", "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
             "editorMode": "code", "queryType": "instant",
@@ -1503,6 +1503,60 @@ def host_selector_panel():
     }
 
 
+def _selected_host_panel(pid, x, y, w, h):
+    # Shows which host the whole board is currently scoped to, or a loud
+    # "NO HOST SELECTED" when $host is empty — distinct from the Host Selector
+    # table, which lists candidates rather than stating the current selection.
+    #
+    # $host is a plain Grafana template variable: it's textually substituted
+    # into the query BEFORE the request reaches Loki, so `line_format "$host"`
+    # becomes a literal string ("redpi4", or "" when unset) baked into the
+    # LogQL text itself. Deliberately queries ALL events (plain SEL, no host
+    # filter) rather than HOST_SCOPED, so this doesn't depend on the selected
+    # host actually having data — it only needs the SERVICE to have logged
+    # anything, ever, which is a much safer assumption than "this specific
+    # host has recent events" (a newly-picked host with zero data yet would
+    # otherwise show empty/NO HOST SELECTED, which would be wrong).
+    return {
+        "id": pid, "type": "stat", "title": "Selected host",
+        "description": ("Which host the rest of this board is scoped to. Click a row in Host "
+                        "Selector (or type one) to change it."),
+        "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+        "gridPos": {"x": x, "y": y, "w": w, "h": h},
+        "targets": [{
+            "refId": "A", "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+            "editorMode": "code", "queryType": "range", "maxLines": 1,
+            "expr": f'{SEL} | line_format "$host"',
+        }],
+        "fieldConfig": {"defaults": {
+            "noValue": "NO HOST SELECTED",
+            "mappings": [
+                {"type": "special", "options": {
+                    "match": "empty", "result": {"text": "NO HOST SELECTED", "color": "red"}}},
+                # No "text" here -> Grafana keeps the original value (the host
+                # name) on display, just tints it blue for the "selected" state.
+                {"type": "regex", "options": {"pattern": ".+", "result": {"color": "blue"}}},
+            ],
+            # "text" (not an actual colour) tells Grafana to use whatever colour
+            # the matched mapping carries, instead of forcing a fixed one — same
+            # trick as Engine State/Alive. A real fixedColor here would override
+            # the mappings' own colours, which is exactly the bug this fixes.
+            "color": {"mode": "fixed", "fixedColor": "text"},
+        }, "overrides": []},
+        "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center",
+                    # "fields" must name the renamed string field explicitly — left as ""
+                    # (auto) first, which defaults to picking a NUMERIC field and silently
+                    # found none, rendering as if the value were empty regardless of $host.
+                    # Same explicit-fields requirement as the proven _line_stat helper.
+                    "reduceOptions": {"calcs": ["lastNotNull"], "fields": "Host", "values": False},
+                    "textMode": "value"},
+        "transformations": [{"id": "organize", "options": {
+            "excludeByName": {"Time": True, "tsNs": True, "id": True, "labels": True, "labelTypes": True},
+            "renameByName": {"Line": "Host"},
+        }}],
+    }
+
+
 def build_live_engine():
     # `or vector(0)` guarantees a non-empty result even when $host matches nothing (e.g. no
     # host picked yet) — without it, the Revenue panel's SQL expression errors on an empty
@@ -1516,6 +1570,7 @@ def build_live_engine():
 
     panels = [
         host_selector_panel(),
+        _selected_host_panel(206, 8, 0, 16, HOST_TABLE_H),
 
         # Row 1 — engine state, aliveness, coin economics snapshot (operator-focused)
         {

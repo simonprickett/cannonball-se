@@ -141,6 +141,115 @@
           }
         }
       },
+      "panel-206": {
+        "kind": "Panel",
+        "spec": {
+          "id": 206,
+          "title": "Selected host",
+          "description": "Which host the rest of this board is scoped to. Click a row in Host Selector (or type one) to change it.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "range",
+                        "maxLines": 1,
+                        "expr": "{service_name=\"cannonball-se\"} | line_format \"$host\""
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [
+                {
+                  "group": "organize",
+                  "kind": "Transformation",
+                  "spec": {
+                    "options": {
+                      "excludeByName": {
+                        "Time": true,
+                        "tsNs": true,
+                        "id": true,
+                        "labels": true,
+                        "labelTypes": true
+                      },
+                      "renameByName": {
+                        "Line": "Host"
+                      }
+                    }
+                  }
+                }
+              ],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "Host",
+                  "values": false
+                },
+                "textMode": "value"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "noValue": "NO HOST SELECTED",
+                  "mappings": [
+                    {
+                      "type": "special",
+                      "options": {
+                        "match": "empty",
+                        "result": {
+                          "text": "NO HOST SELECTED",
+                          "color": "red"
+                        }
+                      }
+                    },
+                    {
+                      "type": "regex",
+                      "options": {
+                        "pattern": ".+",
+                        "result": {
+                          "color": "blue"
+                        }
+                      }
+                    }
+                  ],
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "text"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
       "panel-201": {
         "kind": "Panel",
         "spec": {
@@ -1564,11 +1673,24 @@
             "spec": {
               "x": 0,
               "y": 0,
-              "width": 24,
+              "width": 8,
               "height": 6,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-200"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 8,
+              "y": 0,
+              "width": 16,
+              "height": 6,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-206"
               }
             }
           },
