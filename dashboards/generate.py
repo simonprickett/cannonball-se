@@ -1181,6 +1181,195 @@ def _revenue_panel(pid, x, y, w, h, coins_expr):
     }
 
 
+def _latest_screenshot_panel(pid, x, y, w, h):
+    # Same recipe as Recent Games' screenshot panels (e.g. "Final frame (game
+    # over)", id 21 on live_game_dashboard.json): line_format flattens the
+    # screenshot_jpg structured-metadata attribute into the Line field (SQL/
+    # transforms can't reach structured metadata directly), organize renames
+    # Line -> screenshot_jpg, filterFieldsByName drops everything else, a
+    # Dynamic Text panel (everyRow: true) renders it with TRIPLE braces
+    # ({{{ }}}) so the base64 "=" padding isn't HTML-escaped.
+    #
+    # Unlike Recent Games (session-scoped, one specific event), this is HOST-
+    # scoped and unfiltered by event name — any event that carries a
+    # screenshot (game.session.start, game.session.end, game.stage.end,
+    # game.map_screen) is eligible; `direction: "backward"` + `maxLines: 1`
+    # picks whichever one is most recent, regardless of which event logged it.
+    expr = HOST_SCOPED + ' | screenshot_jpg != "" | line_format "{{.screenshot_jpg}}"'
+    return {
+        "id": pid, "type": "marcusolsson-dynamictext-panel", "title": "📸 Latest screenshot",
+        "description": ("The most recent screenshot captured on the selected host, from "
+                        "whichever event logged it last (game start, stage checkpoint, "
+                        "course map, or game over)."),
+        "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+        "gridPos": {"x": x, "y": y, "w": w, "h": h},
+        "options": {
+            "content": '<img src="data:image/jpeg;base64,{{{screenshot_jpg}}}" style="width:100%;border-radius:4px"/>',
+            "defaultContent": "No screenshot yet for this host.",
+            "everyRow": True,
+        },
+        "targets": [{
+            "refId": "A", "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+            "editorMode": "code", "queryType": "range", "direction": "backward", "maxLines": 1,
+            "expr": expr,
+        }],
+        "transformations": [
+            {"id": "organize", "options": {"renameByName": {"Line": "screenshot_jpg"}}},
+            {"id": "filterFieldsByName", "options": {"include": {"names": ["screenshot_jpg"]}}},
+        ],
+        "fieldConfig": {"defaults": {}, "overrides": []},
+    }
+
+
+def _latest_screenshot_time_panel(pid, x, y, w, h):
+    # Companion stat for the screenshot panel: when it was captured. Uses
+    # Loki's own line timestamp (`__timestamp__`, a line_format template
+    # built-in — confirmed supported in this stack) rather than any one
+    # event's own epoch-ms attribute, since the attribute carrying a
+    # screenshot differs by event (start_epoch_ms/end_epoch_ms/none at all
+    # for stage.end/map_screen) — the line's own timestamp is the one thing
+    # every screenshot-carrying event has in common. Formatted via Loki's
+    # built-in sprig `date` function (confirmed working; `dateInZone` is NOT
+    # defined in this Loki version — tried it first, hard parse error) — UTC,
+    # not BST, since there's no timezone-conversion function available here.
+    # Same `screenshot_jpg != ""` filter as the screenshot panel so both
+    # queries resolve to the exact same single log line.
+    expr = HOST_SCOPED + ' | screenshot_jpg != "" | line_format "{{ __timestamp__ | date \\"2006-01-02 15:04:05\\" }} UTC"'
+    return {
+        "id": pid, "type": "stat", "title": "🕐 Captured",
+        "description": "When the latest screenshot (left) was captured, in UTC.",
+        "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+        "gridPos": {"x": x, "y": y, "w": w, "h": h},
+        "targets": [{
+            "refId": "A", "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+            "editorMode": "code", "queryType": "range", "direction": "backward", "maxLines": 1,
+            "expr": expr,
+        }],
+        "fieldConfig": {"defaults": {
+            "noValue": "—",
+            "color": {"mode": "fixed", "fixedColor": "dark-blue"},
+        }, "overrides": []},
+        "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center",
+                    "reduceOptions": {"calcs": ["lastNotNull"], "fields": "Captured", "values": False},
+                    "textMode": "value"},
+        "transformations": [{"id": "organize", "options": {
+            "excludeByName": {"Time": True, "tsNs": True, "id": True, "labels": True, "labelTypes": True},
+            "renameByName": {"Line": "Captured"},
+        }}],
+    }
+
+
+def _completion_rate_panel(pid, x, y, w, h):
+    # % of today's games on the selected host that reached the goal line
+    # (completed) vs. timed out — derived from game.gameover's own `completed`
+    # 0/1 attribute (avg of 0/1 over the day = fraction completed). Higher is
+    # NOT better for the operator here: a high completion rate can mean the
+    # difficulty is set too easy, which hurts replay value — so the colour
+    # ramp runs the OPPOSITE direction from Utilization/Revenue (green at the
+    # low end, red at the high end), same 4-colour palette reused once more
+    # for visual consistency across the board.
+    expr = f'avg(avg_over_time({HOST_SCOPED} | event="game.gameover" | unwrap completed [$__range])) * 100 or vector(0)'
+    return {
+        "id": pid, "type": "stat", "title": "🏁 Completion rate",
+        "description": ("Percentage of today's games on the selected host that reached the "
+                        "goal line, vs. timing out. A high rate can mean the difficulty is "
+                        "set too easy — hence red at the high end, not green."),
+        "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+        "gridPos": {"x": x, "y": y, "w": w, "h": h},
+        "targets": [{"refId": "A", "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+                     "editorMode": "code", "queryType": "instant", "expr": expr}],
+        "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False},
+                    "colorMode": "background", "graphMode": "none", "justifyMode": "auto",
+                    "textMode": "auto", "wideLayout": True, "showPercentChange": False},
+        "fieldConfig": {"defaults": {"unit": "percent", "decimals": 0, "mappings": [],
+                                     "color": {"mode": "thresholds"},
+                                     "thresholds": {"mode": "absolute", "steps": [
+                                         {"color": "#81c784", "value": None},
+                                         {"color": "#fff176", "value": 40},
+                                         {"color": "#ffb74d", "value": 60},
+                                         {"color": "#e57373", "value": 80}]}},
+                        "overrides": []},
+    }
+
+
+def _lifecycle_pie_panel(pid, x, y, w, h):
+    # % of today's wall-clock time (since the machine was first seen, same
+    # "on since first heartbeat" denominator as Utilization — NOT since
+    # midnight, so time the cabinet was genuinely off doesn't count as
+    # "attract") spent in each of the 3 lifecycle states, for the selected
+    # host. Reuses the same session_label JOIN pattern as Average game
+    # duration/Utilization, extended with a 3rd LEFT JOIN against
+    # game.gameover to split each game's span into its PLAYING portion
+    # (start -> gameover) and POST GAME portion (gameover -> end), instead
+    # of treating the whole game as one block. Handles the currently-OPEN
+    # session (no end yet) by falling back to $__to for whichever boundary
+    # hasn't happened yet — same COALESCE-to-$__to trick as Latest game
+    # duration — so a game in progress RIGHT NOW still counts its elapsed
+    # time correctly. Attract = whatever's left over (total on-time minus
+    # playing minus post game), clamped at 0 via CASE (GREATEST() doesn't
+    # work in this SQL dialect — confirmed failing earlier this project).
+    # No `or vector(0)` on D (first heartbeat) — same deliberate choice as
+    # Utilization: if we genuinely don't know when the machine came on
+    # today, "No data" is the honest answer, not a misleading number.
+    return {
+        "id": pid, "type": "piechart", "title": "🥧 Time in each state (today)",
+        "description": ("Percentage of today's up-time (since the first heartbeat seen today) "
+                        "spent in each lifecycle state, for the selected host. A game still in "
+                        "progress or still in post game right now is counted up to this "
+                        "instant."),
+        "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+        "gridPos": {"x": x, "y": y, "w": w, "h": h},
+        "targets": [
+            {"refId": "A", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+             "editorMode": "code", "queryType": "instant",
+             "expr": f'max by (session_label) (max_over_time({HOST_SCOPED} | event="game.session.start" | unwrap start_epoch_ms [$__range]))'},
+            {"refId": "B", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+             "editorMode": "code", "queryType": "instant",
+             "expr": f'max by (session_label) (max_over_time({HOST_SCOPED} | event="game.session.end" | unwrap end_epoch_ms [$__range]))'},
+            {"refId": "C", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+             "editorMode": "code", "queryType": "instant",
+             "expr": f'max by (session_label) (max_over_time({HOST_SCOPED} | event="game.gameover" | unwrap gameover_epoch_ms [$__range]))'},
+            {"refId": "D", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+             "editorMode": "code", "queryType": "instant",
+             "expr": f'min(min_over_time({HOST_SCOPED} | event="game.heartbeat" | unwrap heartbeat_epoch_ms [$__range]))'},
+            {"refId": "E", "datasource": {"type": "__expr__", "uid": "__expr__"}, "type": "sql",
+             "expression": (
+                 "SELECT "
+                 "CASE WHEN (total_on - playing - postgame) < 0 THEN 0 ELSE (total_on - playing - postgame) END / total_on * 100.0 AS `Attract mode`, "
+                 "playing / total_on * 100.0 AS `Playing`, "
+                 "postgame / total_on * 100.0 AS `Post game` "
+                 "FROM (SELECT "
+                 "$__to - (SELECT `__value__` FROM D) AS total_on, "
+                 "COALESCE(SUM(CASE WHEN c.`__value__` IS NOT NULL THEN c.`__value__` ELSE COALESCE(b.`__value__`, $__to) END - a.`__value__`), 0) AS playing, "
+                 "COALESCE(SUM(COALESCE(b.`__value__`, $__to) - CASE WHEN c.`__value__` IS NOT NULL THEN c.`__value__` ELSE COALESCE(b.`__value__`, $__to) END), 0) AS postgame "
+                 "FROM A a LEFT JOIN B b ON a.session_label = b.session_label LEFT JOIN C c ON a.session_label = c.session_label) q"
+             )},
+        ],
+        "options": {
+            "reduceOptions": {"values": True, "calcs": ["lastNotNull"], "fields": ""},
+            "pieType": "donut",
+            "tooltip": {"mode": "single", "sort": "none"},
+            "legend": {"displayMode": "list", "placement": "right", "showLegend": True, "values": ["percent"]},
+            "displayLabels": [],
+        },
+        "fieldConfig": {
+            "defaults": {"unit": "percent", "decimals": 1, "mappings": [],
+                         "color": {"mode": "palette-classic"}},
+            # Same hex per state as Engine state's own mappings and the
+            # lifecycle graphviz's thresholds — the pie always agrees with
+            # whatever colour those show for the current state.
+            "overrides": [
+                {"matcher": {"id": "byName", "options": "Attract mode"},
+                 "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#fb8c00"}}]},
+                {"matcher": {"id": "byName", "options": "Playing"},
+                 "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#43a047"}}]},
+                {"matcher": {"id": "byName", "options": "Post game"},
+                 "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#ab47bc"}}]},
+            ],
+        },
+    }
+
+
 def _logs_panel(pid, x, y, w, h, title, description, expr, sort="Descending", prettify=False):
     return {
         "id": pid, "type": "logs", "title": title, "description": description,
@@ -1801,6 +1990,7 @@ def build_live_engine():
     # host picked yet) — without it, the Revenue panel's SQL expression errors on an empty
     # input frame (no `__value__` column to select), rather than just showing "No data".
     coins_expr = f'sum(count_over_time({HOST_SCOPED} | event="game.coin_inserted" [$__range])) or vector(0)'
+    games_played_expr = f'sum(count_over_time({HOST_SCOPED} | event="game.session.start" [$__range])) or vector(0)'
     coin_line_fmt = "Coin inserted — {{.credits}} credit(s) now in machine"
     raw_line_fmt = "{{.event}}  stage={{.stage_number}}  speed={{.speed_kph}}  score={{.score}}"
 
@@ -1873,8 +2063,15 @@ def build_live_engine():
         _latest_duration_panel(214, 12, y0 + 5, 6, 5),
         _avg_duration_panel(216, 18, y0 + 5, 6, 5),
 
-        # Row 3 — utilization (% of the range spent PLAYING vs attract mode)
+        # Row 3 — utilization (% of the range spent PLAYING vs attract mode),
+        # games played, completion rate, and the lifecycle time-split pie
         _utilization_panel(225, 0, y0 + 10, 6, 5),
+        _stat(220, 6, y0 + 10, 6, 5, "🏎️ Games played (today)",
+              "game.session.start events in the selected time range (today, by default) on "
+              "the selected host.",
+              games_played_expr, color="blue", colorMode="background"),
+        _completion_rate_panel(221, 12, y0 + 10, 6, 5),
+        _lifecycle_pie_panel(222, 18, y0 + 10, 6, 5),
 
         # Row 4 — config snapshot, from the one-time game.startup event
         _car_colour_panel(217, 0, y0 + 15, 6, 5),
@@ -1933,6 +2130,10 @@ def build_live_engine():
                     "default), newest first — the full, unfiltered feed from whatever game is "
                     "running now (or the most recent one, in attract mode).",
                     f'{HOST_SCOPED} | line_format "{raw_line_fmt}"', prettify=True),
+
+        # Row 10 — latest screenshot, whatever event last captured one
+        _latest_screenshot_panel(227, 0, y0 + 58, 18, 10),
+        _latest_screenshot_time_panel(228, 18, y0 + 58, 6, 10),
     ]
 
     return {
