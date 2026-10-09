@@ -8,8 +8,6 @@ game picker (Loki only, no Tempo). On import you're prompted for the Loki data s
 |------|-----|---------|
 | `live_game_dashboard.json` | `cannonball-now-playing` | **Now Playing** — hands-off, auto-follows the current/most-recent game (no picker; 10s auto-refresh). Identity/state/stage/screenshots are exact at any range; aggregations are a rolling time-window (keep the range short). |
 | `recent_games_dashboard.json` | `cannonball-recent-games` | **Recent Games** — pick any recent game by clicking a row in the Loki "Recent games" table (newest first). Every panel is session-scoped, so exact at any range. Does NOT auto-follow; no auto-refresh. |
-| `aggregate_dashboard.json` | `cannonball-aggregate` | Aggregate stats across all games in the selected time range |
-| `leaderboards_dashboard.json` | `cannonball-leaderboards` | Per-run "Hall of Fame" leaderboards |
 | `operator_dashboard.json` | `cannonball-live-engine` | **Operator Insights** — cabinet/engine state for the operator: attract/playing/post-game lifecycle, coin economics, aliveness, usage patterns, and the latest screenshot. Host-scoped (pick a cabinet via the Host Selector); defaults to "today." Generated straight from Python, no hand-authored v1 source. |
 
 **`recent_games_dashboard.json` is generated, not hand-edited.** `live_game_dashboard.json` is the
