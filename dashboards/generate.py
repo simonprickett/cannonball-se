@@ -7,6 +7,10 @@ from Grafana). This script derives the PICKER board (last_game_dashboard.json) f
 it so the two never drift: same panels, layout, viz, DOT, screenshots — only the
 query scoping and variables differ.
 
+The OPERATOR board (operator_dashboard.json, "Cannonball-SE — Operator Insights")
+is built independently, straight from Python (build_operator_dashboard()) — there's
+no hand-authored v1 source behind it the way LIVE/PICKER share one.
+
 Usage:  python3 dashboards/generate.py
 """
 import json, pathlib, sys, urllib.parse
@@ -14,7 +18,7 @@ import json, pathlib, sys, urllib.parse
 HERE = pathlib.Path(__file__).parent
 LIVE = HERE / "live_game_dashboard.json"
 PICKER = HERE / "recent_games_dashboard.json"
-LIVE_ENGINE = HERE / "live_engine_dashboard.json"
+OPERATOR = HERE / "operator_dashboard.json"
 # Data-driven layout: the v2 spec.layout (RowsLayout) captured from the Grafana UI.
 # Arrange in the UI, then `gcx dashboards get cannonball-recent-games` and save its
 # spec.layout here (see dashboards/README/push.sh). Panel CONTENT stays in this
@@ -1151,7 +1155,7 @@ def _revenue_panel(pid, x, y, w, h, coins_expr):
     # red/orange/yellow/green threshold palette as the stat version, just
     # reused as gauge color bands instead of a background gradient.
     return {
-        "id": pid, "type": "gauge", "title": "💰 Revenue (today)",
+        "id": pid, "type": "gauge", "title": "💰 Revenue",
         "description": (f"Coins inserted in the selected time range (today, by default) × "
                         f"${COIN_PRICE_USD:.2f}/coin. Gauge maxes out at $20 — the number in the "
                         f"middle keeps showing the real total even past that."),
@@ -1204,7 +1208,16 @@ def _latest_screenshot_panel(pid, x, y, w, h):
         "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
         "gridPos": {"x": x, "y": y, "w": w, "h": h},
         "options": {
-            "content": '<img src="data:image/jpeg;base64,{{{screenshot_jpg}}}" style="width:100%;border-radius:4px"/>',
+            # max-width/max-height + object-fit:contain scales the image to
+            # fit WITHIN the panel's box (both dimensions), never overflowing
+            # — unlike a plain width:100%, which forces full width regardless
+            # of height and overflows (scrolls) whenever the panel's aspect
+            # ratio is narrower than the screenshot's.
+            "content": ('<div style="display:flex;align-items:center;justify-content:center;'
+                        'width:100%;height:100%;overflow:hidden">'
+                        '<img src="data:image/jpeg;base64,{{{screenshot_jpg}}}" '
+                        'style="max-width:100%;max-height:100%;object-fit:contain;border-radius:4px"/>'
+                        '</div>'),
             "defaultContent": "No screenshot yet for this host.",
             "everyRow": True,
         },
@@ -1228,16 +1241,25 @@ def _latest_screenshot_time_panel(pid, x, y, w, h):
     # event's own epoch-ms attribute, since the attribute carrying a
     # screenshot differs by event (start_epoch_ms/end_epoch_ms/none at all
     # for stage.end/map_screen) — the line's own timestamp is the one thing
-    # every screenshot-carrying event has in common. Formatted via Loki's
-    # built-in sprig `date` function (confirmed working; `dateInZone` is NOT
-    # defined in this Loki version — tried it first, hard parse error) — UTC,
-    # not BST, since there's no timezone-conversion function available here.
-    # Same `screenshot_jpg != ""` filter as the screenshot panel so both
-    # queries resolve to the exact same single log line.
-    expr = HOST_SCOPED + ' | screenshot_jpg != "" | line_format "{{ __timestamp__ | date \\"2006-01-02 15:04:05\\" }} UTC"'
+    # every screenshot-carrying event has in common. Same `screenshot_jpg !=
+    # ""` filter as the screenshot panel so both queries resolve to the exact
+    # same single log line.
+    #
+    # Renders in LOCAL time, not UTC: extract the RAW epoch ms via Go's
+    # `.UnixMilli` method on `__timestamp__` (confirmed callable directly in
+    # a Loki line_format template) rather than pre-formatting a UTC string
+    # with the `date` sprig function (the earlier approach — worked, but
+    # baked in UTC with no timezone-conversion function available in this
+    # Loki version; tried `dateInZone` first, not defined, hard parse error).
+    # convertFieldType turns that numeric-looking STRING into a real number
+    # field, then the "dateTimeAsLocal" unit does the local-time rendering —
+    # same proven mechanism already used for "Latest game start" earlier in
+    # this project (a plain numeric epoch-ms field + a dateTime unit), just
+    # fed from a flattened Loki line instead of an unwrap metric query.
+    expr = HOST_SCOPED + ' | screenshot_jpg != "" | line_format "{{ __timestamp__.UnixMilli }}"'
     return {
         "id": pid, "type": "stat", "title": "🕐 Captured",
-        "description": "When the latest screenshot (left) was captured, in UTC.",
+        "description": "How long ago the latest screenshot (left) was captured.",
         "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
         "gridPos": {"x": x, "y": y, "w": w, "h": h},
         "targets": [{
@@ -1246,16 +1268,26 @@ def _latest_screenshot_time_panel(pid, x, y, w, h):
             "expr": expr,
         }],
         "fieldConfig": {"defaults": {
+            # Relative "X minutes/hours ago" — same unit originally used for
+            # "Latest game start" before that one switched to a thresholded
+            # elapsed-minutes value; no threshold-colouring need here, so the
+            # plain relative-time unit is simplest.
+            "unit": "dateTimeFromNow",
             "noValue": "—",
             "color": {"mode": "fixed", "fixedColor": "dark-blue"},
         }, "overrides": []},
         "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center",
                     "reduceOptions": {"calcs": ["lastNotNull"], "fields": "Captured", "values": False},
                     "textMode": "value"},
-        "transformations": [{"id": "organize", "options": {
-            "excludeByName": {"Time": True, "tsNs": True, "id": True, "labels": True, "labelTypes": True},
-            "renameByName": {"Line": "Captured"},
-        }}],
+        "transformations": [
+            {"id": "organize", "options": {
+                "excludeByName": {"Time": True, "tsNs": True, "id": True, "labels": True, "labelTypes": True},
+                "renameByName": {"Line": "Captured"},
+            }},
+            {"id": "convertFieldType", "options": {
+                "conversions": [{"targetField": "Captured", "destinationType": "number"}],
+            }},
+        ],
     }
 
 
@@ -1312,7 +1344,7 @@ def _lifecycle_pie_panel(pid, x, y, w, h):
     # Utilization: if we genuinely don't know when the machine came on
     # today, "No data" is the honest answer, not a misleading number.
     return {
-        "id": pid, "type": "piechart", "title": "🥧 Time in each state (today)",
+        "id": pid, "type": "piechart", "title": "🥧 Time in each state",
         "description": ("Percentage of today's up-time (since the first heartbeat seen today) "
                         "spent in each lifecycle state, for the selected host. A game still in "
                         "progress or still in post game right now is counted up to this "
@@ -1384,7 +1416,7 @@ def _logs_panel(pid, x, y, w, h, title, description, expr, sort="Descending", pr
 
 def _engine_state_expr():
     # Shared by the Engine state stat panel and the lifecycle graphviz below —
-    # see Engine state's own comment (in build_live_engine) for the full
+    # see Engine state's own comment (in build_operator_dashboard) for the full
     # breakdown of the 4-value arithmetic ternary (0 attract / 1 playing /
     # 2 post game / 3 unknown).
     return (
@@ -1478,7 +1510,7 @@ def _alive_panel(pid, x, y, w, h):
     # call site in outrun.cpp — but a wider window is a cheap second line of
     # defence against any brief gap.
     return {
-        "id": pid, "type": "stat", "title": "📶 Alive",
+        "id": pid, "type": "stat", "title": "💓 Heartbeat",
         "description": ("Has the selected host logged a heartbeat or any game event in the last "
                         "60 seconds? Independent of the time picker above. OFFLINE until the "
                         "game.heartbeat telemetry change is built onto the cabinet."),
@@ -1645,6 +1677,56 @@ def _utilization_panel(pid, x, y, w, h):
                                      "color": {"mode": "thresholds"},
                                      # Color bands: red (barely used) -> orange -> yellow -> green
                                      # (well utilized). Easy to retune later — just these 4 values.
+                                     "thresholds": {"mode": "absolute", "steps": [
+                                         {"color": "#e57373", "value": None},
+                                         {"color": "#ffb74d", "value": 20},
+                                         {"color": "#fff176", "value": 40},
+                                         {"color": "#81c784", "value": 60}]},
+                                     "mappings": []},
+                        "overrides": []},
+    }
+
+
+def _utilization_bargauge_panel(pid, x, y, w, h):
+    # Same query/thresholds as _utilization_panel (Economics tab's circle/LED
+    # gauge) — this is a SEPARATE panel, not a re-styled copy of that shared
+    # element, because the user wants a different viz (vertical retro-LCD bar)
+    # on Overview while Economics keeps the circle gauge unchanged. Can't do
+    # both styles from one shared element/id, so this duplicates the query
+    # rather than the panel reference.
+    return {
+        "id": pid, "type": "bargauge", "title": "📊 Utilization",
+        "description": ("Percentage of the time the machine has been ON today (since the "
+                        "first heartbeat seen in the selected range) spent PLAYING, for the "
+                        "selected host — sum of completed games' durations ÷ (now minus "
+                        "first heartbeat). A game still in progress isn't counted until it ends."),
+        "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+        "gridPos": {"x": x, "y": y, "w": w, "h": h},
+        "targets": [
+            {"refId": "A", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+             "editorMode": "code", "queryType": "instant",
+             "expr": f'max by (session_label) (max_over_time({HOST_SCOPED} | event="game.session.start" | unwrap start_epoch_ms [$__range]))'},
+            {"refId": "B", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+             "editorMode": "code", "queryType": "instant",
+             "expr": f'max by (session_label) (max_over_time({HOST_SCOPED} | event="game.session.end" | unwrap end_epoch_ms [$__range]))'},
+            {"refId": "D", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+             "editorMode": "code", "queryType": "instant",
+             "expr": f'min(min_over_time({HOST_SCOPED} | event="game.heartbeat" | unwrap heartbeat_epoch_ms [$__range]))'},
+            {"refId": "E", "datasource": {"type": "__expr__", "uid": "__expr__"}, "type": "sql",
+             "expression": ("SELECT COALESCE(SUM(b.`__value__` - a.`__value__`), 0) "
+                            "/ ($__to - (SELECT `__value__` FROM D)) * 100.0 AS utilization_pct "
+                            "FROM A a JOIN B b ON a.session_label = b.session_label")},
+        ],
+        # "lcd" displayMode = the segmented retro-LCD look; vertical since
+        # this is a single narrow column next to the stat stack.
+        "options": {"orientation": "vertical", "displayMode": "lcd",
+                    "valueMode": "color", "showUnfilled": True,
+                    "minVizWidth": 0, "minVizHeight": 10, "sizing": "auto",
+                    "namePlacement": "auto",
+                    "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False}},
+        # Same thresholds/colour bands as the circle-gauge Utilization.
+        "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100, "decimals": 1,
+                                     "color": {"mode": "thresholds"},
                                      "thresholds": {"mode": "absolute", "steps": [
                                          {"color": "#e57373", "value": None},
                                          {"color": "#ffb74d", "value": 20},
@@ -1920,9 +2002,15 @@ def host_selector_panel():
                 {"matcher": {"id": "byName", "options": "Host"},
                  "properties": [
                      {"id": "custom.width", "value": 240},
+                     # Deliberately NOT carrying ${__url_time_range} forward (unlike the
+                     # Recent Games picker's equivalent link) — every panel on this board
+                     # is "today"-scoped by design, so selecting a host should always land
+                     # on the dashboard's own default range, not whatever range happened
+                     # to be active when you clicked (which could lock in a stale range
+                     # indefinitely across reloads, via the URL).
                      {"id": "links", "value": [{
                          "title": "View this host",
-                         "url": "/d/cannonball-live-engine/?var-host=${__value.raw}&${__url_time_range}",
+                         "url": "/d/cannonball-live-engine/?var-host=${__value.raw}",
                          "targetBlank": False,
                      }]},
                  ]},
@@ -1985,7 +2073,7 @@ def _selected_host_panel(pid, x, y, w, h):
     }
 
 
-def build_live_engine():
+def build_operator_dashboard():
     # `or vector(0)` guarantees a non-empty result even when $host matches nothing (e.g. no
     # host picked yet) — without it, the Revenue panel's SQL expression errors on an empty
     # input frame (no `__value__` column to select), rather than just showing "No data".
@@ -2052,7 +2140,7 @@ def build_live_engine():
         },
         _alive_panel(205, 6, y0, 6, 5),
         _credits_available_panel(212, 12, y0, 6, 5, coins_expr),
-        _stat(210, 18, y0, 6, 5, "💰 Coins inserted (today)",
+        _stat(210, 18, y0, 6, 5, "💰 Coins inserted",
               "game.coin_inserted events in the selected time range (today, by default) on the "
               "selected host — one per physical coin.",
               coins_expr, color="#ffd319", colorMode="background"),
@@ -2066,7 +2154,8 @@ def build_live_engine():
         # Row 3 — utilization (% of the range spent PLAYING vs attract mode),
         # games played, completion rate, and the lifecycle time-split pie
         _utilization_panel(225, 0, y0 + 10, 6, 5),
-        _stat(220, 6, y0 + 10, 6, 5, "🏎️ Games played (today)",
+        _utilization_bargauge_panel(229, 0, y0 + 10, 3, 10),
+        _stat(220, 6, y0 + 10, 6, 5, "🏎️ Games played",
               "game.session.start events in the selected time range (today, by default) on "
               "the selected host.",
               games_played_expr, color="blue", colorMode="background"),
@@ -2132,13 +2221,21 @@ def build_live_engine():
                     f'{HOST_SCOPED} | line_format "{raw_line_fmt}"', prettify=True),
 
         # Row 10 — latest screenshot, whatever event last captured one
-        _latest_screenshot_panel(227, 0, y0 + 58, 18, 10),
-        _latest_screenshot_time_panel(228, 18, y0 + 58, 6, 10),
+        # h=16, not 10 — screenshots are 640x360 (16:9); the panel's WIDTH grid
+        # units are responsive (scale with screen width) but HEIGHT units are
+        # roughly fixed (~30px each), so at any reasonably wide screen an
+        # 18-wide panel rendering a 16:9 image needs much more height than a
+        # 10-unit-tall box gives it — that's a real size mismatch, not just a
+        # CSS issue (object-fit:contain can only shrink an image to fit an
+        # already-correctly-sized box, not fix an undersized one). Confirmed
+        # by checking the actual captured JPEG dimensions directly.
+        _latest_screenshot_panel(227, 0, y0 + 58, 14, 14),
+        _latest_screenshot_time_panel(228, 14, y0 + 58, 10, 14),  # fills the rest of the 24-wide row
     ]
 
     return {
         "uid": "cannonball-live-engine",
-        "title": "Cannonball-SE — Live Engine",
+        "title": "Cannonball-SE — Operator Insights",
         "description": ("Operator view of the cabinet for TODAY: attract mode vs. playing, "
                         "aliveness (heartbeat + events), coin-box economics (coins + revenue "
                         "@ $0.25/coin + credits available), usage by hour, music popularity, "
@@ -2587,6 +2684,112 @@ def _flat_grid_layout(panels):
     return {"kind": "GridLayout", "spec": {"items": items}}
 
 
+def _pack_grid(panel_ids, panels_by_id, cols=24):
+    # Simple left-to-right, top-to-bottom shelf packer: places each panel at
+    # the next free x, wrapping to a new row (y += that row's tallest panel)
+    # once the next one would overflow `cols`. Ignores each panel's own
+    # (now-meaningless, single-flat-canvas-era) gridPos x/y — only w/h are
+    # reused — since panels are being regrouped into tabs from scratch.
+    # Broad-brush only: guarantees no overlaps, not a polished arrangement
+    # (that's a follow-up pass per the user's own "don't worry about layout
+    # within tabs yet" instruction).
+    items = []
+    x = y = row_h = 0
+    for pid in panel_ids:
+        p = panels_by_id[pid]
+        w, h = p["gridPos"]["w"], p["gridPos"]["h"]
+        if x + w > cols:
+            x = 0
+            y += row_h
+            row_h = 0
+        items.append({"kind": "GridLayoutItem", "spec": {
+            "x": x, "y": y, "width": w, "height": h,
+            "element": {"kind": "ElementReference", "name": f"panel-{pid}"}}})
+        x += w
+        row_h = max(row_h, h)
+    return {"kind": "GridLayout", "spec": {"items": items}}
+
+
+# Broad-brush tab grouping for the Operator Insights board. Each tab's panels
+# are EITHER a flat list of ids (auto-packed top-to-bottom/left-to-right by
+# _pack_grid, reading order only — a placeholder until that tab gets its own
+# polish pass) OR a list of (id, x, y, w, h) explicit tuples for a tab
+# that's already been manually arranged — see _tab_layout().
+OPERATOR_ALWAYS_VISIBLE = [200, 206]  # Host Selector, Selected host
+OPERATOR_TABS = [
+    # Utilization (225) and the Time-in-each-state pie (222) are deliberately
+    # duplicated across Overview/Economics — both tabs reference the SAME
+    # underlying panel element (same query, same id), just placed in two
+    # different tabs' GridLayouts. Not two copies of the panel config.
+    # Explicitly arranged: Alive stacked under Engine state, Engine lifecycle
+    # matched to that stack's height and filling the rest of the row; the
+    # pie + Utilization left as they were, just shifted down to follow.
+    # 229 is a SEPARATE vertical-LCD-bargauge Utilization panel, not the same
+    # element as 225 (Economics' circle gauge) — see _utilization_bargauge_panel.
+    ("Overview", [(201, 0, 0, 6, 5), (205, 0, 5, 6, 5), (229, 6, 0, 3, 10),
+                   (226, 9, 0, 15, 10)]),
+    # Explicitly arranged: row of the 4 stat panels, then the pie + both
+    # gauges at double height (h=10, not 5) underneath, then Cumulative
+    # revenue full-width below that — pie now sits above Cumulative revenue,
+    # not after it.
+    ("Economics", [(212, 0, 0, 6, 5), (210, 6, 0, 6, 5), (220, 12, 0, 6, 5), (221, 18, 0, 6, 5),
+                    (222, 0, 5, 12, 10), (211, 12, 5, 6, 10), (225, 18, 5, 6, 10),
+                    (240, 0, 15, 24, 8)]),
+    # Explicitly arranged: the 3 stat panels stacked in a single column,
+    # Music plays to their right, matched to the stack's total height (3x5)
+    # and filling the rest of the 24-wide row.
+    ("Game activity", [(213, 0, 0, 6, 5), (214, 0, 5, 6, 5), (216, 0, 10, 6, 5),
+                        (250, 6, 0, 18, 15)]),
+    ("Config", [217, 218, 219, 223]),
+    ("Debug", [227, 228, 215, 230]),
+]
+
+
+def _tab_layout(items, panels_by_id):
+    # items is either a flat list of panel ids (auto-pack via _pack_grid) or
+    # a list of (id, x, y, w, h) tuples (an already-arranged tab) — see
+    # OPERATOR_TABS. Whole-tab switch, not a per-item mix, so each tab is
+    # either "still auto-packed" or "has had its layout pass," not both.
+    if items and isinstance(items[0], tuple):
+        return {"kind": "GridLayout", "spec": {"items": [
+            {"kind": "GridLayoutItem", "spec": {
+                "x": x, "y": y, "width": w, "height": h,
+                "element": {"kind": "ElementReference", "name": f"panel-{pid}"}}}
+            for pid, x, y, w, h in items]}}
+    return _pack_grid(items, panels_by_id)
+
+
+def _operator_layout(panels):
+    # Top-level RowsLayout: an always-visible row (Host Selector + Selected
+    # host — these drive every other panel's scope, so they must never be
+    # hidden) followed by a single row holding a TabsLayout, gated by
+    # conditionalRendering on `$host` being set. Before a host is picked,
+    # every tab's panels would just show "No data"/zero — hiding them
+    # entirely until then is clearer than a wall of empty tiles.
+    panels_by_id = {p["id"]: p for p in panels}
+    # Gate on the ROW wrapping the whole TabsLayout, not on each tab
+    # individually — a per-tab condition would still leave an empty tab
+    # strip visible (clickable tabs with nothing in them) once hidden; gating
+    # the row hides the entire tabs widget (strip + content) in one piece.
+    host_gate = {"kind": "ConditionalRenderingGroup", "spec": {
+        "visibility": "show", "condition": "and",
+        "items": [{"kind": "ConditionalRenderingVariable", "spec": {
+            "variable": "host", "operator": "notEquals", "value": ""}}]}}
+    tabs = [{"kind": "TabsLayoutTab", "spec": {
+                "title": title,
+                "layout": _tab_layout(items, panels_by_id),
+            }} for title, items in OPERATOR_TABS]
+    return {"kind": "RowsLayout", "spec": {"rows": [
+        {"kind": "RowsLayoutRow", "spec": {
+            "hideHeader": True, "collapse": False,
+            "layout": _pack_grid(OPERATOR_ALWAYS_VISIBLE, panels_by_id)}},
+        {"kind": "RowsLayoutRow", "spec": {
+            "hideHeader": True, "collapse": False,
+            "conditionalRendering": host_gate,
+            "layout": {"kind": "TabsLayout", "spec": {"tabs": tabs}}}},
+    ]}}
+
+
 def _load_layout(element_names):
     # Return the v2 layout object (RowsLayout) from layout.json. Panel gridPos in
     # build_picker is now ignored for v2 — layout is owned by layout.json, captured
@@ -2633,12 +2836,15 @@ def _v2_variables(tlist):
     return out
 
 
-def to_v2(v1, use_layout_file=True):
+def to_v2(v1, use_layout_file=True, layout_fn=None):
     # use_layout_file=False builds a flat GridLayout straight from the panels'
     # own gridPos instead of pulling dashboards/layout.json (which only holds
     # the Recent Games arrangement) — for a board with no UI-captured layout yet.
+    # layout_fn overrides both: pass a callable(panels) -> layout dict for a
+    # board with its own custom layout tree (e.g. Operator Insights' tabs).
     cursor = {0: "Off", 1: "Crosshair", 2: "Tooltip"}.get(v1.get("graphTooltip", 0), "Off")
-    layout = (_load_layout([f"panel-{p['id']}" for p in v1["panels"]]) if use_layout_file
+    layout = (layout_fn(v1["panels"]) if layout_fn
+              else _load_layout([f"panel-{p['id']}" for p in v1["panels"]]) if use_layout_file
               else _flat_grid_layout(v1["panels"]))
     return {
         "apiVersion": "dashboard.grafana.app/v2",
@@ -2685,11 +2891,12 @@ def main():
           f"{len(rows)} layout rows ({', '.join(r['spec']['title'] for r in rows)}), "
           f"{n_expr} session-scoped query rewrites, {n_scoped} targets filtered by session_label.")
 
-    live_engine_v1 = build_live_engine()
-    live_engine = to_v2(live_engine_v1, use_layout_file=False)  # no layout.json yet — flat grid
-    LIVE_ENGINE.write_text(json.dumps(live_engine, indent=2) + "\n")
-    print(f"Generated {LIVE_ENGINE.name} (v2 schema): "
-          f"{len(live_engine['spec']['elements'])} panels, flat GridLayout (not yet arranged in UI).")
+    operator_v1 = build_operator_dashboard()
+    operator = to_v2(operator_v1, layout_fn=_operator_layout)
+    OPERATOR.write_text(json.dumps(operator, indent=2) + "\n")
+    print(f"Generated {OPERATOR.name} (v2 schema): "
+          f"{len(operator['spec']['elements'])} panels, "
+          f"{len(OPERATOR_TABS)} tabs (gated on $host), broad-brush grouping only.")
 
 if __name__ == "__main__":
     main()

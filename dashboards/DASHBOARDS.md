@@ -10,6 +10,7 @@ game picker (Loki only, no Tempo). On import you're prompted for the Loki data s
 | `recent_games_dashboard.json` | `cannonball-recent-games` | **Recent Games** — pick any recent game by clicking a row in the Loki "Recent games" table (newest first). Every panel is session-scoped, so exact at any range. Does NOT auto-follow; no auto-refresh. |
 | `aggregate_dashboard.json` | `cannonball-aggregate` | Aggregate stats across all games in the selected time range |
 | `leaderboards_dashboard.json` | `cannonball-leaderboards` | Per-run "Hall of Fame" leaderboards |
+| `operator_dashboard.json` | `cannonball-live-engine` | **Operator Insights** — cabinet/engine state for the operator: attract/playing/post-game lifecycle, coin economics, aliveness, usage patterns, and the latest screenshot. Host-scoped (pick a cabinet via the Host Selector); defaults to "today." Generated straight from Python, no hand-authored v1 source. |
 
 **`recent_games_dashboard.json` is generated, not hand-edited.** `live_game_dashboard.json` is the
 source of truth; `python3 generate.py` derives the Recent Games board from it (same layout/panels/viz,
@@ -85,8 +86,8 @@ Both must be installed (declared in each dashboard's `__requires`):
 | `game.route_chosen` | `direction`, `stage` | (reference; route is reconstructed from `stage_id`) |
 | `game.high_score` | `position`, `initials`, `score` | Aggregate high-score table |
 | `game.coin_inserted` | `credits` | Coin economics (count, revenue, credits available) |
-| `game.startup` | `car_pal`, `gearbox_mode`, `difficulty`, `traffic_difficulty` | Config snapshot panels (Live Engine) |
-| `game.heartbeat` | `heartbeat_epoch_ms` | Aliveness check (Live Engine), alongside any other event |
+| `game.startup` | `car_pal`, `gearbox_mode`, `difficulty`, `traffic_difficulty` | Config snapshot panels (Operator Insights) |
+| `game.heartbeat` | `heartbeat_epoch_ms` | Aliveness check (Operator Insights), alongside any other event |
 | `game.gameover` | `completed`, `gameover_epoch_ms` | PLAYING→POST GAME boundary (Engine state, Live Engine) — fires well before `game.session.end` |
 
 ## The route map (`stage_id`)
