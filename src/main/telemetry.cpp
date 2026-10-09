@@ -318,6 +318,13 @@ int64_t TelemetryManager::now_epoch_ms() {
         std::chrono::system_clock::now().time_since_epoch()).count();
 }
 
+void TelemetryManager::maybe_log_heartbeat(int interval_seconds) {
+    int64_t now = now_epoch_ms();
+    if (now - last_heartbeat_epoch_ms_ < (int64_t)interval_seconds * 1000) return;
+    last_heartbeat_epoch_ms_ = now;
+    log_game_event("game.heartbeat", SEV_INFO, {}, {{"heartbeat_epoch_ms", now}});
+}
+
 void TelemetryManager::start_stage_span(int stage_num, int64_t score_start) {
     // Record wall-clock start even if tracing is disabled, so stage_duration_seconds
     // (a Loki log attribute) is correct regardless of the trace pipeline.

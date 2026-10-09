@@ -75,9 +75,15 @@ public:
     
     // Update attribute on current stage span
     void update_stage_attribute(const std::string& key, int64_t value);
-    
+
     // Clean up any active spans (for abandoned games)
     void cleanup();
+
+    // Logs a "game.heartbeat" event at most once every interval_seconds. Call every
+    // frame from attract mode; it no-ops between intervals. Lets dashboards tell an
+    // idle-but-healthy cabinet apart from a frozen/crashed one even when no game is
+    // being played.
+    void maybe_log_heartbeat(int interval_seconds = 10);
     
     // Helper to convert BCD time to decimal seconds
     static int bcd_to_seconds(int16_t bcd_value);
@@ -101,4 +107,7 @@ private:
 
     // Wall-clock epoch (ms) when the current stage started; drives stage_duration_seconds.
     int64_t stage_start_epoch_ms_ = 0;
+
+    // Wall-clock epoch (ms) of the last heartbeat log; drives maybe_log_heartbeat's throttle.
+    int64_t last_heartbeat_epoch_ms_ = 0;
 };
