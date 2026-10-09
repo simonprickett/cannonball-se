@@ -12,3 +12,4 @@ roms/opr-*
 roms/mpr-*
 roms/epr-*
 .claude/
+__pycache__/
