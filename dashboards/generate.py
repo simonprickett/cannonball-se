@@ -1193,6 +1193,88 @@ def _logs_panel(pid, x, y, w, h, title, description, expr, sort="Descending", pr
     }
 
 
+def _engine_state_expr():
+    # Shared by the Engine state stat panel and the lifecycle graphviz below —
+    # see Engine state's own comment (in build_live_engine) for the full
+    # breakdown of the 4-value arithmetic ternary (0 attract / 1 playing /
+    # 2 post game / 3 unknown).
+    return (
+        '(1 - ((sum(count_over_time(' + HOST_SCOPED + ' [60s])) or vector(0)) > bool 0)) * 3 '
+        '+ ((sum(count_over_time(' + HOST_SCOPED + ' [60s])) or vector(0)) > bool 0) '
+        f'* ((max(last_over_time({HOST_SCOPED} | event="game.session.start" | unwrap start_epoch_ms [$__range])) or vector(0)) '
+        f'> bool (max(last_over_time({HOST_SCOPED} | event="game.session.end" | unwrap end_epoch_ms [$__range])) or vector(0))) '
+        f'* (1 + ((max(last_over_time({HOST_SCOPED} | event="game.gameover" | unwrap gameover_epoch_ms [$__range])) or vector(0)) '
+        f'> bool (max(last_over_time({HOST_SCOPED} | event="game.session.start" | unwrap start_epoch_ms [$__range])) or vector(0))))'
+    )
+
+
+def _engine_lifecycle_panel(pid, x, y, w, h, state_expr):
+    # Attract mode -> Playing -> Post game -> Attract mode, as a graphviz cycle.
+    # Same recipe as the Recent Games route map (see reference_graphviz_data_coloring
+    # memory): nodes default grey in the DOT; a nodeOverride matches each node id
+    # against a `state_id` column and lights it via a named threshold whose step
+    # 0 is "transparent" (lets the default grey show through) and step 1 is that
+    # state's real colour — same hex values as the Engine state stat panel's own
+    # mappings, so the lit node always matches whatever Engine state currently
+    # shows. 3 separate nodeOverrides/thresholds (one per state) because each
+    # node needs its OWN highlight colour, not one shared scheme.
+    dot = (
+        'digraph Lifecycle {\n'
+        '  rankdir=LR;\n'
+        '  bgcolor="transparent";\n'
+        '  node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=16, '
+        'fillcolor="#4a4a4a", fontcolor="white", color="#00000000", penwidth=1.5];\n'
+        '  edge [arrowsize=0.8, color="#9e9e9e", penwidth=1.4];\n\n'
+        '  "attract"  [label="Attract mode"];\n'
+        '  "playing"  [label="Playing"];\n'
+        '  "postgame" [label="Post game"];\n\n'
+        '  "attract" -> "playing" -> "postgame" -> "attract";\n'
+        '}\n'
+    )
+    return {
+        "id": pid, "type": "grafana-graphviz-panel", "title": "🔁 Engine lifecycle",
+        "description": ("Attract mode -> Playing -> Post game -> Attract mode, for the "
+                        "selected host, right now. The lit node matches whatever Engine "
+                        "state (above) currently shows; the other two stay grey. Unknown "
+                        "(host not alive) leaves every node grey."),
+        "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+        "gridPos": {"x": x, "y": y, "w": w, "h": h},
+        "options": {
+            "inputMode": "code",
+            "dotDiagram": dot,
+            "namedThresholds": [
+                {"id": "state-attract", "name": "Attract",
+                 "steps": [{"color": "transparent", "value": 0}, {"color": "#fb8c00", "value": 1}]},
+                {"id": "state-playing", "name": "Playing",
+                 "steps": [{"color": "transparent", "value": 0}, {"color": "#43a047", "value": 1}]},
+                {"id": "state-postgame", "name": "Post game",
+                 "steps": [{"color": "transparent", "value": 0}, {"color": "#ab47bc", "value": 1}]},
+            ],
+            "nodeOverrides": [
+                {"id": "ov-attract", "targetNodeIds": ["attract"],
+                 "matchFieldName": "state_id", "matchPattern": "${id}",
+                 "rules": [{"kind": "fillColor", "colorFieldName": "active", "thresholdId": "state-attract"}]},
+                {"id": "ov-playing", "targetNodeIds": ["playing"],
+                 "matchFieldName": "state_id", "matchPattern": "${id}",
+                 "rules": [{"kind": "fillColor", "colorFieldName": "active", "thresholdId": "state-playing"}]},
+                {"id": "ov-postgame", "targetNodeIds": ["postgame"],
+                 "matchFieldName": "state_id", "matchPattern": "${id}",
+                 "rules": [{"kind": "fillColor", "colorFieldName": "active", "thresholdId": "state-postgame"}]},
+            ],
+        },
+        "targets": [
+            {"refId": "A", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+             "editorMode": "code", "queryType": "instant", "expr": state_expr},
+            {"refId": "B", "datasource": {"type": "__expr__", "uid": "__expr__"}, "type": "sql",
+             "expression": (
+                 "SELECT 'attract' AS state_id, CASE WHEN `__value__` = 0 THEN 1 ELSE 0 END AS active FROM A "
+                 "UNION ALL SELECT 'playing', CASE WHEN `__value__` = 1 THEN 1 ELSE 0 END FROM A "
+                 "UNION ALL SELECT 'postgame', CASE WHEN `__value__` = 2 THEN 1 ELSE 0 END FROM A"
+             )},
+        ],
+    }
+
+
 def _alive_panel(pid, x, y, w, h):
     # Is the selected host alive RIGHT NOW? Any log line (the game.heartbeat, OR a
     # real in-game event) in the last 60 real seconds counts. Deliberately
@@ -1757,14 +1839,7 @@ def build_live_engine():
                 #   -> 0 ATTRACT (alive, session closed)
                 #   -> 1 PLAYING (alive, session open, not yet post-game)
                 #   -> 2 POST GAME (alive, session open, post-game event is newer)
-                "expr": (
-                    '(1 - ((sum(count_over_time(' + HOST_SCOPED + ' [60s])) or vector(0)) > bool 0)) * 3 '
-                    '+ ((sum(count_over_time(' + HOST_SCOPED + ' [60s])) or vector(0)) > bool 0) '
-                    f'* ((max(last_over_time({HOST_SCOPED} | event="game.session.start" | unwrap start_epoch_ms [$__range])) or vector(0)) '
-                    f'> bool (max(last_over_time({HOST_SCOPED} | event="game.session.end" | unwrap end_epoch_ms [$__range])) or vector(0))) '
-                    f'* (1 + ((max(last_over_time({HOST_SCOPED} | event="game.gameover" | unwrap gameover_epoch_ms [$__range])) or vector(0)) '
-                    f'> bool (max(last_over_time({HOST_SCOPED} | event="game.session.start" | unwrap start_epoch_ms [$__range])) or vector(0))))'
-                ),
+                "expr": _engine_state_expr(),
             }],
             "fieldConfig": {"defaults": {
                 "mappings": [{"type": "value", "options": {
@@ -1838,19 +1913,22 @@ def build_live_engine():
                              "HARDEST": {"text": "Hardest", "color": "#e53935"},
                              "DISABLED": {"text": "Disabled", "color": "blue"}}),
 
-        # Row 5 — usage patterns
-        _revenue_per_hour_panel(240, 0, y0 + 20, 24, 8),
+        # Row 5 — engine lifecycle (Attract -> Playing -> Post game -> Attract)
+        _engine_lifecycle_panel(226, 0, y0 + 20, 24, 8, _engine_state_expr()),
 
-        # Row 6 — music track popularity
-        _music_plays_panel(250, 0, y0 + 28, 24, 6),
+        # Row 6 — usage patterns
+        _revenue_per_hour_panel(240, 0, y0 + 28, 24, 8),
 
-        # Row 7 — live coin feed for the selected host
-        _logs_panel(215, 0, y0 + 34, 24, 6, "🪙 Coin inserts",
+        # Row 7 — music track popularity
+        _music_plays_panel(250, 0, y0 + 36, 24, 6),
+
+        # Row 8 — live coin feed for the selected host
+        _logs_panel(215, 0, y0 + 42, 24, 6, "🪙 Coin inserts",
                     "Every game.coin_inserted event on the selected host, newest first.",
                     f'{HOST_SCOPED} | event="game.coin_inserted" | line_format "{coin_line_fmt}"'),
 
-        # Row 8 — raw log feed for the selected host
-        _logs_panel(230, 0, y0 + 40, 24, 10, "📜 Raw event log",
+        # Row 9 — raw log feed for the selected host
+        _logs_panel(230, 0, y0 + 48, 24, 10, "📜 Raw event log",
                     "Every event for the selected host in the selected time range (today, by "
                     "default), newest first — the full, unfiltered feed from whatever game is "
                     "running now (or the most recent one, in attract mode).",

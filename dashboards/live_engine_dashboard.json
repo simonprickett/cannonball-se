@@ -1704,6 +1704,169 @@
           }
         }
       },
+      "panel-226": {
+        "kind": "Panel",
+        "spec": {
+          "id": 226,
+          "title": "\ud83d\udd01 Engine lifecycle",
+          "description": "Attract mode -> Playing -> Post game -> Attract mode, for the selected host, right now. The lit node matches whatever Engine state (above) currently shows; the other two stay grey. Unknown (host not alive) leaves every node grey.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "(1 - ((sum(count_over_time({service_name=\"cannonball-se\"} | host_name=\"$host\" [60s])) or vector(0)) > bool 0)) * 3 + ((sum(count_over_time({service_name=\"cannonball-se\"} | host_name=\"$host\" [60s])) or vector(0)) > bool 0) * ((max(last_over_time({service_name=\"cannonball-se\"} | host_name=\"$host\" | event=\"game.session.start\" | unwrap start_epoch_ms [$__range])) or vector(0)) > bool (max(last_over_time({service_name=\"cannonball-se\"} | host_name=\"$host\" | event=\"game.session.end\" | unwrap end_epoch_ms [$__range])) or vector(0))) * (1 + ((max(last_over_time({service_name=\"cannonball-se\"} | host_name=\"$host\" | event=\"game.gameover\" | unwrap gameover_epoch_ms [$__range])) or vector(0)) > bool (max(last_over_time({service_name=\"cannonball-se\"} | host_name=\"$host\" | event=\"game.session.start\" | unwrap start_epoch_ms [$__range])) or vector(0))))"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "__expr__",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "__expr__"
+                      },
+                      "spec": {
+                        "type": "sql",
+                        "expression": "SELECT 'attract' AS state_id, CASE WHEN `__value__` = 0 THEN 1 ELSE 0 END AS active FROM A UNION ALL SELECT 'playing', CASE WHEN `__value__` = 1 THEN 1 ELSE 0 END FROM A UNION ALL SELECT 'postgame', CASE WHEN `__value__` = 2 THEN 1 ELSE 0 END FROM A"
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "grafana-graphviz-panel",
+            "version": "",
+            "spec": {
+              "options": {
+                "inputMode": "code",
+                "dotDiagram": "digraph Lifecycle {\n  rankdir=LR;\n  bgcolor=\"transparent\";\n  node [shape=box, style=\"rounded,filled\", fontname=\"Helvetica\", fontsize=16, fillcolor=\"#4a4a4a\", fontcolor=\"white\", color=\"#00000000\", penwidth=1.5];\n  edge [arrowsize=0.8, color=\"#9e9e9e\", penwidth=1.4];\n\n  \"attract\"  [label=\"Attract mode\"];\n  \"playing\"  [label=\"Playing\"];\n  \"postgame\" [label=\"Post game\"];\n\n  \"attract\" -> \"playing\" -> \"postgame\" -> \"attract\";\n}\n",
+                "namedThresholds": [
+                  {
+                    "id": "state-attract",
+                    "name": "Attract",
+                    "steps": [
+                      {
+                        "color": "transparent",
+                        "value": 0
+                      },
+                      {
+                        "color": "#fb8c00",
+                        "value": 1
+                      }
+                    ]
+                  },
+                  {
+                    "id": "state-playing",
+                    "name": "Playing",
+                    "steps": [
+                      {
+                        "color": "transparent",
+                        "value": 0
+                      },
+                      {
+                        "color": "#43a047",
+                        "value": 1
+                      }
+                    ]
+                  },
+                  {
+                    "id": "state-postgame",
+                    "name": "Post game",
+                    "steps": [
+                      {
+                        "color": "transparent",
+                        "value": 0
+                      },
+                      {
+                        "color": "#ab47bc",
+                        "value": 1
+                      }
+                    ]
+                  }
+                ],
+                "nodeOverrides": [
+                  {
+                    "id": "ov-attract",
+                    "targetNodeIds": [
+                      "attract"
+                    ],
+                    "matchFieldName": "state_id",
+                    "matchPattern": "${id}",
+                    "rules": [
+                      {
+                        "kind": "fillColor",
+                        "colorFieldName": "active",
+                        "thresholdId": "state-attract"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "ov-playing",
+                    "targetNodeIds": [
+                      "playing"
+                    ],
+                    "matchFieldName": "state_id",
+                    "matchPattern": "${id}",
+                    "rules": [
+                      {
+                        "kind": "fillColor",
+                        "colorFieldName": "active",
+                        "thresholdId": "state-playing"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "ov-postgame",
+                    "targetNodeIds": [
+                      "postgame"
+                    ],
+                    "matchFieldName": "state_id",
+                    "matchPattern": "${id}",
+                    "rules": [
+                      {
+                        "kind": "fillColor",
+                        "colorFieldName": "active",
+                        "thresholdId": "state-postgame"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
       "panel-240": {
         "kind": "Panel",
         "spec": {
@@ -2221,7 +2384,7 @@
               "height": 8,
               "element": {
                 "kind": "ElementReference",
-                "name": "panel-240"
+                "name": "panel-226"
               }
             }
           },
@@ -2230,6 +2393,19 @@
             "spec": {
               "x": 0,
               "y": 34,
+              "width": 24,
+              "height": 8,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-240"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 0,
+              "y": 42,
               "width": 24,
               "height": 6,
               "element": {
@@ -2242,7 +2418,7 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 0,
-              "y": 40,
+              "y": 48,
               "width": 24,
               "height": 6,
               "element": {
@@ -2255,7 +2431,7 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 0,
-              "y": 46,
+              "y": 54,
               "width": 24,
               "height": 10,
               "element": {
