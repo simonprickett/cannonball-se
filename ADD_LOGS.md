@@ -132,6 +132,7 @@ Each event below should be logged with structured attributes:
 | `game.session.end` | INFO | `completion_status`, `screenshot_jpg` | `final_score`, `final_stage`, `longest_clean_seconds`, `end_epoch_ms`, `completion_code` | - | Game over. `longest_clean_seconds` = longest crash/off-road-free stretch (wall-clock). `end_epoch_ms` = end time. `completion_code` = 1 completed / 2 timed out (numeric form of `completion_status` for the 3-state Session panel). Logged before the session span ends so it retains `trace_id` |
 | `game.stage.start` | INFO | - | `stage_number`, `score_start`, `speed_kph`, `stage_id` | - | Stage begins (`stage_id` = canonical section id / `stage_lookup_off`, identifies map branch) |
 | `game.stage.end` | INFO | - | `stage_number`, `score_end`, `time_remaining_seconds`, `score_delta` | - | Stage completes |
+| `game.gameover` | INFO | - | `completed`, `gameover_epoch_ms` | - | Fires once per game, right as gameplay control ends — clock ran out (`completed`=0, `GS_INGAME`→`GS_INIT_GAMEOVER`) or goal line crossed (`completed`=1, entry to `GS_INIT_BONUS`, before the bonus-road celebration plays). Marks the PLAYING→POST GAME boundary — nothing else fires at this instant. Distinct from `game.session.end`, which fires much later (end of high-score/name-entry) |
 | `game.post_game.start` | INFO | - | - | - | High score entry |
 | `game.post_game.end` | INFO | - | - | - | Post-game complete |
 | `game.coin_inserted` | INFO | - | `credits` | - | Coin inserted |

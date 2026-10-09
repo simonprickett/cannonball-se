@@ -255,7 +255,7 @@
         "spec": {
           "id": 201,
           "title": "\ud83c\udfae Engine state",
-          "description": "Is a game being played right now on the selected host? Latest game.session.start newer than latest game.session.end = PLAYING; otherwise ATTRACT MODE \u2014 UNLESS the host hasn't logged anything in the last 60s (same check as Alive), in which case UNKNOWN: an abandoned/killed session (power cut, process killed mid-game) never logs game.session.end, so without this fallback a dead cabinet's last game would show PLAYING forever. Confirmed live 2026-10-07 \u2014 a session cut short by stopping the Pi stayed PLAYING indefinitely.",
+          "description": "What's happening right now on the selected host: ATTRACT MODE, PLAYING, POST GAME (game.gameover fired \u2014 GAME OVER text / bonus road / course map / high-score table / name entry \u2014 but game.session.end hasn't landed yet), or UNKNOWN if the host hasn't logged anything in the last 60s (same check as Alive) \u2014 an abandoned/killed session never logs game.session.end, so without this fallback a dead cabinet's last game would show PLAYING or POST GAME forever. Confirmed live 2026-10-07 \u2014 a session cut short by stopping the Pi stayed PLAYING indefinitely.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -274,7 +274,7 @@
                       "spec": {
                         "editorMode": "code",
                         "queryType": "instant",
-                        "expr": "(1 - ((sum(count_over_time({service_name=\"cannonball-se\"} | host_name=\"$host\" [60s])) or vector(0)) > bool 0)) * 2 + ((sum(count_over_time({service_name=\"cannonball-se\"} | host_name=\"$host\" [60s])) or vector(0)) > bool 0) * ((max(last_over_time({service_name=\"cannonball-se\"} | host_name=\"$host\" | event=\"game.session.start\" | unwrap start_epoch_ms [$__range])) or vector(0)) > bool (max(last_over_time({service_name=\"cannonball-se\"} | host_name=\"$host\" | event=\"game.session.end\" | unwrap end_epoch_ms [$__range])) or vector(0)))"
+                        "expr": "(1 - ((sum(count_over_time({service_name=\"cannonball-se\"} | host_name=\"$host\" [60s])) or vector(0)) > bool 0)) * 3 + ((sum(count_over_time({service_name=\"cannonball-se\"} | host_name=\"$host\" [60s])) or vector(0)) > bool 0) * ((max(last_over_time({service_name=\"cannonball-se\"} | host_name=\"$host\" | event=\"game.session.start\" | unwrap start_epoch_ms [$__range])) or vector(0)) > bool (max(last_over_time({service_name=\"cannonball-se\"} | host_name=\"$host\" | event=\"game.session.end\" | unwrap end_epoch_ms [$__range])) or vector(0))) * (1 + ((max(last_over_time({service_name=\"cannonball-se\"} | host_name=\"$host\" | event=\"game.gameover\" | unwrap gameover_epoch_ms [$__range])) or vector(0)) > bool (max(last_over_time({service_name=\"cannonball-se\"} | host_name=\"$host\" | event=\"game.session.start\" | unwrap start_epoch_ms [$__range])) or vector(0))))"
                       }
                     },
                     "refId": "A",
@@ -321,9 +321,14 @@
                           "index": 1
                         },
                         "2": {
+                          "text": "Post game",
+                          "color": "#ab47bc",
+                          "index": 2
+                        },
+                        "3": {
                           "text": "Unknown",
                           "color": "#808080",
-                          "index": 2
+                          "index": 3
                         }
                       }
                     }

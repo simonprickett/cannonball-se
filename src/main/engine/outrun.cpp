@@ -537,7 +537,20 @@ void Outrun::main_switch()
 
         case GS_INGAME:
             if (decrement_timers())
+            {
+                // Clock ran out before the goal line — marks the PLAYING -> POST GAME
+                // boundary for dashboards (nothing else fires at this instant; see the
+                // matching log call in GS_INIT_BONUS below for the goal-line case).
+                TelemetryManager::instance().log_game_event("game.gameover",
+                    TelemetryManager::SEV_INFO,
+                    {},
+                    {
+                        {"completed", (int64_t)0},
+                        {"gameover_epoch_ms", TelemetryManager::now_epoch_ms()}
+                    }
+                );
                 game_state = GS_INIT_GAMEOVER;
+            }
             break;
 
         // ----------------------------------------------------------------------------------------
@@ -549,6 +562,18 @@ void Outrun::main_switch()
             oroad.road_load_end   |= BIT_0;             // Instruct CPU 1 to load end road section
             ostats.game_completed |= BIT_0;             // Denote game completed
             obonus.bonus_timer = 3600;                  // Safety Timer Added in Rev. A Roms
+            // Goal line crossed — marks the PLAYING -> POST GAME boundary for
+            // dashboards (the bonus-road celebration that follows counts as POST
+            // GAME, not PLAYING, per this event's timing). Matching clock-out case
+            // is logged in GS_INGAME above.
+            TelemetryManager::instance().log_game_event("game.gameover",
+                TelemetryManager::SEV_INFO,
+                {},
+                {
+                    {"completed", (int64_t)1},
+                    {"gameover_epoch_ms", TelemetryManager::now_epoch_ms()}
+                }
+            );
             // Arm the "reached the goal" screenshot. The car drives the whole bonus
             // road first; only once it parks at the finish does bonus_control reach
             // BONUS_SEQ0 (the flag-waving end sequence). This delay is the settle

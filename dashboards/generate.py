@@ -1088,10 +1088,16 @@ COIN_PRICE_USD = 0.25
 # this one.
 
 
-def _line_stat(pid, x, y, w, title, description, event, field, sel=SEL):
+def _line_stat(pid, x, y, w, title, description, event, field, sel=SEL, mappings=None, color="dark-blue"):
     # Stat tile: the <field> attribute off the most recently seen <event> log
     # line (a string field, so line_format rather than unwrap). noValue covers
-    # attract mode / before the first game of all time.
+    # attract mode / before the first game of all time. `mappings` lets a
+    # caller re-case/relabel the raw logged value for display (e.g. the C++
+    # side logs "automatic"/"VERY EASY" — shouty or inconsistent casing some
+    # dashboards don't want) without changing what's actually logged — if a
+    # mapping option carries its own "color", fixedColor:"text" defers to it
+    # (same sentinel trick as Engine State/Alive/Selected host); otherwise
+    # every value just gets the flat `color` background.
     fmt = "{{." + field + "}}"
     expr = f'{sel} | event="{event}" | line_format "{fmt}"'
     return {
@@ -1100,8 +1106,11 @@ def _line_stat(pid, x, y, w, title, description, event, field, sel=SEL):
         "gridPos": {"x": x, "y": y, "w": w, "h": 5},
         "targets": [{"refId": "A", "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
                      "editorMode": "code", "queryType": "range", "maxLines": 1, "expr": expr}],
-        "fieldConfig": {"defaults": {"color": {"mode": "fixed", "fixedColor": "dark-blue"},
-                                     "noValue": "—"},
+        "fieldConfig": {"defaults": {
+            "color": {"mode": "fixed",
+                      "fixedColor": "text" if (mappings and any("color" in m for m in mappings.values())) else color},
+            "noValue": "—",
+            "mappings": [{"type": "value", "options": mappings}] if mappings else []},
                         "overrides": []},
         "options": {"colorMode": "background", "graphMode": "none",
                     "reduceOptions": {"calcs": ["lastNotNull"], "fields": title, "values": False},
@@ -1113,7 +1122,7 @@ def _line_stat(pid, x, y, w, title, description, event, field, sel=SEL):
     }
 
 
-def _stat(pid, x, y, w, h, title, description, expr, unit="short", color="blue"):
+def _stat(pid, x, y, w, h, title, description, expr, unit="short", color="blue", colorMode="value"):
     # Generic plain stat tile (fixed colour, no thresholds yet — content first).
     return {
         "id": pid, "type": "stat", "title": title, "description": description,
@@ -1122,7 +1131,7 @@ def _stat(pid, x, y, w, h, title, description, expr, unit="short", color="blue")
         "targets": [{"refId": "A", "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
                      "editorMode": "code", "queryType": "instant", "expr": expr}],
         "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False},
-                    "colorMode": "value", "graphMode": "none", "justifyMode": "auto",
+                    "colorMode": colorMode, "graphMode": "none", "justifyMode": "auto",
                     "textMode": "auto", "wideLayout": True, "showPercentChange": False},
         "fieldConfig": {"defaults": {"unit": unit, "mappings": [],
                                      "color": {"mode": "fixed", "fixedColor": color}},
@@ -1133,9 +1142,19 @@ def _stat(pid, x, y, w, h, title, description, expr, unit="short", color="blue")
 def _revenue_panel(pid, x, y, w, h, coins_expr):
     # SQL expr: coins (hidden query A) * $/coin. A matching instant query so the
     # SQL step runs once over the single scalar from A.
+    #
+    # Same circle/LED gauge style as Utilization (segmentCount 63, shape/style
+    # "circle", showThresholdMarkers), max pinned to $20 so the arc fills
+    # completely at/above that — but the gauge's min/max only clamp the VISUAL
+    # fill, not the center text, which always shows the real reduced value
+    # (e.g. $27.50 still reads as $27.50 even though the ring is full). Same
+    # red/orange/yellow/green threshold palette as the stat version, just
+    # reused as gauge color bands instead of a background gradient.
     return {
-        "id": pid, "type": "stat", "title": "Revenue (today)",
-        "description": f"Coins inserted in the selected time range (today, by default) × ${COIN_PRICE_USD:.2f}/coin.",
+        "id": pid, "type": "gauge", "title": "💰 Revenue (today)",
+        "description": (f"Coins inserted in the selected time range (today, by default) × "
+                        f"${COIN_PRICE_USD:.2f}/coin. Gauge maxes out at $20 — the number in the "
+                        f"middle keeps showing the real total even past that."),
         "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
         "gridPos": {"x": x, "y": y, "w": w, "h": h},
         "targets": [
@@ -1144,11 +1163,20 @@ def _revenue_panel(pid, x, y, w, h, coins_expr):
             {"refId": "B", "datasource": {"type": "__expr__", "uid": "__expr__"}, "type": "sql",
              "expression": f"SELECT `__value__` * {COIN_PRICE_USD} AS revenue FROM A"},
         ],
-        "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False},
-                    "colorMode": "value", "graphMode": "none", "justifyMode": "auto",
-                    "textMode": "auto", "wideLayout": True, "showPercentChange": False},
-        "fieldConfig": {"defaults": {"unit": "currencyUSD", "decimals": 2, "mappings": [],
-                                     "color": {"mode": "fixed", "fixedColor": "green"}},
+        "options": {"barShape": "flat", "barWidthFactor": 0.5,
+                    "effects": {"barGlow": False, "centerGlow": False, "gradient": False},
+                    "endpointMarker": "point", "minVizHeight": 75, "minVizWidth": 75,
+                    "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False},
+                    "segmentCount": 63, "segmentSpacing": 0.3, "shape": "circle",
+                    "showThresholdLabels": False, "showThresholdMarkers": True, "sizing": "auto",
+                    "sparkline": False, "style": "circle", "textMode": "auto"},
+        "fieldConfig": {"defaults": {"unit": "currencyUSD", "decimals": 2, "min": 0, "max": 20,
+                                     "mappings": [], "color": {"mode": "thresholds"},
+                                     "thresholds": {"mode": "absolute", "steps": [
+                                         {"color": "#e57373", "value": None},
+                                         {"color": "#ffb74d", "value": 5},
+                                         {"color": "#fff176", "value": 10},
+                                         {"color": "#81c784", "value": 15}]}},
                         "overrides": []},
     }
 
@@ -1179,7 +1207,7 @@ def _alive_panel(pid, x, y, w, h):
     # call site in outrun.cpp — but a wider window is a cheap second line of
     # defence against any brief gap.
     return {
-        "id": pid, "type": "stat", "title": "Alive",
+        "id": pid, "type": "stat", "title": "📶 Alive",
         "description": ("Has the selected host logged a heartbeat or any game event in the last "
                         "60 seconds? Independent of the time picker above. OFFLINE until the "
                         "game.heartbeat telemetry change is built onto the cabinet."),
@@ -1192,9 +1220,9 @@ def _alive_panel(pid, x, y, w, h):
         }],
         "fieldConfig": {"defaults": {
             "mappings": [
-                {"type": "value", "options": {"0": {"text": "OFFLINE", "color": "red", "index": 1}}},
+                {"type": "value", "options": {"0": {"text": "Offline", "color": "red", "index": 1}}},
                 {"type": "range", "options": {"from": 1, "to": 9999999,
-                                               "result": {"text": "ONLINE", "color": "green", "index": 0}}},
+                                               "result": {"text": "Online", "color": "green", "index": 0}}},
             ],
             "color": {"mode": "fixed", "fixedColor": "text"},
         }, "overrides": []},
@@ -1211,7 +1239,7 @@ def _credits_available_panel(pid, x, y, w, h, coins_expr):
     # from an unported upstream feature, not a second untelemetered coin path).
     games_expr = f'sum(count_over_time({HOST_SCOPED} | event="game.session.start" [$__range])) or vector(0)'
     return {
-        "id": pid, "type": "stat", "title": "Credits available",
+        "id": pid, "type": "stat", "title": "💰 Credits available",
         "description": ("Coins inserted minus games started, in the selected time range (today, "
                         "by default) — clamped at 0. A credit carried across midnight won't show "
                         "until it's spent or another coin is inserted today."),
@@ -1228,40 +1256,32 @@ def _credits_available_panel(pid, x, y, w, h, coins_expr):
                             "THEN ((SELECT `__value__` FROM A) - (SELECT `__value__` FROM B)) ELSE 0 END AS credits")},
         ],
         "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False},
-                    "colorMode": "value", "graphMode": "none", "justifyMode": "auto",
+                    "colorMode": "background", "graphMode": "none", "justifyMode": "auto",
                     "textMode": "auto", "wideLayout": True, "showPercentChange": False},
         "fieldConfig": {"defaults": {"unit": "short", "mappings": [],
-                                     "color": {"mode": "fixed", "fixedColor": "blue"}},
+                                     # Same synthwave-yellow as the Recent Games "Gearbox" panel —
+                                     # coin-economics tiles the user wants visually grouped with it.
+                                     "color": {"mode": "fixed", "fixedColor": "#ffd319"}},
                         "overrides": []},
     }
 
 
 def _avg_duration_panel(pid, x, y, w, h):
-    # Mean game duration across completed games for the selected host, WITH a
-    # sparkline of each individual game's duration (not just one aggregated
-    # scalar) — the stat panel's own "mean" reduceOptions calc supplies the big
-    # number, graphMode:"area" draws the rest of the returned rows as the trend.
+    # Mean game duration across completed games for the selected host. JOIN
+    # on session_label (exact), NOT an ordinal ROW_NUMBER() pairing — an
+    # earlier attempt paired the Nth start with the Nth end by row position,
+    # which goes silently wrong (and stays wrong for every later game) the
+    # moment starts and ends aren't equal in count — confirmed broken live
+    # (an abandoned/incomplete game elsewhere in the selected range produced
+    # a bogus "1 day" average).
     #
-    # JOIN on session_label (exact — same proven technique as before), NOT an
-    # ordinal ROW_NUMBER() pairing: a first attempt paired the Nth start with
-    # the Nth end by row position, which goes silently wrong (and stays wrong
-    # for every later game) the moment starts and ends aren't equal in count —
-    # confirmed broken live (an abandoned/incomplete game elsewhere in the
-    # selected range produced a bogus "1 day" average). session_label is only
-    # available as a column from a `by(session_label)` METRIC query though,
-    # and that query's own Time field is just the single evaluation instant
-    # (same for every row) — useless as a sparkline x-axis. Fix: derive a REAL
-    # per-game timestamp FROM the end_epoch_ms value itself — NOT via an SQL
-    # `to_timestamp()` call (tried, hard-errored — unverified function in this
-    # SQL-expression dialect), but via Grafana's own `convertFieldType` core
-    # transform, which turns a plain number into a proper time field (assumes
-    # Unix milliseconds, which end_epoch_ms already is — no /1000 needed). A
-    # long-stable Grafana feature, lower-risk than an unproven SQL function.
+    # This used to also carry a sparkline (one row per game instead of a
+    # single AVG(), plus a convertFieldType transform to give it a real time
+    # axis) — removed per the user's request; back to the simple scalar form.
     return {
-        "id": pid, "type": "stat", "title": "Average game duration",
+        "id": pid, "type": "stat", "title": "⏱️ Average game duration",
         "description": ("Mean game length (session.end minus session.start) across completed "
-                        "games for the selected host, in the selected time range, with a "
-                        "sparkline of each game's duration."),
+                        "games for the selected host, in the selected time range."),
         "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
         "gridPos": {"x": x, "y": y, "w": w, "h": h},
         "targets": [
@@ -1272,20 +1292,133 @@ def _avg_duration_panel(pid, x, y, w, h):
              "editorMode": "code", "queryType": "instant",
              "expr": f'max by (session_label) (max_over_time({HOST_SCOPED} | event="game.session.end" | unwrap end_epoch_ms [$__range]))'},
             {"refId": "C", "datasource": {"type": "__expr__", "uid": "__expr__"}, "type": "sql",
-             "expression": ("SELECT b.`__value__` AS end_epoch_ms, "
-                            "(b.`__value__` - a.`__value__`)/1000.0 AS duration_seconds "
-                            "FROM A a JOIN B b ON a.session_label = b.session_label ORDER BY end_epoch_ms")},
+             "expression": ("SELECT AVG((b.`__value__` - a.`__value__`)/1000.0) AS avg_duration_seconds "
+                            "FROM A a JOIN B b ON a.session_label = b.session_label")},
         ],
-        "transformations": [
-            {"id": "convertFieldType", "options": {"conversions": [
-                {"targetField": "end_epoch_ms", "destinationType": "time"}
-            ]}},
-        ],
-        "options": {"reduceOptions": {"calcs": ["mean"], "fields": "/^duration_seconds$/", "values": False},
-                    "colorMode": "value", "graphMode": "area", "justifyMode": "auto",
+        "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False},
+                    "colorMode": "background", "graphMode": "none", "justifyMode": "auto",
                     "textMode": "auto", "wideLayout": True, "showPercentChange": False},
+        # Simple traffic light, low = good for the operator: green <=1min,
+        # yellow for the 1-4min middle ground (covers the user's "2-3 min"
+        # callout plus the unstated 1-2min gap, kept as one band for a true
+        # 3-color light), red at 4min+. Same bands reused on Latest game
+        # duration below.
         "fieldConfig": {"defaults": {"unit": "s", "decimals": 0, "mappings": [],
-                                     "color": {"mode": "fixed", "fixedColor": "blue"}},
+                                     "color": {"mode": "thresholds"},
+                                     "thresholds": {"mode": "absolute", "steps": [
+                                         {"color": "green", "value": None},
+                                         {"color": "yellow", "value": 61},
+                                         {"color": "red", "value": 240}]}},
+                        "overrides": []},
+    }
+
+
+def _utilization_panel(pid, x, y, w, h):
+    # % of the time the machine has actually been ON today spent PLAYING
+    # (not % of the wall-clock range) — derivable purely from existing
+    # events, no C++ change needed. Sum of completed games' durations /
+    # (now - first heartbeat seen in range) * 100.
+    #
+    # "On since" = the FIRST game.heartbeat's own heartbeat_epoch_ms in the
+    # selected range (D below) — not a native Loki Time column converted via
+    # an SQL date function (to_timestamp() already failed once this session;
+    # avoiding that whole class of risk by using the attribute's own ms value
+    # instead, same unwrap pattern already proven for start/end_epoch_ms).
+    # Deliberately NOT given an "or vector(0)" fallback: if there's truly no
+    # heartbeat in range, "machine on since" is unknowable, and the SQL's
+    # scalar subquery on an empty D correctly propagates NULL -> "No data",
+    # which is the honest answer, not a misleading 0%.
+    #
+    # Session durations still use the exact session_label JOIN (same as
+    # Average game duration — safe against abandoned/mismatched sessions,
+    # unlike ordinal pairing). "Now" = $__to, not a fresh clock read, matching
+    # the rest of this board's "as of the render" convention; both $__to and
+    # $__from are confirmed interpolating inside a SQL expression.
+    # Caveat: a game still IN PROGRESS right now isn't counted until it ends
+    # (the JOIN needs both a start and an end) — self-corrects once it does.
+    return {
+        "id": pid, "type": "gauge", "title": "📊 Utilization",
+        "description": ("Percentage of the time the machine has been ON today (since the "
+                        "first heartbeat seen in the selected range) spent PLAYING, for the "
+                        "selected host — sum of completed games' durations ÷ (now minus "
+                        "first heartbeat). A game still in progress isn't counted until it ends."),
+        "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+        "gridPos": {"x": x, "y": y, "w": w, "h": h},
+        "targets": [
+            {"refId": "A", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+             "editorMode": "code", "queryType": "instant",
+             "expr": f'max by (session_label) (max_over_time({HOST_SCOPED} | event="game.session.start" | unwrap start_epoch_ms [$__range]))'},
+            {"refId": "B", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+             "editorMode": "code", "queryType": "instant",
+             "expr": f'max by (session_label) (max_over_time({HOST_SCOPED} | event="game.session.end" | unwrap end_epoch_ms [$__range]))'},
+            {"refId": "D", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+             "editorMode": "code", "queryType": "instant",
+             "expr": f'min(min_over_time({HOST_SCOPED} | event="game.heartbeat" | unwrap heartbeat_epoch_ms [$__range]))'},
+            {"refId": "E", "datasource": {"type": "__expr__", "uid": "__expr__"}, "type": "sql",
+             "expression": ("SELECT COALESCE(SUM(b.`__value__` - a.`__value__`), 0) "
+                            "/ ($__to - (SELECT `__value__` FROM D)) * 100.0 AS utilization_pct "
+                            "FROM A a JOIN B b ON a.session_label = b.session_label")},
+        ],
+        # Same circle/LED-segment gauge style as the Top speed/Avg speed gauges
+        # (speed_gauge_panel): segmentCount 63 (dashed-arc "LED" look),
+        # style:"circle", showThresholdMarkers — reused verbatim per the
+        # user's request for "the gauge that's a circle with the LED style".
+        "options": {"barShape": "flat", "barWidthFactor": 0.5,
+                    "effects": {"barGlow": False, "centerGlow": False, "gradient": False},
+                    "endpointMarker": "point", "minVizHeight": 75, "minVizWidth": 75,
+                    "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False},
+                    "segmentCount": 63, "segmentSpacing": 0.3, "shape": "circle",  # full circle, not an arc
+                    "showThresholdLabels": False, "showThresholdMarkers": True, "sizing": "auto",
+                    "sparkline": False, "style": "circle", "textMode": "auto"},
+        "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100, "decimals": 1,
+                                     "color": {"mode": "thresholds"},
+                                     # Color bands: red (barely used) -> orange -> yellow -> green
+                                     # (well utilized). Easy to retune later — just these 4 values.
+                                     "thresholds": {"mode": "absolute", "steps": [
+                                         {"color": "#e57373", "value": None},
+                                         {"color": "#ffb74d", "value": 20},
+                                         {"color": "#fff176", "value": 40},
+                                         {"color": "#81c784", "value": 60}]},
+                                     "mappings": []},
+                        "overrides": []},
+    }
+
+
+def _time_since_last_game_panel(pid, x, y, w, h):
+    # Minutes since the most recently started game began, floored to a whole
+    # number — NOT the absolute start time. An absolute epoch (the previous
+    # version, displayed via the "dateTimeFromNow" unit as "X ago") can't be
+    # meaningfully thresholded: the raw value keeps growing every second, so
+    # a fixed cutoff would never mean the same thing twice. Flooring (not
+    # rounding) matches "latest game duration"'s counting-up feel — at 9m59s
+    # it should still read 9, not jump to 10 a second early.
+    start_expr = f'max(last_over_time({HOST_SCOPED} | event="game.session.start" | unwrap start_epoch_ms [$__range])) or vector(0)'
+    return {
+        "id": pid, "type": "stat", "title": "⏱️ Time since last game",
+        "description": ("Minutes since the most recently started game began, for the selected "
+                        "host — a long gap means the cabinet has been sitting idle, not "
+                        "earning. Floored to a whole minute."),
+        "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+        "gridPos": {"x": x, "y": y, "w": w, "h": h},
+        "targets": [
+            {"refId": "A", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+             "editorMode": "code", "queryType": "instant", "expr": start_expr},
+            {"refId": "B", "datasource": {"type": "__expr__", "uid": "__expr__"}, "type": "sql",
+             "expression": "SELECT FLOOR(($__to - `__value__`) / 60000.0) AS minutes_since_start FROM A"},
+        ],
+        "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False},
+                    "colorMode": "background", "graphMode": "none", "justifyMode": "auto",
+                    "textMode": "auto", "wideLayout": True, "showPercentChange": False},
+        # Idle traffic light: green while recently played, yellow for a mid
+        # stretch, red once it's been a while — same bands discussed with the
+        # user for this panel, inverted sense from the duration panels (here
+        # a BIG gap is bad, not a long game).
+        "fieldConfig": {"defaults": {"unit": "m", "decimals": 0, "mappings": [],
+                                     "color": {"mode": "thresholds"},
+                                     "thresholds": {"mode": "absolute", "steps": [
+                                         {"color": "green", "value": None},
+                                         {"color": "yellow", "value": 10},
+                                         {"color": "red", "value": 30}]}},
                         "overrides": []},
     }
 
@@ -1300,7 +1433,7 @@ def _latest_duration_panel(pid, x, y, w, h):
     start_expr = f'max(last_over_time({HOST_SCOPED} | event="game.session.start" | unwrap start_epoch_ms [$__range])) or vector(0)'
     end_expr = f'max(last_over_time({HOST_SCOPED} | event="game.session.end" | unwrap end_epoch_ms [$__range])) or vector(0)'
     return {
-        "id": pid, "type": "stat", "title": "Latest game duration",
+        "id": pid, "type": "stat", "title": "⏱️ Latest game duration",
         "description": ("How long the most recently started game has lasted: counts up live "
                         "from its start time while still in progress (latest start newer than "
                         "latest end), otherwise end minus start — for the selected host in the "
@@ -1319,10 +1452,15 @@ def _latest_duration_panel(pid, x, y, w, h):
                             "END AS duration_seconds")},
         ],
         "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False},
-                    "colorMode": "value", "graphMode": "none", "justifyMode": "auto",
+                    "colorMode": "background", "graphMode": "none", "justifyMode": "auto",
                     "textMode": "auto", "wideLayout": True, "showPercentChange": False},
+        # Same traffic-light bands as Average game duration — see that panel.
         "fieldConfig": {"defaults": {"unit": "s", "decimals": 0, "mappings": [],
-                                     "color": {"mode": "fixed", "fixedColor": "blue"}},
+                                     "color": {"mode": "thresholds"},
+                                     "thresholds": {"mode": "absolute", "steps": [
+                                         {"color": "green", "value": None},
+                                         {"color": "yellow", "value": 61},
+                                         {"color": "red", "value": 240}]}},
                         "overrides": []},
     }
 
@@ -1342,7 +1480,7 @@ def _car_colour_panel(pid, x, y, w, h):
     # tells Grafana to paint the background with whatever colour is attached to
     # the matched value mapping — same mechanism as the Engine State/Alive panels).
     return {
-        "id": pid, "type": "stat", "title": "Car colour",
+        "id": pid, "type": "stat", "title": "🚗 Car colour",
         "description": ("Configured car colour (config.xml <engine><car_color>, car_pal 0-4) "
                         "from the most recent game.startup on the selected host."),
         "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
@@ -1366,49 +1504,65 @@ def _car_colour_panel(pid, x, y, w, h):
 
 
 def _revenue_per_hour_panel(pid, x, y, w, h):
-    # One discrete bar per hour (e.g. 14:00-15:00), revenue in USD @ $0.25/coin.
-    # `or vector(0)` matters here, not just as an empty-query guard: a
-    # Loki/Prometheus-style range query evaluates its expression independently
-    # AT EACH STEP, and `count_over_time` yields NO point (not a zero) for a
-    # step with no matching lines — without the fallback, empty hours are
-    # missing bars, not 0-height ones. Confirmed via `gcx logs metrics ...
-    # --step 1h`: with it, every hour gets an explicit point. The $/coin
-    # multiplication happens directly in LogQL (vector * scalar), no SQL expr
-    # needed. `intervalMs` forces the step to exactly 1h -> 24 buckets/day;
-    # boundaries land on the clock hour because $__from is itself clock-aligned
-    # for the board's default "today" (now/d) range.
+    # Cumulative revenue over time (running total), line + gradient fill —
+    # NOT hourly bars. An earlier hourly-bucket version needed `offset -1h`
+    # to label each bar by its bucket START rather than its END (LogQL
+    # range-vector windows are trailing: count_over_time(X[1h]) at T covers
+    # (T-1h,T], so an 11-12 event naturally labels at 12:00). But that
+    # offset trick has a fatal side effect for a LIVE dashboard: the grid
+    # point for the current, still-forming hour needs to evaluate as if
+    # "now" were 1h in the future (to look at its own (T,T+1h] window), and
+    # Loki returns NO data at all for a grid point whose effective eval time
+    # is still in the future — not partial data for the elapsed portion,
+    # nothing. Confirmed live: a coin inserted 4 minutes earlier didn't show
+    # up at all, with or without the offset, because the current hour's
+    # bucket can only resolve once real wall-clock time passes its END.
     #
-    # Panel type is "timeseries" with bars draw style, NOT "barchart" — tried
-    # barchart first (its gapped-category look is closer to "one bar per hour"
-    # in principle) but it overflows into a horizontal scrollbar once point
-    # count passes roughly 15-20, and the default "today" range already has
-    # that many hourly buckets by mid-afternoon — confirmed live, not just a
-    # wide-range test artifact. Tried `barWidthFactor` to force a gap between
-    # bars; it had no visible effect on this panel type (not a real option
-    # for timeseries bars, apparently — that's a barchart-only control).
-    # User's explicit call once shown the tradeoff: keep timeseries (never
-    # overflows/breaks, regardless of time of day) over barchart's true gaps.
-    # Hour boundaries are still marked by the x-axis gridlines, just not by a
-    # gap in the fill — the standard look for a Grafana "events per hour" panel.
+    # A running total sidesteps this entirely: no bucket, no offset, no
+    # "which label does this belong to" question. Each fine-grained step
+    # ($__interval, auto-sized from panel width) just counts coins in that
+    # tiny slice (`or vector(0)` so every step is an explicit number, never
+    # a gap — same reasoning as the old hourly version), and the
+    # `calculateField`/cumulative transform turns those per-step deltas into
+    # a running sum. Confirmed via `gcx logs metrics ... --step 5m`: a coin
+    # inserted 4 minutes prior showed up immediately at the next 5m step,
+    # with no delay — the fix for the live-data gap the user hit.
     return {
-        "id": pid, "type": "timeseries", "title": "Revenue per hour",
-        "description": ("Revenue (game.coin_inserted events × $0.25/coin) bucketed by hour "
-                        "(24 buckets/day for the default today range; empty hours show $0, not "
-                        "a gap), for the selected host."),
+        "id": pid, "type": "timeseries", "title": "📈 Cumulative revenue",
+        "description": ("Running total revenue (game.coin_inserted events × $0.25/coin) "
+                        "across the selected range, for the selected host. Updates live as "
+                        "coins are inserted — no hourly bucketing, so there's no lag waiting "
+                        "for an hour to complete."),
         "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
         "gridPos": {"x": x, "y": y, "w": w, "h": h},
         "targets": [
             {"refId": "A", "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
-             "editorMode": "code", "queryType": "range", "intervalMs": 3600000,
-             "expr": f'sum(count_over_time({HOST_SCOPED} | event="game.coin_inserted" [1h])) * {COIN_PRICE_USD} or vector(0)'},
+             "editorMode": "code", "queryType": "range",
+             "expr": f'sum(count_over_time({HOST_SCOPED} | event="game.coin_inserted" [$__interval])) * {COIN_PRICE_USD} or vector(0)'},
+        ],
+        "transformations": [
+            # mode MUST be "cumulativeFunctions", not "cumulative" — confirmed
+            # against Grafana's own calculateField.ts source (CalculateFieldMode
+            # enum). Got this wrong first; an unrecognized mode string doesn't
+            # error, it silently no-ops, so the panel just showed the raw
+            # per-step deltas (spikes that drop back to 0) instead of a running
+            # total — looked plausible enough to be mistaken for "working" at a
+            # glance, caught only by checking the actual shape against what a
+            # true monotonic cumulative sum must look like.
+            {"id": "calculateField", "options": {
+                "mode": "cumulativeFunctions",
+                "cumulative": {"field": "Value", "reducer": "sum"},
+                "alias": "Revenue",
+                "replaceFields": True,
+            }},
         ],
         "options": {"tooltip": {"mode": "single", "sort": "none"},
                     "legend": {"displayMode": "list", "placement": "bottom", "showLegend": False}},
         "fieldConfig": {"defaults": {"unit": "currencyUSD", "decimals": 2,
-                                     "color": {"mode": "fixed", "fixedColor": "green"},
-                                     "custom": {"drawStyle": "bars", "barAlignment": 0,
-                                                "lineWidth": 1, "fillOpacity": 90,
-                                                "gradientMode": "none", "spanNulls": False,
+                                     "color": {"mode": "fixed", "fixedColor": "#fb8c00"},
+                                     "custom": {"drawStyle": "line", "barAlignment": 0,
+                                                "lineWidth": 2, "fillOpacity": 25,
+                                                "gradientMode": "opacity", "spanNulls": False,
                                                 "showPoints": "never", "pointSize": 5,
                                                 "axisPlacement": "auto", "axisLabel": "Revenue",
                                                 "stacking": {"mode": "none", "group": "A"},
@@ -1425,7 +1579,7 @@ def _music_plays_panel(pid, x, y, w, h):
     # Track-name convention matches the single-game music_panel helper (id 33):
     # 0 Magical Sound Shower / 1 Passing Breeze / 2 Splash Wave / else Custom.
     return {
-        "id": pid, "type": "bargauge", "title": "Music plays",
+        "id": pid, "type": "bargauge", "title": "🎵 Music plays",
         "description": ("Count of games started with each music track, for the selected host "
                         "in the selected time range."),
         "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
@@ -1445,8 +1599,11 @@ def _music_plays_panel(pid, x, y, w, h):
         "options": {"displayMode": "lcd", "orientation": "horizontal", "valueMode": "color",
                     "showUnfilled": True,
                     "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": True}},
+        # A value-based ramp (pale peach at low counts) looked washed-out/cold
+        # with this data's mostly-small play counts — just one flat saturated
+        # warm orange instead, matching Revenue per hour.
         "fieldConfig": {"defaults": {"unit": "short", "decimals": 0,
-                                     "color": {"mode": "fixed", "fixedColor": "blue"},
+                                     "color": {"mode": "fixed", "fixedColor": "#fb8c00"},
                                      "mappings": []},
                         "overrides": []},
     }
@@ -1464,7 +1621,7 @@ def host_selector_panel():
     # data link set the $host textbox. Deliberately UNSCOPED (plain SEL) —
     # this is the one panel that must see every host, not just the selected one.
     return {
-        "id": 200, "type": "table", "title": "Host Selector",
+        "id": 200, "type": "table", "title": "🖥️ Host Selector",
         "description": ("Every cabinet (host_name) active in the selected time range (today, "
                         "by default). Click a row to scope the whole board to that cabinet — "
                         "useful once more than one is deployed."),
@@ -1518,7 +1675,7 @@ def _selected_host_panel(pid, x, y, w, h):
     # host has recent events" (a newly-picked host with zero data yet would
     # otherwise show empty/NO HOST SELECTED, which would be wrong).
     return {
-        "id": pid, "type": "stat", "title": "Selected host",
+        "id": pid, "type": "stat", "title": "📍 Selected host",
         "description": ("Which host the rest of this board is scoped to. Click a row in Host "
                         "Selector (or type one) to change it."),
         "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
@@ -1564,7 +1721,6 @@ def build_live_engine():
     coins_expr = f'sum(count_over_time({HOST_SCOPED} | event="game.coin_inserted" [$__range])) or vector(0)'
     coin_line_fmt = "Coin inserted — {{.credits}} credit(s) now in machine"
     raw_line_fmt = "{{.event}}  stage={{.stage_number}}  speed={{.speed_kph}}  score={{.score}}"
-    start_epoch_expr = f'max(last_over_time({HOST_SCOPED} | event="game.session.start" | unwrap start_epoch_ms [$__range]))'
 
     y0 = HOST_TABLE_H  # everything below the Host Selector shifts down by its height
 
@@ -1574,38 +1730,54 @@ def build_live_engine():
 
         # Row 1 — engine state, aliveness, coin economics snapshot (operator-focused)
         {
-            "id": 201, "type": "stat", "title": "Engine state",
-            "description": ("Is a game being played right now on the selected host? Latest "
-                            "game.session.start newer than latest game.session.end = PLAYING; "
-                            "otherwise ATTRACT MODE — UNLESS the host hasn't logged anything in "
-                            "the last 60s (same check as Alive), in which case UNKNOWN: an "
-                            "abandoned/killed session (power cut, process killed mid-game) never "
-                            "logs game.session.end, so without this fallback a dead cabinet's "
-                            "last game would show PLAYING forever. Confirmed live 2026-10-07 — "
-                            "a session cut short by stopping the Pi stayed PLAYING indefinitely."),
+            "id": 201, "type": "stat", "title": "🎮 Engine state",
+            "description": ("What's happening right now on the selected host: ATTRACT MODE, "
+                            "PLAYING, POST GAME (game.gameover fired — GAME OVER text / bonus "
+                            "road / course map / high-score table / name entry — but "
+                            "game.session.end hasn't landed yet), or UNKNOWN if the host hasn't "
+                            "logged anything in the last 60s (same check as Alive) — an "
+                            "abandoned/killed session never logs game.session.end, so without "
+                            "this fallback a dead cabinet's last game would show PLAYING or "
+                            "POST GAME forever. Confirmed live 2026-10-07 — a session cut short "
+                            "by stopping the Pi stayed PLAYING indefinitely."),
             "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
             "gridPos": {"x": 0, "y": y0, "w": 6, "h": 5},
             "targets": [{
                 "refId": "A", "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
                 "editorMode": "code", "queryType": "instant",
-                # alive = 1 if the host logged anything in the last 60s, else 0.
-                # playing = 1 if the latest session.start is newer than the latest
-                # session.end, else 0 (the original PLAYING/ATTRACT MODE logic).
-                # result = (1-alive)*2 + alive*playing -> 2 (UNKNOWN) when not alive,
-                # otherwise falls through to plain 0/1 — arithmetic ternary, no `if`
-                # in LogQL. alive's [60s] window matches _alive_panel exactly.
+                # alive = 1 if the host logged anything in the last 60s, else 0 (same
+                # [60s] window as _alive_panel). session_open = 1 if the latest
+                # session.start is newer than the latest session.end (a game is
+                # underway in SOME sense — playing or post-game). post_game = 1 if
+                # the latest game.gameover is newer than the latest session.start
+                # (gameplay control has ended for THIS session, but session.end
+                # hasn't landed yet). Arithmetic ternary (no `if` in LogQL):
+                # result = (1-alive)*3 + alive*session_open*(1+post_game)
+                #   -> 3 UNKNOWN (not alive, regardless of anything else)
+                #   -> 0 ATTRACT (alive, session closed)
+                #   -> 1 PLAYING (alive, session open, not yet post-game)
+                #   -> 2 POST GAME (alive, session open, post-game event is newer)
                 "expr": (
-                    '(1 - ((sum(count_over_time(' + HOST_SCOPED + ' [60s])) or vector(0)) > bool 0)) * 2 '
+                    '(1 - ((sum(count_over_time(' + HOST_SCOPED + ' [60s])) or vector(0)) > bool 0)) * 3 '
                     '+ ((sum(count_over_time(' + HOST_SCOPED + ' [60s])) or vector(0)) > bool 0) '
                     f'* ((max(last_over_time({HOST_SCOPED} | event="game.session.start" | unwrap start_epoch_ms [$__range])) or vector(0)) '
-                    f'> bool (max(last_over_time({HOST_SCOPED} | event="game.session.end" | unwrap end_epoch_ms [$__range])) or vector(0)))'
+                    f'> bool (max(last_over_time({HOST_SCOPED} | event="game.session.end" | unwrap end_epoch_ms [$__range])) or vector(0))) '
+                    f'* (1 + ((max(last_over_time({HOST_SCOPED} | event="game.gameover" | unwrap gameover_epoch_ms [$__range])) or vector(0)) '
+                    f'> bool (max(last_over_time({HOST_SCOPED} | event="game.session.start" | unwrap start_epoch_ms [$__range])) or vector(0))))'
                 ),
             }],
             "fieldConfig": {"defaults": {
                 "mappings": [{"type": "value", "options": {
-                    "1": {"text": "PLAYING", "color": "green", "index": 0},
-                    "0": {"text": "ATTRACT MODE", "color": "blue", "index": 1},
-                    "2": {"text": "UNKNOWN", "color": "#808080", "index": 2},
+                    "1": {"text": "Playing", "color": "green", "index": 0},
+                    # Orange, not blue — attract mode is the "no money coming
+                    # in" state, worth visually flagging as the lesser state
+                    # vs. Playing's green.
+                    "0": {"text": "Attract mode", "color": "#fb8c00", "index": 1},
+                    # Purple — distinct from all 3 other states, reads as
+                    # "wrapping up" (game over text / bonus road / course map /
+                    # high-score table / name entry, all bundled as one state).
+                    "2": {"text": "Post game", "color": "#ab47bc", "index": 2},
+                    "3": {"text": "Unknown", "color": "#808080", "index": 3},
                 }}],
                 "color": {"mode": "fixed", "fixedColor": "text"},
             }, "overrides": []},
@@ -1615,48 +1787,70 @@ def build_live_engine():
         },
         _alive_panel(205, 6, y0, 6, 5),
         _credits_available_panel(212, 12, y0, 6, 5, coins_expr),
-        _stat(210, 18, y0, 6, 5, "Coins inserted (today)",
+        _stat(210, 18, y0, 6, 5, "💰 Coins inserted (today)",
               "game.coin_inserted events in the selected time range (today, by default) on the "
               "selected host — one per physical coin.",
-              coins_expr),
+              coins_expr, color="#ffd319", colorMode="background"),
 
         # Row 2 — revenue + game timing, for the selected host/time range
         _revenue_panel(211, 0, y0 + 5, 6, 5, coins_expr),
-        _stat(213, 6, y0 + 5, 6, 5, "Latest game start",
-              "Start time of the most recently started game on the selected host, in the "
-              "selected time range.",
-              start_epoch_expr, unit="dateTimeFromNow"),
+        _time_since_last_game_panel(213, 6, y0 + 5, 6, 5),
         _latest_duration_panel(214, 12, y0 + 5, 6, 5),
         _avg_duration_panel(216, 18, y0 + 5, 6, 5),
 
-        # Row 3 — config snapshot, from the one-time game.startup event
-        _car_colour_panel(217, 0, y0 + 10, 6, 5),
-        _line_stat(218, 6, y0 + 10, 6, "Gearbox mode",
+        # Row 3 — utilization (% of the range spent PLAYING vs attract mode)
+        _utilization_panel(225, 0, y0 + 10, 6, 5),
+
+        # Row 4 — config snapshot, from the one-time game.startup event
+        _car_colour_panel(217, 0, y0 + 15, 6, 5),
+        # Automatic is easier to drive -> green. Manual keeps the synthwave
+        # yellow (#ffd319, the original flat colour both values used to
+        # share, matching the "Gearbox" panel on Recent Games) as the
+        # harder/"watch out" mode.
+        _line_stat(218, 6, y0 + 15, 6, "🕹️ Gearbox mode",
                    "Configured transmission mode (automatic/manual) from the most recent "
                    "game.startup on the selected host.",
-                   "game.startup", "gearbox_mode", sel=HOST_SCOPED),
-        _line_stat(219, 12, y0 + 10, 6, "Difficulty",
+                   "game.startup", "gearbox_mode", sel=HOST_SCOPED,
+                   mappings={"automatic": {"text": "Automatic", "color": "green"},
+                             "manual": {"text": "Manual", "color": "#ffd319"}}),
+        # Green -> red ramp by difficulty (easy=good/green, hard=danger/red).
+        # INFINITE isn't on that scale at all (no time pressure, a distinct
+        # mode rather than a difficulty level) -> neutral blue, not green.
+        _line_stat(219, 12, y0 + 15, 6, "🎯 Difficulty",
                    "Configured game-time DIP-switch difficulty from the most recent "
                    "game.startup on the selected host.",
-                   "game.startup", "difficulty", sel=HOST_SCOPED),
-        _line_stat(223, 18, y0 + 10, 6, "Traffic difficulty",
+                   "game.startup", "difficulty", sel=HOST_SCOPED,
+                   mappings={"VERY EASY": {"text": "Very easy", "color": "#4caf50"},
+                             "EASY": {"text": "Easy", "color": "#8bc34a"},
+                             "NORMAL": {"text": "Normal", "color": "#fdd835"},
+                             "HARD": {"text": "Hard", "color": "#fb8c00"},
+                             "HARDEST": {"text": "Hardest", "color": "#e53935"},
+                             "INFINITE": {"text": "Infinite", "color": "blue"}}),
+        # Same green -> red ramp; DISABLED (no traffic at all) is its own
+        # neutral blue, not part of the difficulty scale either.
+        _line_stat(223, 18, y0 + 15, 6, "🚦 Traffic difficulty",
                    "Configured traffic DIP-switch difficulty from the most recent game.startup "
                    "on the selected host.",
-                   "game.startup", "traffic_difficulty", sel=HOST_SCOPED),
+                   "game.startup", "traffic_difficulty", sel=HOST_SCOPED,
+                   mappings={"EASY": {"text": "Easy", "color": "#8bc34a"},
+                             "NORMAL": {"text": "Normal", "color": "#fdd835"},
+                             "HARD": {"text": "Hard", "color": "#fb8c00"},
+                             "HARDEST": {"text": "Hardest", "color": "#e53935"},
+                             "DISABLED": {"text": "Disabled", "color": "blue"}}),
 
-        # Row 4 — usage patterns
-        _revenue_per_hour_panel(240, 0, y0 + 15, 24, 8),
+        # Row 5 — usage patterns
+        _revenue_per_hour_panel(240, 0, y0 + 20, 24, 8),
 
-        # Row 5 — music track popularity
-        _music_plays_panel(250, 0, y0 + 23, 24, 6),
+        # Row 6 — music track popularity
+        _music_plays_panel(250, 0, y0 + 28, 24, 6),
 
-        # Row 6 — live coin feed for the selected host
-        _logs_panel(215, 0, y0 + 29, 24, 6, "Coin inserts",
+        # Row 7 — live coin feed for the selected host
+        _logs_panel(215, 0, y0 + 34, 24, 6, "🪙 Coin inserts",
                     "Every game.coin_inserted event on the selected host, newest first.",
                     f'{HOST_SCOPED} | event="game.coin_inserted" | line_format "{coin_line_fmt}"'),
 
-        # Row 7 — raw log feed for the selected host
-        _logs_panel(230, 0, y0 + 35, 24, 10, "Raw event log",
+        # Row 8 — raw log feed for the selected host
+        _logs_panel(230, 0, y0 + 40, 24, 10, "📜 Raw event log",
                     "Every event for the selected host in the selected time range (today, by "
                     "default), newest first — the full, unfiltered feed from whatever game is "
                     "running now (or the most recent one, in attract mode).",
@@ -2071,6 +2265,20 @@ def _v2_transform(tr):
 
 
 def _v2_element(p):
+    # A per-TARGET "interval"/"intervalMs" (the classic v1 "min step" override)
+    # lands inside the DataQuery's own spec via _v2_query's generic passthrough
+    # — which Loki's query plugin just ignores as an unrecognized field, so it
+    # silently does nothing. The min-interval override actually belongs at the
+    # QueryGroup level (sibling to "queries"), which the transpiler previously
+    # always left empty. Confirmed live: an hourly bar chart kept showing a
+    # sub-hour staircase (3 coins minutes apart rendered as 3 separate steps)
+    # until the override was moved from the target to panel-level "interval"/
+    # "maxDataPoints", mapped here into queryOptions.
+    query_options = {}
+    if "interval" in p:
+        query_options["interval"] = p["interval"]
+    if "maxDataPoints" in p:
+        query_options["maxDataPoints"] = p["maxDataPoints"]
     return {"kind": "Panel", "spec": {
         "id": p["id"],
         "title": p.get("title", ""),
@@ -2079,7 +2287,7 @@ def _v2_element(p):
         "data": {"kind": "QueryGroup", "spec": {
             "queries": [_v2_query(t) for t in p.get("targets", [])],
             "transformations": [_v2_transform(tr) for tr in p.get("transformations", [])],
-            "queryOptions": {},
+            "queryOptions": query_options,
         }},
         "vizConfig": {"kind": "VizConfig", "group": p["type"], "version": "",
                       "spec": {"options": p.get("options", {}),

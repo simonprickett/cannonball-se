@@ -87,6 +87,7 @@ Both must be installed (declared in each dashboard's `__requires`):
 | `game.coin_inserted` | `credits` | Coin economics (count, revenue, credits available) |
 | `game.startup` | `car_pal`, `gearbox_mode`, `difficulty`, `traffic_difficulty` | Config snapshot panels (Live Engine) |
 | `game.heartbeat` | `heartbeat_epoch_ms` | Aliveness check (Live Engine), alongside any other event |
+| `game.gameover` | `completed`, `gameover_epoch_ms` | PLAYING→POST GAME boundary (Engine state, Live Engine) — fires well before `game.session.end` |
 
 ## The route map (`stage_id`)
 
