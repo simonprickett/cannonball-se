@@ -34,12 +34,122 @@
     "description": "Rankings and aggregations across ALL games in the time range (default: today) on ANY host: top 5 boards for score, clean streak, finish-line time, overtakes, crashes, slowest crash, off-road rate and best score per stage reached, plus a route heat map. n = TOP_N in dashboards/generate.py.",
     "editable": true,
     "elements": {
-      "panel-301": {
+      "panel-315": {
         "kind": "Panel",
         "spec": {
-          "id": 301,
-          "title": "\ud83c\udfc6 Top 5: highest scores",
-          "description": "Highest final score per finished game, across all hosts in the time range.",
+          "id": 315,
+          "title": "",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "text",
+            "version": "",
+            "spec": {
+              "options": {
+                "mode": "html",
+                "code": {
+                  "language": "html",
+                  "showLineNumbers": false,
+                  "showMiniMap": false
+                },
+                "content": "<div style=\"background:linear-gradient(90deg, #311b92, #5e35b1, #9575cd);border-radius:6px;color:#fff;text-align:center;font-size:1.5em;font-weight:700;line-height:50px;height:50px;margin:0;text-shadow:0 1px 3px rgba(0,0,0,0.5)\">\ud83c\udfc6 Top scorer</div>"
+              },
+              "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-312": {
+        "kind": "Panel",
+        "spec": {
+          "id": 312,
+          "title": "Rank",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "vector(1)"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "textMode": "value",
+                "wideLayout": true,
+                "showPercentChange": false
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "none",
+                  "decimals": 0,
+                  "noValue": "\u2014",
+                  "mappings": [],
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "#b8860b"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-313": {
+        "kind": "Panel",
+        "spec": {
+          "id": 313,
+          "title": "Player",
+          "description": "",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -77,7 +187,191 @@
                       },
                       "spec": {
                         "type": "sql",
-                        "expression": "SELECT ROW_NUMBER() OVER (ORDER BY A.`__value__` DESC) AS `Rank`, A.player_initials AS Player, A.`__value__` AS `Score` FROM A WHERE A.session_label <> '~' ORDER BY A.`__value__` DESC LIMIT 5"
+                        "expression": "SELECT b.player_initials AS Player, b.v AS `Score` FROM (SELECT A.player_initials, A.`__value__` AS v, 0 AS tb FROM A WHERE A.session_label <> '~') b ORDER BY v DESC, tb DESC LIMIT 1"
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "/^Player$/",
+                  "values": false
+                },
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "textMode": "value",
+                "wideLayout": true,
+                "showPercentChange": false
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "none",
+                  "decimals": 0,
+                  "noValue": "\u2014",
+                  "mappings": [],
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "#b8860b"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-314": {
+        "kind": "Panel",
+        "spec": {
+          "id": 314,
+          "title": "Score",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "(max by (session_label, player_initials) (max_over_time({service_name=\"cannonball-se\"} | event=\"game.session.end\" | unwrap final_score [$__range]))) or label_replace(label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\"), \"player_initials\", \"~\", \"\", \".*\")"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "__expr__",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "__expr__"
+                      },
+                      "spec": {
+                        "type": "sql",
+                        "expression": "SELECT b.player_initials AS Player, b.v AS `Score` FROM (SELECT A.player_initials, A.`__value__` AS v, 0 AS tb FROM A WHERE A.session_label <> '~') b ORDER BY v DESC, tb DESC LIMIT 1"
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "/^Score$/",
+                  "values": false
+                },
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "textMode": "value",
+                "wideLayout": true,
+                "showPercentChange": false
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "none",
+                  "decimals": 0,
+                  "noValue": "\u2014",
+                  "mappings": [],
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "#b8860b"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-301": {
+        "kind": "Panel",
+        "spec": {
+          "id": 301,
+          "title": "\ud83c\udfc6 Top 10: highest scores",
+          "description": "Highest final score per finished game, across all hosts in the time range. Rank 1 is in the gold tiles above; this table lists the rest.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "(max by (session_label, player_initials) (max_over_time({service_name=\"cannonball-se\"} | event=\"game.session.end\" | unwrap final_score [$__range]))) or label_replace(label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\"), \"player_initials\", \"~\", \"\", \".*\")"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "__expr__",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "__expr__"
+                      },
+                      "spec": {
+                        "type": "sql",
+                        "expression": "SELECT r.rn AS `Rank`, r.player_initials AS Player, r.v AS `Score` FROM (SELECT b.player_initials, b.v, ROW_NUMBER() OVER (ORDER BY v DESC, tb DESC) AS rn FROM (SELECT A.player_initials, A.`__value__` AS v, 0 AS tb FROM A WHERE A.session_label <> '~') b) r WHERE r.rn BETWEEN 2 AND 10 ORDER BY r.rn"
                       }
                     },
                     "refId": "B",
@@ -188,12 +482,122 @@
           }
         }
       },
-      "panel-302": {
+      "panel-325": {
         "kind": "Panel",
         "spec": {
-          "id": 302,
-          "title": "\ud83e\uddfc Top 5: longest clean driving streak",
-          "description": "Longest stretch without a crash or off-road incident in a single game (wall-clock seconds).",
+          "id": 325,
+          "title": "",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "text",
+            "version": "",
+            "spec": {
+              "options": {
+                "mode": "html",
+                "code": {
+                  "language": "html",
+                  "showLineNumbers": false,
+                  "showMiniMap": false
+                },
+                "content": "<div style=\"background:linear-gradient(90deg, #1b5e20, #388e3c, #66bb6a);border-radius:6px;color:#fff;text-align:center;font-size:1.5em;font-weight:700;line-height:50px;height:50px;margin:0;text-shadow:0 1px 3px rgba(0,0,0,0.5)\">\ud83e\uddfc Cleanest Driver</div>"
+              },
+              "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-322": {
+        "kind": "Panel",
+        "spec": {
+          "id": 322,
+          "title": "Rank",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "vector(1)"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "textMode": "value",
+                "wideLayout": true,
+                "showPercentChange": false
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "none",
+                  "decimals": 0,
+                  "noValue": "\u2014",
+                  "mappings": [],
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "#b8860b"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-323": {
+        "kind": "Panel",
+        "spec": {
+          "id": 323,
+          "title": "Player",
+          "description": "",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -231,7 +635,191 @@
                       },
                       "spec": {
                         "type": "sql",
-                        "expression": "SELECT ROW_NUMBER() OVER (ORDER BY A.`__value__` DESC) AS `Rank`, A.player_initials AS Player, A.`__value__` AS `Streak` FROM A WHERE A.session_label <> '~' ORDER BY A.`__value__` DESC LIMIT 5"
+                        "expression": "SELECT b.player_initials AS Player, b.v AS `Streak` FROM (SELECT A.player_initials, A.`__value__` AS v, 0 AS tb FROM A WHERE A.session_label <> '~') b ORDER BY v DESC, tb DESC LIMIT 1"
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "/^Player$/",
+                  "values": false
+                },
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "textMode": "value",
+                "wideLayout": true,
+                "showPercentChange": false
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "none",
+                  "decimals": 0,
+                  "noValue": "\u2014",
+                  "mappings": [],
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "#b8860b"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-324": {
+        "kind": "Panel",
+        "spec": {
+          "id": 324,
+          "title": "Streak",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "(max by (session_label, player_initials) (max_over_time({service_name=\"cannonball-se\"} | event=\"game.session.end\" | unwrap longest_clean_seconds [$__range]))) or label_replace(label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\"), \"player_initials\", \"~\", \"\", \".*\")"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "__expr__",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "__expr__"
+                      },
+                      "spec": {
+                        "type": "sql",
+                        "expression": "SELECT b.player_initials AS Player, b.v AS `Streak` FROM (SELECT A.player_initials, A.`__value__` AS v, 0 AS tb FROM A WHERE A.session_label <> '~') b ORDER BY v DESC, tb DESC LIMIT 1"
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "/^Streak$/",
+                  "values": false
+                },
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "textMode": "value",
+                "wideLayout": true,
+                "showPercentChange": false
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "suffix: s",
+                  "decimals": 0,
+                  "noValue": "\u2014",
+                  "mappings": [],
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "#b8860b"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-302": {
+        "kind": "Panel",
+        "spec": {
+          "id": 302,
+          "title": "\ud83e\uddfc Top 10: longest clean driving streak",
+          "description": "Longest stretch without a crash or off-road incident in a single game (wall-clock seconds). Rank 1 is in the gold tiles above; this table lists the rest.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "(max by (session_label, player_initials) (max_over_time({service_name=\"cannonball-se\"} | event=\"game.session.end\" | unwrap longest_clean_seconds [$__range]))) or label_replace(label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\"), \"player_initials\", \"~\", \"\", \".*\")"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "__expr__",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "__expr__"
+                      },
+                      "spec": {
+                        "type": "sql",
+                        "expression": "SELECT r.rn AS `Rank`, r.player_initials AS Player, r.v AS `Streak` FROM (SELECT b.player_initials, b.v, ROW_NUMBER() OVER (ORDER BY v DESC, tb DESC) AS rn FROM (SELECT A.player_initials, A.`__value__` AS v, 0 AS tb FROM A WHERE A.session_label <> '~') b) r WHERE r.rn BETWEEN 2 AND 10 ORDER BY r.rn"
                       }
                     },
                     "refId": "B",
@@ -333,6 +921,2130 @@
                           "mode": "fixed",
                           "fixedColor": "green"
                         }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "panel-334": {
+        "kind": "Panel",
+        "spec": {
+          "id": 334,
+          "title": "",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "text",
+            "version": "",
+            "spec": {
+              "options": {
+                "mode": "html",
+                "code": {
+                  "language": "html",
+                  "showLineNumbers": false,
+                  "showMiniMap": false
+                },
+                "content": "<div style=\"background:linear-gradient(90deg, #33691e, #689f38, #aed581);border-radius:6px;color:#fff;text-align:center;font-size:1.5em;font-weight:700;line-height:50px;height:50px;margin:0;text-shadow:0 1px 3px rgba(0,0,0,0.5)\">\ud83d\ude97 Best Overtaking</div>"
+              },
+              "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-331": {
+        "kind": "Panel",
+        "spec": {
+          "id": 331,
+          "title": "Rank",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "vector(1)"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "textMode": "value",
+                "wideLayout": true,
+                "showPercentChange": false
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "none",
+                  "decimals": 0,
+                  "noValue": "\u2014",
+                  "mappings": [],
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "#b8860b"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-332": {
+        "kind": "Panel",
+        "spec": {
+          "id": 332,
+          "title": "Player",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "(sum by (session_label, player_initials) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.session.end\" [$__range]))) or label_replace(label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\"), \"player_initials\", \"~\", \"\", \".*\")"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "(sum by (session_label) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.vehicle_overtake\" [$__range]))) or label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\")"
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "__expr__",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "__expr__"
+                      },
+                      "spec": {
+                        "type": "sql",
+                        "expression": "SELECT b.player_initials AS Player, b.v AS `Overtakes` FROM (SELECT A.player_initials, COALESCE(B.`__value__`, 0) AS v, 0 AS tb FROM A LEFT JOIN B ON A.session_label = B.session_label WHERE A.session_label <> '~') b ORDER BY v DESC, tb DESC LIMIT 1"
+                      }
+                    },
+                    "refId": "C",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "/^Player$/",
+                  "values": false
+                },
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "textMode": "value",
+                "wideLayout": true,
+                "showPercentChange": false
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "none",
+                  "decimals": 0,
+                  "noValue": "\u2014",
+                  "mappings": [],
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "#b8860b"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-333": {
+        "kind": "Panel",
+        "spec": {
+          "id": 333,
+          "title": "Overtakes",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "(sum by (session_label, player_initials) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.session.end\" [$__range]))) or label_replace(label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\"), \"player_initials\", \"~\", \"\", \".*\")"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "(sum by (session_label) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.vehicle_overtake\" [$__range]))) or label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\")"
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "__expr__",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "__expr__"
+                      },
+                      "spec": {
+                        "type": "sql",
+                        "expression": "SELECT b.player_initials AS Player, b.v AS `Overtakes` FROM (SELECT A.player_initials, COALESCE(B.`__value__`, 0) AS v, 0 AS tb FROM A LEFT JOIN B ON A.session_label = B.session_label WHERE A.session_label <> '~') b ORDER BY v DESC, tb DESC LIMIT 1"
+                      }
+                    },
+                    "refId": "C",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "/^Overtakes$/",
+                  "values": false
+                },
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "textMode": "value",
+                "wideLayout": true,
+                "showPercentChange": false
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "short",
+                  "decimals": 0,
+                  "noValue": "\u2014",
+                  "mappings": [],
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "#b8860b"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-306": {
+        "kind": "Panel",
+        "spec": {
+          "id": 306,
+          "title": "\ud83d\ude97 Top 10: most vehicles overtaken",
+          "description": "Traffic overtakes (game.vehicle_overtake) in a single game. Rank 1 is in the gold tiles above.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "(sum by (session_label, player_initials) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.session.end\" [$__range]))) or label_replace(label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\"), \"player_initials\", \"~\", \"\", \".*\")"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "(sum by (session_label) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.vehicle_overtake\" [$__range]))) or label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\")"
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "__expr__",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "__expr__"
+                      },
+                      "spec": {
+                        "type": "sql",
+                        "expression": "SELECT r.rn AS `Rank`, r.player_initials AS Player, r.v AS `Overtakes` FROM (SELECT b.player_initials, b.v, ROW_NUMBER() OVER (ORDER BY v DESC, tb DESC) AS rn FROM (SELECT A.player_initials, COALESCE(B.`__value__`, 0) AS v, 0 AS tb FROM A LEFT JOIN B ON A.session_label = B.session_label WHERE A.session_label <> '~') b) r WHERE r.rn BETWEEN 2 AND 10 ORDER BY r.rn"
+                      }
+                    },
+                    "refId": "C",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "table",
+            "version": "",
+            "spec": {
+              "options": {
+                "showHeader": true,
+                "cellHeight": "sm",
+                "footer": {
+                  "show": false
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "custom": {
+                    "align": "auto",
+                    "filterable": false
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Rank"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 60
+                      },
+                      {
+                        "id": "custom.cellOptions",
+                        "value": {
+                          "type": "color-background",
+                          "mode": "basic"
+                        }
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "type": "value",
+                            "options": {
+                              "1": {
+                                "text": "1",
+                                "color": "#b8860b",
+                                "index": 0
+                              },
+                              "2": {
+                                "text": "2",
+                                "color": "#808891",
+                                "index": 1
+                              },
+                              "3": {
+                                "text": "3",
+                                "color": "#a05a2c",
+                                "index": 2
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Overtakes"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "short"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 0
+                      },
+                      {
+                        "id": "custom.cellOptions",
+                        "value": {
+                          "type": "color-text"
+                        }
+                      },
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "blue"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "panel-344": {
+        "kind": "Panel",
+        "spec": {
+          "id": 344,
+          "title": "",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "text",
+            "version": "",
+            "spec": {
+              "options": {
+                "mode": "html",
+                "code": {
+                  "language": "html",
+                  "showLineNumbers": false,
+                  "showMiniMap": false
+                },
+                "content": "<div style=\"background:linear-gradient(90deg, #7f0000, #c62828, #e65100);border-radius:6px;color:#fff;text-align:center;font-size:1.5em;font-weight:700;line-height:50px;height:50px;margin:0;text-shadow:0 1px 3px rgba(0,0,0,0.5)\">\ud83d\udca5 Destruction Derby Champion</div>"
+              },
+              "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-341": {
+        "kind": "Panel",
+        "spec": {
+          "id": 341,
+          "title": "Rank",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "vector(1)"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "textMode": "value",
+                "wideLayout": true,
+                "showPercentChange": false
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "none",
+                  "decimals": 0,
+                  "noValue": "\u2014",
+                  "mappings": [],
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "#b8860b"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-342": {
+        "kind": "Panel",
+        "spec": {
+          "id": 342,
+          "title": "Player",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "(sum by (session_label, player_initials) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.session.end\" [$__range]))) or label_replace(label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\"), \"player_initials\", \"~\", \"\", \".*\")"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "(sum by (session_label) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.crash\" [$__range]))) or label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\")"
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "__expr__",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "__expr__"
+                      },
+                      "spec": {
+                        "type": "sql",
+                        "expression": "SELECT b.player_initials AS Player, b.v AS `Crashes` FROM (SELECT A.player_initials, COALESCE(B.`__value__`, 0) AS v, 0 AS tb FROM A LEFT JOIN B ON A.session_label = B.session_label WHERE A.session_label <> '~') b ORDER BY v DESC, tb DESC LIMIT 1"
+                      }
+                    },
+                    "refId": "C",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "/^Player$/",
+                  "values": false
+                },
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "textMode": "value",
+                "wideLayout": true,
+                "showPercentChange": false
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "none",
+                  "decimals": 0,
+                  "noValue": "\u2014",
+                  "mappings": [],
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "#b8860b"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-343": {
+        "kind": "Panel",
+        "spec": {
+          "id": 343,
+          "title": "Crashes",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "(sum by (session_label, player_initials) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.session.end\" [$__range]))) or label_replace(label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\"), \"player_initials\", \"~\", \"\", \".*\")"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "(sum by (session_label) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.crash\" [$__range]))) or label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\")"
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "__expr__",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "__expr__"
+                      },
+                      "spec": {
+                        "type": "sql",
+                        "expression": "SELECT b.player_initials AS Player, b.v AS `Crashes` FROM (SELECT A.player_initials, COALESCE(B.`__value__`, 0) AS v, 0 AS tb FROM A LEFT JOIN B ON A.session_label = B.session_label WHERE A.session_label <> '~') b ORDER BY v DESC, tb DESC LIMIT 1"
+                      }
+                    },
+                    "refId": "C",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "/^Crashes$/",
+                  "values": false
+                },
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "textMode": "value",
+                "wideLayout": true,
+                "showPercentChange": false
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "short",
+                  "decimals": 0,
+                  "noValue": "\u2014",
+                  "mappings": [],
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "#b8860b"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-307": {
+        "kind": "Panel",
+        "spec": {
+          "id": 307,
+          "title": "\ud83d\udca5 Top 10: most crashes",
+          "description": "Crashes (game.crash: bump/spin/flip) in a single game. Rank 1 is in the gold tiles above.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "(sum by (session_label, player_initials) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.session.end\" [$__range]))) or label_replace(label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\"), \"player_initials\", \"~\", \"\", \".*\")"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "(sum by (session_label) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.crash\" [$__range]))) or label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\")"
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "__expr__",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "__expr__"
+                      },
+                      "spec": {
+                        "type": "sql",
+                        "expression": "SELECT r.rn AS `Rank`, r.player_initials AS Player, r.v AS `Crashes` FROM (SELECT b.player_initials, b.v, ROW_NUMBER() OVER (ORDER BY v DESC, tb DESC) AS rn FROM (SELECT A.player_initials, COALESCE(B.`__value__`, 0) AS v, 0 AS tb FROM A LEFT JOIN B ON A.session_label = B.session_label WHERE A.session_label <> '~') b) r WHERE r.rn BETWEEN 2 AND 10 ORDER BY r.rn"
+                      }
+                    },
+                    "refId": "C",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "table",
+            "version": "",
+            "spec": {
+              "options": {
+                "showHeader": true,
+                "cellHeight": "sm",
+                "footer": {
+                  "show": false
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "custom": {
+                    "align": "auto",
+                    "filterable": false
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Rank"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 60
+                      },
+                      {
+                        "id": "custom.cellOptions",
+                        "value": {
+                          "type": "color-background",
+                          "mode": "basic"
+                        }
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "type": "value",
+                            "options": {
+                              "1": {
+                                "text": "1",
+                                "color": "#b8860b",
+                                "index": 0
+                              },
+                              "2": {
+                                "text": "2",
+                                "color": "#808891",
+                                "index": 1
+                              },
+                              "3": {
+                                "text": "3",
+                                "color": "#a05a2c",
+                                "index": 2
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Crashes"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "short"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 0
+                      },
+                      {
+                        "id": "custom.cellOptions",
+                        "value": {
+                          "type": "color-text"
+                        }
+                      },
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "red"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "panel-354": {
+        "kind": "Panel",
+        "spec": {
+          "id": 354,
+          "title": "",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "text",
+            "version": "",
+            "spec": {
+              "options": {
+                "mode": "html",
+                "code": {
+                  "language": "html",
+                  "showLineNumbers": false,
+                  "showMiniMap": false
+                },
+                "content": "<div style=\"background:linear-gradient(90deg, #bf360c, #ef6c00, #ff9800);border-radius:6px;color:#fff;text-align:center;font-size:1.5em;font-weight:700;line-height:50px;height:50px;margin:0;text-shadow:0 1px 3px rgba(0,0,0,0.5)\">\ud83d\udc22 Slowest Crash</div>"
+              },
+              "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-351": {
+        "kind": "Panel",
+        "spec": {
+          "id": 351,
+          "title": "Rank",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "vector(1)"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "textMode": "value",
+                "wideLayout": true,
+                "showPercentChange": false
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "none",
+                  "decimals": 0,
+                  "noValue": "\u2014",
+                  "mappings": [],
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "#b8860b"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-352": {
+        "kind": "Panel",
+        "spec": {
+          "id": 352,
+          "title": "Player",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "(sum by (session_label, player_initials) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.session.end\" [$__range]))) or label_replace(label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\"), \"player_initials\", \"~\", \"\", \".*\")"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "(min by (session_label) (min_over_time({service_name=\"cannonball-se\"} | event=\"game.crash\" | unwrap speed_kph [$__range]))) or label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\")"
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "__expr__",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "__expr__"
+                      },
+                      "spec": {
+                        "type": "sql",
+                        "expression": "SELECT b.player_initials AS Player, b.v AS `Speed` FROM (SELECT A.player_initials, B.`__value__` AS v, 0 AS tb FROM A JOIN B ON A.session_label = B.session_label WHERE A.session_label <> '~') b ORDER BY v ASC, tb DESC LIMIT 1"
+                      }
+                    },
+                    "refId": "C",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "/^Player$/",
+                  "values": false
+                },
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "textMode": "value",
+                "wideLayout": true,
+                "showPercentChange": false
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "none",
+                  "decimals": 0,
+                  "noValue": "\u2014",
+                  "mappings": [],
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "#b8860b"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-353": {
+        "kind": "Panel",
+        "spec": {
+          "id": 353,
+          "title": "Speed",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "(sum by (session_label, player_initials) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.session.end\" [$__range]))) or label_replace(label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\"), \"player_initials\", \"~\", \"\", \".*\")"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "(min by (session_label) (min_over_time({service_name=\"cannonball-se\"} | event=\"game.crash\" | unwrap speed_kph [$__range]))) or label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\")"
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "__expr__",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "__expr__"
+                      },
+                      "spec": {
+                        "type": "sql",
+                        "expression": "SELECT b.player_initials AS Player, b.v AS `Speed` FROM (SELECT A.player_initials, B.`__value__` AS v, 0 AS tb FROM A JOIN B ON A.session_label = B.session_label WHERE A.session_label <> '~') b ORDER BY v ASC, tb DESC LIMIT 1"
+                      }
+                    },
+                    "refId": "C",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "/^Speed$/",
+                  "values": false
+                },
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "textMode": "value",
+                "wideLayout": true,
+                "showPercentChange": false
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "velocitykmh",
+                  "decimals": 0,
+                  "noValue": "\u2014",
+                  "mappings": [],
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "#b8860b"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-308": {
+        "kind": "Panel",
+        "spec": {
+          "id": 308,
+          "title": "\ud83d\udc22 Top 10: slowest crash",
+          "description": "Lowest speed (km/h) at which a game crashed \u2014 the gentlest crash per game, slowest first. Rank 1 is in the gold tiles above.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "(sum by (session_label, player_initials) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.session.end\" [$__range]))) or label_replace(label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\"), \"player_initials\", \"~\", \"\", \".*\")"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "(min by (session_label) (min_over_time({service_name=\"cannonball-se\"} | event=\"game.crash\" | unwrap speed_kph [$__range]))) or label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\")"
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "__expr__",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "__expr__"
+                      },
+                      "spec": {
+                        "type": "sql",
+                        "expression": "SELECT r.rn AS `Rank`, r.player_initials AS Player, r.v AS `Speed` FROM (SELECT b.player_initials, b.v, ROW_NUMBER() OVER (ORDER BY v ASC, tb DESC) AS rn FROM (SELECT A.player_initials, B.`__value__` AS v, 0 AS tb FROM A JOIN B ON A.session_label = B.session_label WHERE A.session_label <> '~') b) r WHERE r.rn BETWEEN 2 AND 10 ORDER BY r.rn"
+                      }
+                    },
+                    "refId": "C",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "table",
+            "version": "",
+            "spec": {
+              "options": {
+                "showHeader": true,
+                "cellHeight": "sm",
+                "footer": {
+                  "show": false
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "custom": {
+                    "align": "auto",
+                    "filterable": false
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Rank"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 60
+                      },
+                      {
+                        "id": "custom.cellOptions",
+                        "value": {
+                          "type": "color-background",
+                          "mode": "basic"
+                        }
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "type": "value",
+                            "options": {
+                              "1": {
+                                "text": "1",
+                                "color": "#b8860b",
+                                "index": 0
+                              },
+                              "2": {
+                                "text": "2",
+                                "color": "#808891",
+                                "index": 1
+                              },
+                              "3": {
+                                "text": "3",
+                                "color": "#a05a2c",
+                                "index": 2
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Speed"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "velocitykmh"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 0
+                      },
+                      {
+                        "id": "custom.cellOptions",
+                        "value": {
+                          "type": "color-text"
+                        }
+                      },
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "orange"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "panel-364": {
+        "kind": "Panel",
+        "spec": {
+          "id": 364,
+          "title": "",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "text",
+            "version": "",
+            "spec": {
+              "options": {
+                "mode": "html",
+                "code": {
+                  "language": "html",
+                  "showLineNumbers": false,
+                  "showMiniMap": false
+                },
+                "content": "<div style=\"background:linear-gradient(90deg, #424242, #616161, #8a8a8a);border-radius:6px;color:#fff;text-align:center;font-size:1.5em;font-weight:700;line-height:50px;height:50px;margin:0;text-shadow:0 1px 3px rgba(0,0,0,0.5)\">\ud83d\udee3\ufe0f Tarmac Champion</div>"
+              },
+              "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-361": {
+        "kind": "Panel",
+        "spec": {
+          "id": 361,
+          "title": "Rank",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "vector(1)"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "textMode": "value",
+                "wideLayout": true,
+                "showPercentChange": false
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "none",
+                  "decimals": 0,
+                  "noValue": "\u2014",
+                  "mappings": [],
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "#b8860b"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-362": {
+        "kind": "Panel",
+        "spec": {
+          "id": 362,
+          "title": "Player",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "(max by (session_label, player_initials) (max_over_time({service_name=\"cannonball-se\"} | event=\"game.session.end\" | unwrap final_score [$__range]))) or label_replace(label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\"), \"player_initials\", \"~\", \"\", \".*\")"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "(sum by (session_label) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.off_road\" [$__range]))) or label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\")"
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "(sum by (session_label) (sum_over_time({service_name=\"cannonball-se\"} | event=\"game.stage.end\" | unwrap stage_duration_seconds [$__range]))) or label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\")"
+                      }
+                    },
+                    "refId": "C",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "__expr__",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "__expr__"
+                      },
+                      "spec": {
+                        "type": "sql",
+                        "expression": "SELECT b.player_initials AS Player, b.v AS `Per minute` FROM (SELECT A.player_initials, COALESCE(B.`__value__`, 0) / (C.`__value__` / 60.0) AS v, C.`__value__` AS tb, COALESCE(B.`__value__`, 0) AS offroad, C.`__value__` / 60.0 AS minutes FROM A LEFT JOIN B ON A.session_label = B.session_label JOIN C ON A.session_label = C.session_label WHERE A.session_label <> '~' AND A.`__value__` >= 10000 AND C.`__value__` >= 60) b ORDER BY v ASC, tb DESC LIMIT 1"
+                      }
+                    },
+                    "refId": "D",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "/^Player$/",
+                  "values": false
+                },
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "textMode": "value",
+                "wideLayout": true,
+                "showPercentChange": false
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "none",
+                  "decimals": 0,
+                  "noValue": "\u2014",
+                  "mappings": [],
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "#b8860b"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-363": {
+        "kind": "Panel",
+        "spec": {
+          "id": 363,
+          "title": "Per minute",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "(max by (session_label, player_initials) (max_over_time({service_name=\"cannonball-se\"} | event=\"game.session.end\" | unwrap final_score [$__range]))) or label_replace(label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\"), \"player_initials\", \"~\", \"\", \".*\")"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "(sum by (session_label) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.off_road\" [$__range]))) or label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\")"
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "(sum by (session_label) (sum_over_time({service_name=\"cannonball-se\"} | event=\"game.stage.end\" | unwrap stage_duration_seconds [$__range]))) or label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\")"
+                      }
+                    },
+                    "refId": "C",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "__expr__",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "__expr__"
+                      },
+                      "spec": {
+                        "type": "sql",
+                        "expression": "SELECT b.player_initials AS Player, b.v AS `Per minute` FROM (SELECT A.player_initials, COALESCE(B.`__value__`, 0) / (C.`__value__` / 60.0) AS v, C.`__value__` AS tb, COALESCE(B.`__value__`, 0) AS offroad, C.`__value__` / 60.0 AS minutes FROM A LEFT JOIN B ON A.session_label = B.session_label JOIN C ON A.session_label = C.session_label WHERE A.session_label <> '~' AND A.`__value__` >= 10000 AND C.`__value__` >= 60) b ORDER BY v ASC, tb DESC LIMIT 1"
+                      }
+                    },
+                    "refId": "D",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "/^Per minute$/",
+                  "values": false
+                },
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "textMode": "value",
+                "wideLayout": true,
+                "showPercentChange": false
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "short",
+                  "decimals": 2,
+                  "noValue": "\u2014",
+                  "mappings": [],
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "#b8860b"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-309": {
+        "kind": "Panel",
+        "spec": {
+          "id": 309,
+          "title": "\ud83c\udf3f Top 10: fewest off-road incidents",
+          "description": "Off-road incidents PER MINUTE DRIVEN (game.off_road count / summed stage durations), lowest first, so a long clean run beats a short one. Games driven for under 60s are excluded, as are games that scored under 10000 (the car never moved); ties go to the longer game. Zero-incident games are included. Rank 1 is in the gold tiles above.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "(max by (session_label, player_initials) (max_over_time({service_name=\"cannonball-se\"} | event=\"game.session.end\" | unwrap final_score [$__range]))) or label_replace(label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\"), \"player_initials\", \"~\", \"\", \".*\")"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "(sum by (session_label) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.off_road\" [$__range]))) or label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\")"
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "(sum by (session_label) (sum_over_time({service_name=\"cannonball-se\"} | event=\"game.stage.end\" | unwrap stage_duration_seconds [$__range]))) or label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\")"
+                      }
+                    },
+                    "refId": "C",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "__expr__",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "__expr__"
+                      },
+                      "spec": {
+                        "type": "sql",
+                        "expression": "SELECT r.rn AS `Rank`, r.player_initials AS Player, r.v AS `Per minute`, r.offroad AS `Off-road`, r.minutes AS `Minutes driven` FROM (SELECT b.player_initials, b.v, b.offroad, b.minutes, ROW_NUMBER() OVER (ORDER BY v ASC, tb DESC) AS rn FROM (SELECT A.player_initials, COALESCE(B.`__value__`, 0) / (C.`__value__` / 60.0) AS v, C.`__value__` AS tb, COALESCE(B.`__value__`, 0) AS offroad, C.`__value__` / 60.0 AS minutes FROM A LEFT JOIN B ON A.session_label = B.session_label JOIN C ON A.session_label = C.session_label WHERE A.session_label <> '~' AND A.`__value__` >= 10000 AND C.`__value__` >= 60) b) r WHERE r.rn BETWEEN 2 AND 10 ORDER BY r.rn"
+                      }
+                    },
+                    "refId": "D",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "table",
+            "version": "",
+            "spec": {
+              "options": {
+                "showHeader": true,
+                "cellHeight": "sm",
+                "footer": {
+                  "show": false
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "custom": {
+                    "align": "auto",
+                    "filterable": false
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Rank"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 60
+                      },
+                      {
+                        "id": "custom.cellOptions",
+                        "value": {
+                          "type": "color-background",
+                          "mode": "basic"
+                        }
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "type": "value",
+                            "options": {
+                              "1": {
+                                "text": "1",
+                                "color": "#b8860b",
+                                "index": 0
+                              },
+                              "2": {
+                                "text": "2",
+                                "color": "#808891",
+                                "index": 1
+                              },
+                              "3": {
+                                "text": "3",
+                                "color": "#a05a2c",
+                                "index": 2
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Per minute"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "short"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 2
+                      },
+                      {
+                        "id": "custom.cellOptions",
+                        "value": {
+                          "type": "color-text"
+                        }
+                      },
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "green"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Off-road"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "short"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 0
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Minutes driven"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "short"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 1
                       }
                     ]
                   }
@@ -703,118 +3415,13 @@
                         }
                       }
                     ]
-                  }
-                ]
-              }
-            }
-          }
-        }
-      },
-      "panel-306": {
-        "kind": "Panel",
-        "spec": {
-          "id": 306,
-          "title": "\ud83d\ude97 Top 5: most vehicles overtaken",
-          "description": "Traffic overtakes (game.vehicle_overtake) in a single game.",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "loki",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "grafanacloud-simonprickett-logs"
-                      },
-                      "spec": {
-                        "editorMode": "code",
-                        "queryType": "instant",
-                        "expr": "(sum by (session_label, player_initials) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.session.end\" [$__range]))) or label_replace(label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\"), \"player_initials\", \"~\", \"\", \".*\")"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": true
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "loki",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "grafanacloud-simonprickett-logs"
-                      },
-                      "spec": {
-                        "editorMode": "code",
-                        "queryType": "instant",
-                        "expr": "(sum by (session_label) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.vehicle_overtake\" [$__range]))) or label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\")"
-                      }
-                    },
-                    "refId": "B",
-                    "hidden": true
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "__expr__",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "__expr__"
-                      },
-                      "spec": {
-                        "type": "sql",
-                        "expression": "SELECT ROW_NUMBER() OVER (ORDER BY COALESCE(B.`__value__`, 0) DESC) AS `Rank`, A.player_initials AS Player, COALESCE(B.`__value__`, 0) AS `Overtakes` FROM A LEFT JOIN B ON A.session_label = B.session_label WHERE A.session_label <> '~' ORDER BY COALESCE(B.`__value__`, 0) DESC LIMIT 5"
-                      }
-                    },
-                    "refId": "C",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "table",
-            "version": "",
-            "spec": {
-              "options": {
-                "showHeader": true,
-                "cellHeight": "sm",
-                "footer": {
-                  "show": false
-                }
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "custom": {
-                    "align": "auto",
-                    "filterable": false
-                  }
-                },
-                "overrides": [
+                  },
                   {
                     "matcher": {
                       "id": "byName",
-                      "options": "Rank"
+                      "options": "Stage completed"
                     },
                     "properties": [
-                      {
-                        "id": "custom.width",
-                        "value": 60
-                      },
                       {
                         "id": "custom.cellOptions",
                         "value": {
@@ -828,627 +3435,34 @@
                           {
                             "type": "value",
                             "options": {
-                              "1": {
-                                "text": "1",
-                                "color": "#b8860b",
+                              "Stage 1": {
+                                "text": "Stage 1",
+                                "color": "#e53935",
                                 "index": 0
                               },
-                              "2": {
-                                "text": "2",
-                                "color": "#808891",
+                              "Stage 2": {
+                                "text": "Stage 2",
+                                "color": "#fb8c00",
                                 "index": 1
                               },
-                              "3": {
-                                "text": "3",
-                                "color": "#a05a2c",
+                              "Stage 3": {
+                                "text": "Stage 3",
+                                "color": "#fdd835",
                                 "index": 2
+                              },
+                              "Stage 4": {
+                                "text": "Stage 4",
+                                "color": "#7cb342",
+                                "index": 3
+                              },
+                              "Stage 5": {
+                                "text": "Stage 5",
+                                "color": "#1e88e5",
+                                "index": 4
                               }
                             }
                           }
                         ]
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "Overtakes"
-                    },
-                    "properties": [
-                      {
-                        "id": "unit",
-                        "value": "short"
-                      },
-                      {
-                        "id": "decimals",
-                        "value": 0
-                      },
-                      {
-                        "id": "custom.cellOptions",
-                        "value": {
-                          "type": "color-text"
-                        }
-                      },
-                      {
-                        "id": "color",
-                        "value": {
-                          "mode": "fixed",
-                          "fixedColor": "blue"
-                        }
-                      }
-                    ]
-                  }
-                ]
-              }
-            }
-          }
-        }
-      },
-      "panel-307": {
-        "kind": "Panel",
-        "spec": {
-          "id": 307,
-          "title": "\ud83d\udca5 Top 5: most crashes",
-          "description": "Crashes (game.crash: bump/spin/flip) in a single game.",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "loki",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "grafanacloud-simonprickett-logs"
-                      },
-                      "spec": {
-                        "editorMode": "code",
-                        "queryType": "instant",
-                        "expr": "(sum by (session_label, player_initials) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.session.end\" [$__range]))) or label_replace(label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\"), \"player_initials\", \"~\", \"\", \".*\")"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": true
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "loki",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "grafanacloud-simonprickett-logs"
-                      },
-                      "spec": {
-                        "editorMode": "code",
-                        "queryType": "instant",
-                        "expr": "(sum by (session_label) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.crash\" [$__range]))) or label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\")"
-                      }
-                    },
-                    "refId": "B",
-                    "hidden": true
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "__expr__",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "__expr__"
-                      },
-                      "spec": {
-                        "type": "sql",
-                        "expression": "SELECT ROW_NUMBER() OVER (ORDER BY COALESCE(B.`__value__`, 0) DESC) AS `Rank`, A.player_initials AS Player, COALESCE(B.`__value__`, 0) AS `Crashes` FROM A LEFT JOIN B ON A.session_label = B.session_label WHERE A.session_label <> '~' ORDER BY COALESCE(B.`__value__`, 0) DESC LIMIT 5"
-                      }
-                    },
-                    "refId": "C",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "table",
-            "version": "",
-            "spec": {
-              "options": {
-                "showHeader": true,
-                "cellHeight": "sm",
-                "footer": {
-                  "show": false
-                }
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "custom": {
-                    "align": "auto",
-                    "filterable": false
-                  }
-                },
-                "overrides": [
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "Rank"
-                    },
-                    "properties": [
-                      {
-                        "id": "custom.width",
-                        "value": 60
-                      },
-                      {
-                        "id": "custom.cellOptions",
-                        "value": {
-                          "type": "color-background",
-                          "mode": "basic"
-                        }
-                      },
-                      {
-                        "id": "mappings",
-                        "value": [
-                          {
-                            "type": "value",
-                            "options": {
-                              "1": {
-                                "text": "1",
-                                "color": "#b8860b",
-                                "index": 0
-                              },
-                              "2": {
-                                "text": "2",
-                                "color": "#808891",
-                                "index": 1
-                              },
-                              "3": {
-                                "text": "3",
-                                "color": "#a05a2c",
-                                "index": 2
-                              }
-                            }
-                          }
-                        ]
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "Crashes"
-                    },
-                    "properties": [
-                      {
-                        "id": "unit",
-                        "value": "short"
-                      },
-                      {
-                        "id": "decimals",
-                        "value": 0
-                      },
-                      {
-                        "id": "custom.cellOptions",
-                        "value": {
-                          "type": "color-text"
-                        }
-                      },
-                      {
-                        "id": "color",
-                        "value": {
-                          "mode": "fixed",
-                          "fixedColor": "red"
-                        }
-                      }
-                    ]
-                  }
-                ]
-              }
-            }
-          }
-        }
-      },
-      "panel-308": {
-        "kind": "Panel",
-        "spec": {
-          "id": 308,
-          "title": "\ud83d\udc22 Top 5: slowest crash",
-          "description": "Lowest speed (km/h) at which a game crashed \u2014 the gentlest crash per game, slowest first.",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "loki",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "grafanacloud-simonprickett-logs"
-                      },
-                      "spec": {
-                        "editorMode": "code",
-                        "queryType": "instant",
-                        "expr": "(sum by (session_label, player_initials) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.session.end\" [$__range]))) or label_replace(label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\"), \"player_initials\", \"~\", \"\", \".*\")"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": true
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "loki",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "grafanacloud-simonprickett-logs"
-                      },
-                      "spec": {
-                        "editorMode": "code",
-                        "queryType": "instant",
-                        "expr": "(min by (session_label) (min_over_time({service_name=\"cannonball-se\"} | event=\"game.crash\" | unwrap speed_kph [$__range]))) or label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\")"
-                      }
-                    },
-                    "refId": "B",
-                    "hidden": true
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "__expr__",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "__expr__"
-                      },
-                      "spec": {
-                        "type": "sql",
-                        "expression": "SELECT ROW_NUMBER() OVER (ORDER BY B.`__value__` ASC) AS `Rank`, A.player_initials AS Player, B.`__value__` AS `Speed` FROM A JOIN B ON A.session_label = B.session_label WHERE A.session_label <> '~' ORDER BY B.`__value__` ASC LIMIT 5"
-                      }
-                    },
-                    "refId": "C",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "table",
-            "version": "",
-            "spec": {
-              "options": {
-                "showHeader": true,
-                "cellHeight": "sm",
-                "footer": {
-                  "show": false
-                }
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "custom": {
-                    "align": "auto",
-                    "filterable": false
-                  }
-                },
-                "overrides": [
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "Rank"
-                    },
-                    "properties": [
-                      {
-                        "id": "custom.width",
-                        "value": 60
-                      },
-                      {
-                        "id": "custom.cellOptions",
-                        "value": {
-                          "type": "color-background",
-                          "mode": "basic"
-                        }
-                      },
-                      {
-                        "id": "mappings",
-                        "value": [
-                          {
-                            "type": "value",
-                            "options": {
-                              "1": {
-                                "text": "1",
-                                "color": "#b8860b",
-                                "index": 0
-                              },
-                              "2": {
-                                "text": "2",
-                                "color": "#808891",
-                                "index": 1
-                              },
-                              "3": {
-                                "text": "3",
-                                "color": "#a05a2c",
-                                "index": 2
-                              }
-                            }
-                          }
-                        ]
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "Speed"
-                    },
-                    "properties": [
-                      {
-                        "id": "unit",
-                        "value": "velocitykmh"
-                      },
-                      {
-                        "id": "decimals",
-                        "value": 0
-                      },
-                      {
-                        "id": "custom.cellOptions",
-                        "value": {
-                          "type": "color-text"
-                        }
-                      },
-                      {
-                        "id": "color",
-                        "value": {
-                          "mode": "fixed",
-                          "fixedColor": "orange"
-                        }
-                      }
-                    ]
-                  }
-                ]
-              }
-            }
-          }
-        }
-      },
-      "panel-309": {
-        "kind": "Panel",
-        "spec": {
-          "id": 309,
-          "title": "\ud83c\udf3f Top 5: fewest off-road incidents",
-          "description": "Off-road incidents PER MINUTE DRIVEN (game.off_road count / summed stage durations), lowest first, so a long clean run beats a short one. Games driven for under 60s are excluded, as are games that scored under 10000 (the car never moved); ties go to the longer game. Zero-incident games are included.",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "loki",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "grafanacloud-simonprickett-logs"
-                      },
-                      "spec": {
-                        "editorMode": "code",
-                        "queryType": "instant",
-                        "expr": "(max by (session_label, player_initials) (max_over_time({service_name=\"cannonball-se\"} | event=\"game.session.end\" | unwrap final_score [$__range]))) or label_replace(label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\"), \"player_initials\", \"~\", \"\", \".*\")"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": true
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "loki",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "grafanacloud-simonprickett-logs"
-                      },
-                      "spec": {
-                        "editorMode": "code",
-                        "queryType": "instant",
-                        "expr": "(sum by (session_label) (count_over_time({service_name=\"cannonball-se\"} | event=\"game.off_road\" [$__range]))) or label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\")"
-                      }
-                    },
-                    "refId": "B",
-                    "hidden": true
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "loki",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "grafanacloud-simonprickett-logs"
-                      },
-                      "spec": {
-                        "editorMode": "code",
-                        "queryType": "instant",
-                        "expr": "(sum by (session_label) (sum_over_time({service_name=\"cannonball-se\"} | event=\"game.stage.end\" | unwrap stage_duration_seconds [$__range]))) or label_replace(vector(0), \"session_label\", \"~\", \"\", \".*\")"
-                      }
-                    },
-                    "refId": "C",
-                    "hidden": true
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "__expr__",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "__expr__"
-                      },
-                      "spec": {
-                        "type": "sql",
-                        "expression": "SELECT ROW_NUMBER() OVER (ORDER BY COALESCE(B.`__value__`, 0) / (C.`__value__` / 60.0) ASC, C.`__value__` DESC) AS `Rank`, A.player_initials AS Player, COALESCE(B.`__value__`, 0) / (C.`__value__` / 60.0) AS `Per minute`, COALESCE(B.`__value__`, 0) AS `Off-road`, C.`__value__` / 60.0 AS `Minutes driven` FROM A LEFT JOIN B ON A.session_label = B.session_label JOIN C ON A.session_label = C.session_label WHERE A.session_label <> '~' AND A.`__value__` >= 10000 AND C.`__value__` >= 60 ORDER BY COALESCE(B.`__value__`, 0) / (C.`__value__` / 60.0) ASC, C.`__value__` DESC LIMIT 5"
-                      }
-                    },
-                    "refId": "D",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "table",
-            "version": "",
-            "spec": {
-              "options": {
-                "showHeader": true,
-                "cellHeight": "sm",
-                "footer": {
-                  "show": false
-                }
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "custom": {
-                    "align": "auto",
-                    "filterable": false
-                  }
-                },
-                "overrides": [
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "Rank"
-                    },
-                    "properties": [
-                      {
-                        "id": "custom.width",
-                        "value": 60
-                      },
-                      {
-                        "id": "custom.cellOptions",
-                        "value": {
-                          "type": "color-background",
-                          "mode": "basic"
-                        }
-                      },
-                      {
-                        "id": "mappings",
-                        "value": [
-                          {
-                            "type": "value",
-                            "options": {
-                              "1": {
-                                "text": "1",
-                                "color": "#b8860b",
-                                "index": 0
-                              },
-                              "2": {
-                                "text": "2",
-                                "color": "#808891",
-                                "index": 1
-                              },
-                              "3": {
-                                "text": "3",
-                                "color": "#a05a2c",
-                                "index": 2
-                              }
-                            }
-                          }
-                        ]
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "Per minute"
-                    },
-                    "properties": [
-                      {
-                        "id": "unit",
-                        "value": "short"
-                      },
-                      {
-                        "id": "decimals",
-                        "value": 2
-                      },
-                      {
-                        "id": "custom.cellOptions",
-                        "value": {
-                          "type": "color-text"
-                        }
-                      },
-                      {
-                        "id": "color",
-                        "value": {
-                          "mode": "fixed",
-                          "fixedColor": "green"
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "Off-road"
-                    },
-                    "properties": [
-                      {
-                        "id": "unit",
-                        "value": "short"
-                      },
-                      {
-                        "id": "decimals",
-                        "value": 0
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "Minutes driven"
-                    },
-                    "properties": [
-                      {
-                        "id": "unit",
-                        "value": "short"
-                      },
-                      {
-                        "id": "decimals",
-                        "value": 1
                       }
                     ]
                   }
@@ -1815,7 +3829,59 @@
                         "x": 0,
                         "y": 0,
                         "width": 12,
-                        "height": 8,
+                        "height": 2,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-315"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 0,
+                        "y": 2,
+                        "width": 3,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-312"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 3,
+                        "y": 2,
+                        "width": 4,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-313"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 7,
+                        "y": 2,
+                        "width": 5,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-314"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 0,
+                        "y": 6,
+                        "width": 12,
+                        "height": 12,
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-301"
@@ -1828,7 +3894,59 @@
                         "x": 12,
                         "y": 0,
                         "width": 12,
-                        "height": 8,
+                        "height": 2,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-325"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 12,
+                        "y": 2,
+                        "width": 3,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-322"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 15,
+                        "y": 2,
+                        "width": 4,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-323"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 19,
+                        "y": 2,
+                        "width": 5,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-324"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 12,
+                        "y": 6,
+                        "width": 12,
+                        "height": 12,
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-302"
@@ -1839,7 +3957,7 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 0,
-                        "y": 8,
+                        "y": 18,
                         "width": 12,
                         "height": 8,
                         "element": {
@@ -1852,7 +3970,7 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 12,
-                        "y": 8,
+                        "y": 18,
                         "width": 12,
                         "height": 8,
                         "element": {
@@ -1880,7 +3998,59 @@
                         "x": 0,
                         "y": 0,
                         "width": 12,
-                        "height": 8,
+                        "height": 2,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-334"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 0,
+                        "y": 2,
+                        "width": 3,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-331"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 3,
+                        "y": 2,
+                        "width": 4,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-332"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 7,
+                        "y": 2,
+                        "width": 5,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-333"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 0,
+                        "y": 6,
+                        "width": 12,
+                        "height": 12,
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-306"
@@ -1893,7 +4063,59 @@
                         "x": 12,
                         "y": 0,
                         "width": 12,
-                        "height": 8,
+                        "height": 2,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-344"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 12,
+                        "y": 2,
+                        "width": 3,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-341"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 15,
+                        "y": 2,
+                        "width": 4,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-342"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 19,
+                        "y": 2,
+                        "width": 5,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-343"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 12,
+                        "y": 6,
+                        "width": 12,
+                        "height": 12,
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-307"
@@ -1904,9 +4126,61 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 0,
-                        "y": 8,
+                        "y": 18,
                         "width": 12,
-                        "height": 8,
+                        "height": 2,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-354"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 0,
+                        "y": 20,
+                        "width": 3,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-351"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 3,
+                        "y": 20,
+                        "width": 4,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-352"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 7,
+                        "y": 20,
+                        "width": 5,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-353"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 0,
+                        "y": 24,
+                        "width": 12,
+                        "height": 12,
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-308"
@@ -1917,9 +4191,61 @@
                       "kind": "GridLayoutItem",
                       "spec": {
                         "x": 12,
-                        "y": 8,
+                        "y": 18,
                         "width": 12,
-                        "height": 8,
+                        "height": 2,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-364"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 12,
+                        "y": 20,
+                        "width": 3,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-361"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 15,
+                        "y": 20,
+                        "width": 4,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-362"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 19,
+                        "y": 20,
+                        "width": 5,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-363"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 12,
+                        "y": 24,
+                        "width": 12,
+                        "height": 12,
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-309"
