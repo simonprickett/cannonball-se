@@ -571,7 +571,11 @@ void Outrun::main_switch()
                 {},
                 {
                     {"completed", (int64_t)1},
-                    {"gameover_epoch_ms", TelemetryManager::now_epoch_ms()}
+                    {"gameover_epoch_ms", TelemetryManager::now_epoch_ms()},
+                    // Clock left at the goal line (BCD counter -> seconds). Only on the
+                    // completed case; a clock-out is 0 by definition. Drives the
+                    // Leaderboard's "most time remaining at the finish" board.
+                    {"time_remaining_seconds", (int64_t)TelemetryManager::bcd_to_seconds(ostats.time_counter)}
                 }
             );
             // Arm the "reached the goal" screenshot. The car drives the whole bonus

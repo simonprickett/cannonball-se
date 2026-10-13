@@ -7,8 +7,9 @@ game picker (Loki only, no Tempo). On import you're prompted for the Loki data s
 | File | UID | Purpose |
 |------|-----|---------|
 | `live_game_dashboard.json` | `cannonball-now-playing` | **Now Playing** — hands-off, auto-follows the current/most-recent game (no picker; 10s auto-refresh). Identity/state/stage/screenshots are exact at any range; aggregations are a rolling time-window (keep the range short). |
-| `recent_games_dashboard.json` | `cannonball-recent-games` | **Recent Games** — pick any recent game by clicking a row in the Loki "Recent games" table (newest first). Every panel is session-scoped, so exact at any range. Does NOT auto-follow; no auto-refresh. |
+| `recent_games_dashboard.json` | `cannonball-recent-games` | **Recent Games** — pick any recent game by clicking a row in the Loki "Recent games" table (newest first). Every panel is session-scoped, so exact at any range. Does NOT auto-follow; no auto-refresh. Defaults to **today** (like Operator Insights and the Leaderboard) so its Rank tiles compare against the same set of games the Leaderboard ranks; widen the time picker to browse older games. |
 | `operator_dashboard.json` | `cannonball-live-engine` | **Operator Insights** — cabinet/engine state for the operator: attract/playing/post-game lifecycle, coin economics, aliveness, usage patterns, and the latest screenshot. Host-scoped (pick a cabinet via the Host Selector); defaults to "today." Generated straight from Python, no hand-authored v1 source. |
+| `leaderboard_dashboard.json` | `cannonball-leaderboard` | **Leaderboard** — rankings/aggregations over ALL games in the range (default today) on ANY host: top-`TOP_N` boards (score, clean streak, finish-line time left, overtakes, crashes, slowest crash, fewest off-road per minute driven, best score per stage reached) + a route heat map. `TOP_N` / `MIN_DRIVEN_SECONDS` / `HEAT_STEPS` are constants in `generate.py`. Tabs: Scores / Driving / Route map. |
 
 **`recent_games_dashboard.json` is generated, not hand-edited.** `live_game_dashboard.json` is the
 source of truth; `python3 generate.py` derives the Recent Games board from it (same layout/panels/viz,
@@ -42,7 +43,7 @@ pinning the variable's `current`, do **not** work. Override the display names fo
 
 Both must be installed (declared in each dashboard's `__requires`):
 
-- **`grafana-graphviz-panel`** — renders the OutRun route map (Now Playing, Recent Games, aggregate).
+- **`grafana-graphviz-panel`** — renders the OutRun route map (Now Playing, Recent Games), the Operator Insights lifecycle, and the Leaderboard route heat map.
 - **`marcusolsson-dynamictext-panel`** (Business/Dynamic Text) — renders the base64 screenshots (Now Playing, Recent Games).
 
 ## Core conventions
@@ -78,6 +79,7 @@ Both must be installed (declared in each dashboard's `__requires`):
 | `game.stage.start` | `stage_number`, `stage_id`, `score_start`, `speed_kph` | Route map (`stage_id`), stage reached |
 | `game.stage.end` | `stage_number`, `score_end`, `time_remaining_seconds`, `screenshot_jpg` | Score progression, checkpoint screenshots |
 | `game.map_screen` | `screenshot_jpg` | Course-map screenshot |
+| `game.gear_shift` | `direction`, `speed_kph`, `stage_number` | Gear shifts per stage / shift-speed histograms (Recent Games, manual gearbox) |
 | `game.crash` | `crash_type`, `speed_kph`, `stage_number` | Crashes by type, fastest crash, clean-streak reset |
 | `game.off_road` | `speed_kph`, `stage_number` | Off-road counts, clean-streak reset |
 | `game.vehicle_overtake` | `vehicle_type`, `speed_kph` | Overtakes by type / leaderboard |
@@ -86,7 +88,7 @@ Both must be installed (declared in each dashboard's `__requires`):
 | `game.coin_inserted` | `credits` | Coin economics (count, revenue, credits available) |
 | `game.startup` | `car_pal`, `gearbox_mode`, `difficulty`, `traffic_difficulty` | Config snapshot panels (Operator Insights) |
 | `game.heartbeat` | `heartbeat_epoch_ms` | Aliveness check (Operator Insights), alongside any other event |
-| `game.gameover` | `completed`, `gameover_epoch_ms` | PLAYING→POST GAME boundary (Engine state, Live Engine) — fires well before `game.session.end` |
+| `game.gameover` | `completed`, `gameover_epoch_ms`, `time_remaining_seconds` (completed=1) | PLAYING→POST GAME boundary (Engine state, Live Engine) — fires well before `game.session.end` |
 
 ## The route map (`stage_id`)
 
@@ -136,10 +138,44 @@ full-resolution frames.
   honours the full time range and has no such cap, so Tempo was dropped entirely.)
 - **Average speed is sampled**, not a true whole-lap mean — `speed_kph` is only logged on
   crash / off-road / stage-start / route / overtake events.
-- **"Fewest X" leaderboards are intentionally absent.** A run with zero crashes/off-road
-  produces no series in LogQL (absent ≠ zero), so `bottomk` would silently skip the perfect
-  runs. Only "most/worst" boards are included.
+- **Absent ≠ zero.** A run with zero crashes/off-road produces no series in LogQL, so a plain
+  `bottomk` would silently skip the perfect runs. The Leaderboard's "fewest off-road" board avoids
+  this by starting from every finished game (`game.session.end`) and `LEFT JOIN`ing the counts in a
+  SQL expression with `COALESCE(…, 0)` (see the Leaderboard section below).
 - **`longest_clean_seconds` is wall-clock.** The game does not allow pausing, so this equals
   in-game driving time between incidents.
 - **Leaderboards are per-run** (`trace_id` + `player_initials`). `player_initials` is not a
   unique identity — the same initials from different people are distinct runs, not merged.
+
+## The Leaderboard board
+
+`leaderboard_dashboard.json` (uid `cannonball-leaderboard`) ranks **all finished games on any host**
+in the time range (default today); there are no variables. Built straight from Python
+(`build_leaderboard_dashboard()` in `generate.py`) as a tabbed v2 dashboard: **Scores**, **Driving**,
+**Route map**.
+
+- **Tuning constants** (top of the Leaderboard section in `generate.py`): `TOP_N` (rows on plain top-n
+  tables), `HERO_TOP_N` (total rows on the gold-tile boards, rank 1 in the tiles + ranks 2..n in the
+  table), `MIN_DRIVEN_SECONDS` / `MIN_SCORE` (a game must have driven this long / scored this much to
+  rank for fewest off-road — keeps a car left sitting at the start line from "winning"), `HEAT_STEPS`
+  (route heat colour ramp).
+- **Finished games only.** Every board starts from games that have a `game.session.end`, so a game in
+  progress never ranks. **Fewest off-road** ranks incidents per minute driven (summed
+  `stage_duration_seconds`). **Time left at the finish** uses `time_remaining_seconds` on
+  `game.gameover` with `completed=1`. **Best score at the end of each stage** takes `score_end` from the
+  mid-game stage transitions (stages 1-4; only those `game.stage.end` events carry
+  `time_remaining_seconds`) plus the final score of completed games for stage 5.
+- **Route heat map.** Games per stage and per leg, from one `(session_label, stage_id)` instant query:
+  a leg A→B counts every game that visited both A and B (a game visits exactly one stage per course
+  column). Colour = % of the busiest stage/leg via `HEAT_STEPS`; counts are shown as graphviz `label`
+  rules (`${games}`), with the numbers also in the "Route usage" table.
+- **Links.** Each table's Player cell and each gold Player tile link to that game on Recent Games
+  (`var-session=<session_label>` from a hidden column, new tab). `var-gearbox` isn't set, so a manual
+  game's Gearbox row may not show after clicking through.
+- **SQL-expression gotchas** (Grafana SQL expressions over Loki): `Rank` is a reserved word (backtick
+  it); `SUBSTR` is not allowed (use `SUBSTRING`); a query that returns no rows makes the expression
+  error, so optional/joined queries are padded with an inert row (`_pad()`, label value `~`) that the
+  SQL filters out.
+- **First deploy.** `push.sh` *updates* an existing dashboard (it needs the server's `resourceVersion`).
+  The first time, create it: `gcx dashboards create -f dashboards/leaderboard_dashboard.json`, then use
+  `push.sh` from then on.
