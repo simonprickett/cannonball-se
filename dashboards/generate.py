@@ -2887,9 +2887,14 @@ TOP_N = 5
 # "Fewest off-road incidents" ranks incidents PER MINUTE DRIVEN; games driven for
 # less than this many seconds are excluded so a game that dies instantly can't win.
 MIN_DRIVEN_SECONDS = 60
+# ...and must have actually driven: final score at least this. A car left sitting at the
+# start line scores 0 yet logs no off-road incidents, so it would otherwise "win". The
+# lowest genuine score seen so far is ~9,000 — raise this to be stricter.
+MIN_SCORE = 1
 # Route heat map colour ramp, cold -> hot. Each step starts at that % of the busiest
 # stage/leg (so the ramp self-scales with traffic); anything never used stays grey.
-HEAT_STEPS = [(1, "#4fc3f7"), (21, "#66bb6a"), (41, "#fdd835"), (61, "#fb8c00"), (81, "#e53935")]
+HEAT_STEPS = [(1, "#1e88e5"), (11, "#29b6f6"), (21, "#26c6da"), (31, "#26a69a"), (41, "#66bb6a"),
+              (51, "#c0ca33"), (61, "#fdd835"), (71, "#ffb300"), (81, "#fb8c00"), (91, "#e53935")]
 
 # Per-game identity labels carried by every in-game log (structured metadata).
 _GAME_LBL = "session_label, player_initials"
@@ -2930,12 +2935,12 @@ def leaderboard_panel(pid, x, y, w, h, title, description, targets, value_col, u
                       color="blue", extra_cols=None):
     # A top-<n> table. `targets` = hidden Loki queries + a final SQL expr that outputs
     # Rank, Player, <value_col> (+ extra_cols); only the last is visible.
-    # Rank 1-3 get gold/silver/bronze text, like the Recent Games rank tiles.
+    # Rank 1-3 get the gold/silver/bronze BACKGROUND (same _MEDAL colours as the Recent Games rank tiles); lower ranks get none.
     medal = {str(n): {"text": str(n), "color": c, "index": n - 1} for n, c in _MEDAL.items()}
     overrides = [
         {"matcher": {"id": "byName", "options": "Rank"},
          "properties": [{"id": "custom.width", "value": 60},
-                        {"id": "custom.cellOptions", "value": {"type": "color-text"}},
+                        {"id": "custom.cellOptions", "value": {"type": "color-background", "mode": "basic"}},
                         {"id": "mappings", "value": [{"type": "value", "options": medal}]}]},
         {"matcher": {"id": "byName", "options": value_col},
          "properties": [{"id": "unit", "value": unit}, {"id": "decimals", "value": decimals},
@@ -2970,6 +2975,18 @@ def _simple_board(pid, x, y, w, h, title, desc, expr, value_col, unit, order="DE
                              [_lb_loki("A", _pad(expr, _GAME_LBLS)), _lb_sql("B", sql)], value_col, unit, 0, color)
 
 
+def _joined_board(pid, x, y, w, h, title, desc, metric_expr, value_col, unit, order, color):
+    # Per-game metric off an event stream (crashes, gameover...) restricted to FINISHED games:
+    # A = finished games (session.end), B = the metric by session_label, inner-joined so an
+    # in-progress game (no session.end yet) never ranks.
+    sql = (f"SELECT ROW_NUMBER() OVER (ORDER BY B.`__value__` {order}) AS `Rank`, {_game_cols()}, "
+           f"B.`__value__` AS `{value_col}` FROM A JOIN B ON A.session_label = B.session_label "
+           f"WHERE A.session_label <> '{NO_ROW}' ORDER BY B.`__value__` {order} LIMIT {TOP_N}")
+    return leaderboard_panel(pid, x, y, w, h, title, desc,
+                             [_lb_loki("A", _GAMES_EXPR), _lb_loki("B", _pad(metric_expr)), _lb_sql("C", sql)],
+                             value_col, unit, 0, color)
+
+
 def _count_board(pid, x, y, w, h, title, desc, event, value_col, color):
     # Most-of-X per game: start from every finished game and LEFT JOIN the count, so the
     # ranking covers ALL games (absent != zero).
@@ -2983,6 +3000,7 @@ def _count_board(pid, x, y, w, h, title, desc, event, value_col, color):
 
 
 def _offroad_board(pid, x, y, w, h):
+    # A's value = the game's final score (also the "did it actually drive" gate).
     offroad = _pad(f'sum by (session_label) (count_over_time({SEL} | event="game.off_road" [$__range]))')
     driven = _pad(f'sum by (session_label) (sum_over_time({SEL} | event="game.stage.end" '
                   f'| unwrap stage_duration_seconds [$__range]))')
@@ -2991,30 +3009,50 @@ def _offroad_board(pid, x, y, w, h):
            f"{rate} AS `Per minute`, COALESCE(B.`__value__`, 0) AS `Off-road`, C.`__value__` / 60.0 AS `Minutes driven` "
            f"FROM A LEFT JOIN B ON A.session_label = B.session_label "
            f"JOIN C ON A.session_label = C.session_label "
-           f"WHERE A.session_label <> '{NO_ROW}' AND C.`__value__` >= {MIN_DRIVEN_SECONDS} "
+           f"WHERE A.session_label <> '{NO_ROW}' AND A.`__value__` >= {MIN_SCORE} "
+           f"AND C.`__value__` >= {MIN_DRIVEN_SECONDS} "
            f"ORDER BY {rate} ASC, C.`__value__` DESC LIMIT {TOP_N}")
     return leaderboard_panel(
         pid, x, y, w, h, f"🌿 Top {TOP_N}: fewest off-road incidents",
         (f"Off-road incidents PER MINUTE DRIVEN (game.off_road count / summed stage durations), lowest "
          f"first, so a long clean run beats a short one. Games driven for under {MIN_DRIVEN_SECONDS}s are "
-         f"excluded; ties go to the longer game. Zero-incident games are included."),
-        [_lb_loki("A", _GAMES_EXPR), _lb_loki("B", offroad), _lb_loki("C", driven), _lb_sql("D", sql)],
+         f"excluded, as are games that scored under {MIN_SCORE} (the car never moved); ties go to the longer game. "
+         f"Zero-incident games are included."),
+        [_lb_loki("A", _pad(_end_expr("final_score"), _GAME_LBLS)), _lb_loki("B", offroad),
+         _lb_loki("C", driven), _lb_sql("D", sql)],
         "Per minute", "short", 2, "green",
         extra_cols=[{"name": "Off-road"}, {"name": "Minutes driven", "decimals": 1}])
 
 
 def _stage_best_board(pid, x, y, w, h):
-    by_stage = _pad(f'max by ({_GAME_LBL}, final_stage) (max_over_time({SEL} | event="game.session.end" '
-                    f'| unwrap final_score [$__range]))', _GAME_LBLS + ("final_stage",))
-    sql = (f"SELECT s.rn AS `Rank`, CONCAT('Stage ', s.final_stage) AS `Stage reached`, "
-           f"s.player_initials AS Player, "
-           f"s.`__value__` AS Score FROM (SELECT final_stage, player_initials, session_label, "
-           f"`__value__`, ROW_NUMBER() OVER (PARTITION BY final_stage ORDER BY `__value__` DESC) AS rn FROM A "
-           f"WHERE session_label <> '{NO_ROW}') s WHERE s.rn <= {TOP_N} ORDER BY s.final_stage ASC, s.rn ASC")
+    # One row per stage: the game with the highest cumulative score on COMPLETING that stage.
+    #   A = score_end at each mid-game stage transition (stages 1-4; only those stage.end events
+    #       carry time_remaining_seconds — the one logged at game end for the final/failed stage
+    #       doesn't, so a game that timed out on stage 3 does NOT count as completing stage 3).
+    #   B = finished games (so games still in progress don't rank).
+    #   C = final score of games that completed the course (stage 5 has no mid-game transition).
+    # No Rank column (it would always be 1), so this is not a top-<n> board.
+    at_end = _pad(f'max by (session_label, player_initials, stage_number) (max_over_time({SEL} '
+                  f'| event="game.stage.end" | time_remaining_seconds!="" | unwrap score_end [$__range]))',
+                  ("session_label", "player_initials", "stage_number"))
+    ended = _pad(f'sum by (session_label) (count_over_time({SEL} | event="game.session.end" [$__range]))')
+    finished = _pad(f'max by (session_label, player_initials) (max_over_time({SEL} | event="game.session.end" '
+                    f'| completion_status="completed" | unwrap final_score [$__range]))',
+                    ("session_label", "player_initials"))
+    sql = (f"SELECT CONCAT('Stage ', t.stage) AS `Stage completed`, t.player_initials AS Player, "
+           f"t.score AS Score FROM (SELECT u.stage, u.player_initials, u.score, "
+           f"ROW_NUMBER() OVER (PARTITION BY u.stage ORDER BY u.score DESC) AS rn FROM ("
+           f"SELECT A.stage_number AS stage, A.player_initials, A.`__value__` AS score FROM A "
+           f"JOIN B ON B.session_label = A.session_label WHERE A.session_label <> '{NO_ROW}' "
+           f"UNION ALL SELECT '5', C.player_initials, C.`__value__` FROM C WHERE C.session_label <> '{NO_ROW}'"
+           f") u) t WHERE t.rn = 1 ORDER BY t.stage ASC")
     return leaderboard_panel(
-        pid, x, y, w, h, f"🏁 Top {TOP_N} per stage reached: best score",
-        (f"For each stage a game ENDED on (1-5; 5 = completed the course), the {TOP_N} best final scores."),
-        [_lb_loki("A", by_stage), _lb_sql("B", sql)], "Score", "none", 0, "purple")
+        pid, x, y, w, h, "🏁 Best score at the end of each stage",
+        ("For each stage (1-5), the highest cumulative score on COMPLETING it, and who set it — a pace "
+         "board: who was scoring best at each checkpoint. Stage 5 = finished the course. Only games that "
+         "completed the stage count (not one that timed out on it), and only finished games."),
+        [_lb_loki("A", at_end), _lb_loki("B", ended), _lb_loki("C", finished), _lb_sql("D", sql)],
+        "Score", "none", 0, "purple")
 
 
 def _route_heat_panels(pid_map, pid_tbl, x, y, w, h):
@@ -3032,20 +3070,23 @@ def _route_heat_panels(pid_map, pid_tbl, x, y, w, h):
         (f"SELECT '{nid}' AS id, '{name}' AS name" if i == 0 else f"SELECT '{nid}', '{name}'")
         .replace("Devil's", "Devil''s")
         for i, (nid, name) in enumerate(n for col in STAGES for n in col))
-    node_cnt = (f"SELECT stage_id, COUNT(DISTINCT session_label) AS games FROM A "
-                f"WHERE session_label <> '{NO_ROW}' GROUP BY stage_id")
+    # V = (game, stage) rows for FINISHED games only (B = games with a session.end).
+    ended = _pad(f'sum by (session_label) (count_over_time({SEL} | event="game.session.end" [$__range]))')
+    V = (f"(SELECT A.session_label, A.stage_id FROM A JOIN B ON B.session_label = A.session_label "
+         f"WHERE A.session_label <> '{NO_ROW}')")
+    node_cnt = f"SELECT v.stage_id, COUNT(DISTINCT v.session_label) AS games FROM {V} v GROUP BY v.stage_id"
     edge_cnt = (f"SELECT e.a, e.b, COUNT(*) AS games FROM ({edge_rows}) e "
-                f"JOIN A x ON x.stage_id = e.a JOIN A y ON y.stage_id = e.b AND y.session_label = x.session_label "
+                f"JOIN {V} x ON x.stage_id = e.a JOIN {V} y ON y.stage_id = e.b AND y.session_label = x.session_label "
                 f"GROUP BY e.a, e.b")
-    node_sql = (f"SELECT stage_id, ROUND(100.0 * games / (SELECT MAX(games) FROM ({node_cnt}) m)) AS heat, games "
-                f"FROM ({node_cnt}) n")
+    node_sql = (f"SELECT n.stage_id, ROUND(100.0 * n.games / (SELECT MAX(games) FROM ({node_cnt}) m)) AS heat, "
+                f"n.games, nm.name FROM ({node_cnt}) n JOIN ({names}) nm ON nm.id = n.stage_id")
     edge_sql = (f"SELECT CONCAT(a, '__to__', b) AS edge_id, ROUND(100.0 * games / (SELECT MAX(games) FROM ({edge_cnt}) m)) AS heat, "
                 f"games FROM ({edge_cnt}) c")
     heat_steps = [{"color": "transparent", "value": 0}] + [{"color": c, "value": v} for v, c in HEAT_STEPS]
     heat_map = {
         "id": pid_map, "type": "grafana-graphviz-panel", "title": "🔥 Route heat map",
         "description": ("How many games used each stage and each leg of the course, across all hosts in "
-                        "the time range. Colour is relative to the busiest stage/leg: cool blue = rarely "
+                        "the time range (counts shown on the stages and on the legs). Colour is relative to the busiest stage/leg: cool blue = rarely "
                         "used -> red = most used. Grey = never used."),
         "datasource": _LOKI, "gridPos": {"x": x, "y": y, "w": w, "h": h},
         "options": {
@@ -3054,13 +3095,17 @@ def _route_heat_panels(pid_map, pid_tbl, x, y, w, h):
             "nodeOverrides": [{
                 "id": "heat-nodes", "targetNodeIds": ROUTE_NODE_IDS,
                 "matchFieldName": "stage_id", "matchPattern": "${id}",
-                "rules": [{"kind": "fillColor", "colorFieldName": "heat", "thresholdId": "heat"}]}],
+                "rules": [{"kind": "fillColor", "colorFieldName": "heat", "thresholdId": "heat"},
+                          # Stage name + how many games entered it (unmatched = never used
+                          # -> keeps the plain DOT name).
+                          {"kind": "label", "labelTemplate": "${name}: ${games}"}]}],
             "edgeOverrides": [{
                 "id": "heat-edges", "targetEdgeIds": [f"{a}__to__{b}" for a, b in ROUTE_EDGES],
                 "matchFieldName": "edge_id", "matchPattern": "${id}",
-                "rules": [{"kind": "strokeColor", "colorFieldName": "heat", "thresholdId": "heat"}]}],
+                "rules": [{"kind": "strokeColor", "colorFieldName": "heat", "thresholdId": "heat"},
+                          {"kind": "label", "labelTemplate": "${games}"}]}],
         },
-        "targets": [_lb_loki("A", visits), _lb_sql("B", node_sql), _lb_sql("C", edge_sql)],
+        "targets": [_lb_loki("A", visits), _lb_loki("B", ended), _lb_sql("C", node_sql), _lb_sql("D", edge_sql)],
     }
     # Companion table with the real counts (colour alone doesn't say how many).
     tbl_sql = (f"SELECT 'Stage' AS Kind, nm.name AS Segment, n.games AS Games FROM ({node_cnt}) n "
@@ -3071,8 +3116,8 @@ def _route_heat_panels(pid_map, pid_tbl, x, y, w, h):
     counts = {
         "id": pid_tbl, "type": "table", "title": "🔢 Route usage (games)",
         "description": "Games per stage and per leg — the numbers behind the heat map colours, busiest first.",
-        "datasource": _LOKI, "gridPos": {"x": x + w, "y": y, "w": 24 - (x + w), "h": h},
-        "targets": [_lb_loki("A", visits), _lb_sql("B", tbl_sql)],
+        "datasource": _LOKI, "gridPos": {"x": x, "y": y + h, "w": w, "h": h},
+        "targets": [_lb_loki("A", visits), _lb_loki("B", ended), _lb_sql("C", tbl_sql)],
         "options": {"showHeader": True, "cellHeight": "sm", "footer": {"show": False}},
         "fieldConfig": {"defaults": {"custom": {"align": "auto", "filterable": True}}, "overrides": []},
     }
@@ -3081,36 +3126,36 @@ def _route_heat_panels(pid_map, pid_tbl, x, y, w, h):
 
 LEADERBOARD_TABS = [
     # 303 (finish-line time) only applies to completed games, so it sits last.
-    ("Scores", [(301, 0, 0, 12, 8), (302, 12, 0, 12, 8), (305, 0, 8, 24, 17), (303, 0, 25, 12, 8)]),
+    ("Scores", [(301, 0, 0, 12, 8), (302, 12, 0, 12, 8), (305, 0, 8, 12, 8), (303, 12, 8, 12, 8)]),
     ("Driving", [(306, 0, 0, 12, 8), (307, 12, 0, 12, 8), (308, 0, 8, 12, 8), (309, 12, 8, 12, 8)]),
-    ("Route map", [(310, 0, 0, 16, 14), (311, 16, 0, 8, 14)]),
+    ("Route map", [(310, 0, 0, 24, 14), (311, 0, 14, 24, 14)]),
 ]
 
 
 def build_leaderboard_dashboard():
-    heat_map, route_counts = _route_heat_panels(310, 311, 0, 0, 16, 14)
+    heat_map, route_counts = _route_heat_panels(310, 311, 0, 0, 24, 14)
     panels = [
         _simple_board(301, 0, 0, 12, 8, f"🏆 Top {TOP_N}: highest scores",
                       "Highest final score per finished game, across all hosts in the time range.",
                       _end_expr("final_score"), "Score", "none", "DESC", "yellow"),
         _simple_board(302, 12, 0, 12, 8, f"🧼 Top {TOP_N}: longest clean driving streak",
                       "Longest stretch without a crash or off-road incident in a single game (wall-clock seconds).",
-                      _end_expr("longest_clean_seconds"), "Streak", "s", "DESC", "green"),
-        _simple_board(303, 0, 8, 12, 8, f"⏱️ Top {TOP_N}: most time left at the finish",
-                      "Seconds left on the clock when the goal line was crossed (completed games only).",
-                      f'max by ({_GAME_LBL}) (max_over_time({SEL} | event="game.gameover" | completed="1" '
+                      _end_expr("longest_clean_seconds"), "Streak", "suffix: s", "DESC", "green"),
+        _joined_board(303, 12, 8, 12, 8, f"⏱️ Top {TOP_N}: most time left at the finish",
+                      "Seconds left on the clock when the goal line was crossed (games that reached the goal only).",
+                      f'max by (session_label) (max_over_time({SEL} | event="game.gameover" | completed="1" '
                       f'| unwrap time_remaining_seconds [$__range]))',
-                      "Time left", "s", "DESC", "blue"),
-        _stage_best_board(305, 0, 16, 24, 17),
+                      "Time left", "suffix: s", "DESC", "blue"),
+        _stage_best_board(305, 0, 8, 12, 8),
         _count_board(306, 0, 0, 12, 8, f"🚗 Top {TOP_N}: most vehicles overtaken",
                      "Traffic overtakes (game.vehicle_overtake) in a single game.",
                      "game.vehicle_overtake", "Overtakes", "blue"),
         _count_board(307, 12, 0, 12, 8, f"💥 Top {TOP_N}: most crashes",
                      "Crashes (game.crash: bump/spin/flip) in a single game.",
                      "game.crash", "Crashes", "red"),
-        _simple_board(308, 0, 8, 12, 8, f"🐢 Top {TOP_N}: slowest crash",
+        _joined_board(308, 0, 8, 12, 8, f"🐢 Top {TOP_N}: slowest crash",
                       "Lowest speed (km/h) at which a game crashed — the gentlest crash per game, slowest first.",
-                      f'min by ({_GAME_LBL}) (min_over_time({SEL} | event="game.crash" '
+                      f'min by (session_label) (min_over_time({SEL} | event="game.crash" '
                       f'| unwrap speed_kph [$__range]))',
                       "Speed", "velocitykmh", "ASC", "orange"),
         _offroad_board(309, 12, 8, 12, 8),
