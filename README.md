@@ -268,7 +268,7 @@ The [`dashboards/`](dashboards) folder holds four Grafana dashboards built on th
 |-----------|---------------|
 | **Now Playing** | Hands-off view that follows the current or most recent game. |
 | **Recent Games** | Pick any game from today (or a wider range) and see its route, stage-by-stage score and time, crashes, overtakes and ranking against the other games in the range. |
-| **Operator Insights** | Cabinet health for one host: attract/playing state, coins and revenue, utilisation, usage by hour, latest screenshot. |
+| **Operator Insights** | Cabinet health for one host: attract/playing state, process starts, coins and revenue, utilisation, usage by hour, regular players, walk-away games, latest screenshot. |
 | **Leaderboard** | Rankings across all games and hosts in the range: top scores, longest clean streak, finish-line time left, overtakes, crashes, slowest crash, fewest off-road incidents, best score at the end of each stage, and a route heat map. Player names link through to that game on Recent Games. |
 
 Required panel plugins: `grafana-graphviz-panel` and `marcusolsson-dynamictext-panel`.

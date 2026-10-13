@@ -1298,6 +1298,75 @@ def _latest_screenshot_time_panel(pid, x, y, w, h):
     }
 
 
+def _starts_today_panel(pid, x, y, w, h):
+    # Process starts (game.startup, emitted once when the game process launches) in the selected
+    # range. 1 is normal if the cabinet was powered on today and 0 if it has been up since before
+    # the range began; 2+ means the game restarted (crash loop, power glitch, someone rebooting it).
+    expr = f'sum(count_over_time({HOST_SCOPED} | event="game.startup" [$__range])) or vector(0)'
+    p = _stat(pid, x, y, w, h, "🔄 Process starts today",
+              ("How many times the game process started in the selected time range (game.startup) on the "
+               "selected host. 1 is normal after powering on today; 0 means it has been up since before "
+               "the range began; 2 or more means it restarted."),
+              expr, colorMode="background")
+    p["fieldConfig"]["defaults"].update({
+        "decimals": 0, "color": {"mode": "thresholds"},
+        "thresholds": {"mode": "absolute", "steps": [
+            {"color": "green", "value": None}, {"color": "orange", "value": 2}, {"color": "red", "value": 4}]}})
+    return p
+
+
+def _last_start_panel(pid, x, y, w, h):
+    # How long ago the game process last started — same log-timestamp trick as the "Captured" panel.
+    # game.startup carries no epoch attribute, so read the log line's own timestamp. Only looks inside
+    # the selected range, so a cabinet up since before the range began shows "Before today".
+    expr = HOST_SCOPED + ' | event="game.startup" | line_format "{{ __timestamp__.UnixMilli }}"'
+    return {
+        "id": pid, "type": "stat", "title": "🕐 Last started",
+        "description": ("How long ago the game process last started on the selected host (game.startup). "
+                        "Shows 'Before today' if it hasn't started within the selected time range."),
+        "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+        "gridPos": {"x": x, "y": y, "w": w, "h": h},
+        "targets": [{"refId": "A", "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+                     "editorMode": "code", "queryType": "range", "direction": "backward", "maxLines": 1,
+                     "expr": expr}],
+        "fieldConfig": {"defaults": {"unit": "dateTimeFromNow", "noValue": "Before today",
+                                     "color": {"mode": "fixed", "fixedColor": "dark-blue"}}, "overrides": []},
+        "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center",
+                    "reduceOptions": {"calcs": ["lastNotNull"], "fields": "Last started", "values": False},
+                    "textMode": "value"},
+        "transformations": [
+            {"id": "organize", "options": {
+                "excludeByName": {"Time": True, "tsNs": True, "id": True, "labels": True, "labelTypes": True},
+                "renameByName": {"Line": "Last started"}}},
+            {"id": "convertFieldType", "options": {
+                "conversions": [{"targetField": "Last started", "destinationType": "number"}]}},
+        ],
+    }
+
+
+# A finished game whose final score is below this counts as a "walk-away": the car barely (or never)
+# moved — someone lost patience, or a control failed and the cabinet needs looking at. Not based on
+# duration: every game runs the full clock (75s + lead-in, ~112s start to end), so duration can't
+# tell a walk-away from anyone else.
+WALKAWAY_MAX_SCORE = 1000
+
+
+def _walk_aways_panel(pid, x, y, w, h):
+    expr = (f'sum(count_over_time({HOST_SCOPED} | event="game.session.end" | final_score < {WALKAWAY_MAX_SCORE} '
+            f'[$__range])) or vector(0)')
+    p = _stat(pid, x, y, w, h, "👟 Walk-away games",
+              (f"Games that finished with a score under {WALKAWAY_MAX_SCORE:,} in the selected time range on the "
+               "selected host — the car barely or never moved: a player who lost patience, or a control "
+               "failure that means the cabinet needs looking at."),
+              expr, colorMode="background")
+    p["fieldConfig"]["defaults"].update({
+        "decimals": 0, "color": {"mode": "thresholds"},
+        "thresholds": {"mode": "absolute", "steps": [
+            {"color": "green", "value": None}, {"color": "yellow", "value": 1},
+            {"color": "orange", "value": 3}, {"color": "red", "value": 5}]}})
+    return p
+
+
 def _completion_rate_panel(pid, x, y, w, h):
     # % of today's games on the selected host that reached the goal line
     # (completed) vs. timed out — derived from game.gameover's own `completed`
@@ -1969,6 +2038,38 @@ def _music_plays_panel(pid, x, y, w, h):
     }
 
 
+def _regular_players_panel(pid, x, y, w, h, top=10):
+    # Games started today per set of player initials, most first, as a horizontal retro-LCD bar
+    # gauge. Initials aren't a unique identity (two people can share them), so this is a rough
+    # "who keeps coming back" indicator, not an accurate head count. Same SQL-fed LCD pattern as
+    # Music plays; the query is padded (see _pad) so a day with no games shows empty, not an error.
+    return {
+        "id": pid, "type": "bargauge", "title": "🕹️ Regular players",
+        "description": (f"The {top} sets of player initials with the most games started in the selected "
+                        "time range (today, by default) on the selected host, most first. Initials aren't "
+                        "unique, so this is approximate."),
+        "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+        "gridPos": {"x": x, "y": y, "w": w, "h": h},
+        "targets": [
+            {"refId": "A", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+             "editorMode": "code", "queryType": "instant",
+             "expr": _pad(f'sum by (player_initials) (count_over_time({HOST_SCOPED} | event="game.session.start" '
+                          f'| player_initials!="" [$__range]))', ("player_initials",))},
+            {"refId": "B", "datasource": {"type": "__expr__", "uid": "__expr__"}, "type": "sql",
+             "expression": (f"SELECT player_initials AS player, `__value__` AS games FROM A "
+                            f"WHERE player_initials <> '{NO_ROW}' ORDER BY `__value__` DESC, player_initials ASC "
+                            f"LIMIT {top}")},
+        ],
+        "options": {"displayMode": "lcd", "orientation": "horizontal", "valueMode": "color",
+                    "showUnfilled": True, "namePlacement": "left",
+                    "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": True}},
+        "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "min": 0,
+                                     "color": {"mode": "fixed", "fixedColor": "#00acc1"},
+                                     "mappings": []},
+                        "overrides": []},
+    }
+
+
 HOST_TABLE_H = 6  # grid units for the Host Selector table
 
 
@@ -2152,6 +2253,11 @@ def build_operator_dashboard():
               "selected host — one per physical coin.",
               coins_expr, color="#ffd319", colorMode="background"),
 
+        # Row 1b — process health + wasted credits (Overview tab)
+        _starts_today_panel(270, 0, y0 + 10, 8, 5),
+        _last_start_panel(271, 8, y0 + 10, 8, 5),
+        _walk_aways_panel(272, 16, y0 + 10, 8, 5),
+
         # Row 2 — revenue + game timing, for the selected host/time range
         _revenue_panel(211, 0, y0 + 5, 6, 5, coins_expr),
         _time_since_last_game_panel(213, 6, y0 + 5, 6, 5),
@@ -2211,6 +2317,7 @@ def build_operator_dashboard():
 
         # Row 6 — usage patterns
         _revenue_per_hour_panel(240, 0, y0 + 28, 24, 8),
+        _regular_players_panel(260, 12, y0 + 28, 12, 8),
 
         # Row 7 — music track popularity
         _music_plays_panel(250, 0, y0 + 36, 24, 6),
@@ -2737,14 +2844,15 @@ OPERATOR_TABS = [
     # 229 is a SEPARATE vertical-LCD-bargauge Utilization panel, not the same
     # element as 225 (Economics' circle gauge) — see _utilization_bargauge_panel.
     ("Overview", [(201, 0, 0, 6, 5), (205, 0, 5, 6, 5), (229, 6, 0, 3, 10),
-                   (226, 9, 0, 15, 10)]),
+                   (226, 9, 0, 15, 10),
+                   (270, 0, 10, 8, 5), (271, 8, 10, 8, 5), (272, 16, 10, 8, 5)]),
     # Explicitly arranged: row of the 4 stat panels, then the pie + both
     # gauges at double height (h=10, not 5) underneath, then Cumulative
     # revenue full-width below that — pie now sits above Cumulative revenue,
     # not after it.
     ("Economics", [(212, 0, 0, 6, 5), (210, 6, 0, 6, 5), (220, 12, 0, 6, 5), (221, 18, 0, 6, 5),
                     (222, 0, 5, 12, 10), (211, 12, 5, 6, 10), (225, 18, 5, 6, 10),
-                    (240, 0, 15, 24, 8)]),
+                    (240, 0, 15, 12, 8), (260, 12, 15, 12, 8)]),
     # Explicitly arranged: the 3 stat panels stacked in a single column,
     # Music plays to their right, matched to the stack's total height (3x5)
     # and filling the rest of the 24-wide row.

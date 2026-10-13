@@ -616,6 +616,290 @@
           }
         }
       },
+      "panel-270": {
+        "kind": "Panel",
+        "spec": {
+          "id": 270,
+          "title": "\ud83d\udd04 Process starts today",
+          "description": "How many times the game process started in the selected time range (game.startup) on the selected host. 1 is normal after powering on today; 0 means it has been up since before the range began; 2 or more means it restarted.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "sum(count_over_time({service_name=\"cannonball-se\"} | host_name=\"$host\" | event=\"game.startup\" [$__range])) or vector(0)"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "textMode": "auto",
+                "wideLayout": true,
+                "showPercentChange": false
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "short",
+                  "mappings": [],
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "decimals": 0,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": null
+                      },
+                      {
+                        "color": "orange",
+                        "value": 2
+                      },
+                      {
+                        "color": "red",
+                        "value": 4
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-271": {
+        "kind": "Panel",
+        "spec": {
+          "id": 271,
+          "title": "\ud83d\udd50 Last started",
+          "description": "How long ago the game process last started on the selected host (game.startup). Shows 'Before today' if it hasn't started within the selected time range.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "range",
+                        "direction": "backward",
+                        "maxLines": 1,
+                        "expr": "{service_name=\"cannonball-se\"} | host_name=\"$host\" | event=\"game.startup\" | line_format \"{{ __timestamp__.UnixMilli }}\""
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [
+                {
+                  "group": "organize",
+                  "kind": "Transformation",
+                  "spec": {
+                    "options": {
+                      "excludeByName": {
+                        "Time": true,
+                        "tsNs": true,
+                        "id": true,
+                        "labels": true,
+                        "labelTypes": true
+                      },
+                      "renameByName": {
+                        "Line": "Last started"
+                      }
+                    }
+                  }
+                },
+                {
+                  "group": "convertFieldType",
+                  "kind": "Transformation",
+                  "spec": {
+                    "options": {
+                      "conversions": [
+                        {
+                          "targetField": "Last started",
+                          "destinationType": "number"
+                        }
+                      ]
+                    }
+                  }
+                }
+              ],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "Last started",
+                  "values": false
+                },
+                "textMode": "value"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "dateTimeFromNow",
+                  "noValue": "Before today",
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "dark-blue"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-272": {
+        "kind": "Panel",
+        "spec": {
+          "id": 272,
+          "title": "\ud83d\udc5f Walk-away games",
+          "description": "Games that finished with a score under 1,000 in the selected time range on the selected host \u2014 the car barely or never moved: a player who lost patience, or a control failure that means the cabinet needs looking at.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "sum(count_over_time({service_name=\"cannonball-se\"} | host_name=\"$host\" | event=\"game.session.end\" | final_score < 1000 [$__range])) or vector(0)"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "textMode": "auto",
+                "wideLayout": true,
+                "showPercentChange": false
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "short",
+                  "mappings": [],
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "decimals": 0,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": null
+                      },
+                      {
+                        "color": "yellow",
+                        "value": 1
+                      },
+                      {
+                        "color": "orange",
+                        "value": 3
+                      },
+                      {
+                        "color": "red",
+                        "value": 5
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
       "panel-211": {
         "kind": "Panel",
         "spec": {
@@ -2492,6 +2776,97 @@
           }
         }
       },
+      "panel-260": {
+        "kind": "Panel",
+        "spec": {
+          "id": 260,
+          "title": "\ud83d\udd79\ufe0f Regular players",
+          "description": "The 10 sets of player initials with the most games started in the selected time range (today, by default) on the selected host, most first. Initials aren't unique, so this is approximate.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-simonprickett-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "queryType": "instant",
+                        "expr": "(sum by (player_initials) (count_over_time({service_name=\"cannonball-se\"} | host_name=\"$host\" | event=\"game.session.start\" | player_initials!=\"\" [$__range]))) or label_replace(vector(0), \"player_initials\", \"~\", \"\", \".*\")"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "__expr__",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "__expr__"
+                      },
+                      "spec": {
+                        "type": "sql",
+                        "expression": "SELECT player_initials AS player, `__value__` AS games FROM A WHERE player_initials <> '~' ORDER BY `__value__` DESC, player_initials ASC LIMIT 10"
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "bargauge",
+            "version": "",
+            "spec": {
+              "options": {
+                "displayMode": "lcd",
+                "orientation": "horizontal",
+                "valueMode": "color",
+                "showUnfilled": true,
+                "namePlacement": "left",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": true
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "short",
+                  "decimals": 0,
+                  "min": 0,
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "#00acc1"
+                  },
+                  "mappings": []
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
       "panel-250": {
         "kind": "Panel",
         "spec": {
@@ -3012,6 +3387,45 @@
                                     "name": "panel-226"
                                   }
                                 }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 0,
+                                  "y": 10,
+                                  "width": 8,
+                                  "height": 5,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-270"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 8,
+                                  "y": 10,
+                                  "width": 8,
+                                  "height": 5,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-271"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 16,
+                                  "y": 10,
+                                  "width": 8,
+                                  "height": 5,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-272"
+                                  }
+                                }
                               }
                             ]
                           }
@@ -3122,11 +3536,24 @@
                                 "spec": {
                                   "x": 0,
                                   "y": 15,
-                                  "width": 24,
+                                  "width": 12,
                                   "height": 8,
                                   "element": {
                                     "kind": "ElementReference",
                                     "name": "panel-240"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 12,
+                                  "y": 15,
+                                  "width": 12,
+                                  "height": 8,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-260"
                                   }
                                 }
                               }
