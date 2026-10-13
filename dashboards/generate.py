@@ -2574,7 +2574,10 @@ def build_picker(live):
     d["title"] = "Cannonball-SE — Recent Games"
     d["uid"] = "cannonball-recent-games"
     d["tags"] = ["cannonball-se", "loki", "game", "recent"]
-    d["time"] = {"from": "now-7d", "to": "now"}
+    # "Today so far", matching the Leaderboard and Operator Insights: the Rank tiles rank a game among
+    # ALL games in the range, so a different default range would give different ranks than the
+    # Leaderboard shows. Widen the picker to browse older games.
+    d["time"] = {"from": "now/d", "to": "now"}
     d["refresh"] = ""  # historical board — no auto-refresh (avoids slow periodic reloads)
     d["preload"] = True  # load all panels on dashboard load, not lazily on scroll
                          # (so the below-the-fold screenshots aren't sluggish)
