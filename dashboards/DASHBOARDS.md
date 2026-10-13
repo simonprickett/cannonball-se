@@ -9,6 +9,7 @@ game picker (Loki only, no Tempo). On import you're prompted for the Loki data s
 | `live_game_dashboard.json` | `cannonball-now-playing` | **Now Playing** — hands-off, auto-follows the current/most-recent game (no picker; 10s auto-refresh). Identity/state/stage/screenshots are exact at any range; aggregations are a rolling time-window (keep the range short). |
 | `recent_games_dashboard.json` | `cannonball-recent-games` | **Recent Games** — pick any recent game by clicking a row in the Loki "Recent games" table (newest first). Every panel is session-scoped, so exact at any range. Does NOT auto-follow; no auto-refresh. |
 | `operator_dashboard.json` | `cannonball-live-engine` | **Operator Insights** — cabinet/engine state for the operator: attract/playing/post-game lifecycle, coin economics, aliveness, usage patterns, and the latest screenshot. Host-scoped (pick a cabinet via the Host Selector); defaults to "today." Generated straight from Python, no hand-authored v1 source. |
+| `leaderboard_dashboard.json` | `cannonball-leaderboard` | **Leaderboard** — rankings/aggregations over ALL games in the range (default today) on ANY host: top-`TOP_N` boards (score, clean streak, finish-line time left, overtakes, crashes, slowest crash, fewest off-road per minute driven, best score per stage reached) + a route heat map. `TOP_N` / `MIN_DRIVEN_SECONDS` / `HEAT_STEPS` are constants in `generate.py`. Tabs: Scores / Driving / Route map. |
 
 **`recent_games_dashboard.json` is generated, not hand-edited.** `live_game_dashboard.json` is the
 source of truth; `python3 generate.py` derives the Recent Games board from it (same layout/panels/viz,
@@ -86,7 +87,7 @@ Both must be installed (declared in each dashboard's `__requires`):
 | `game.coin_inserted` | `credits` | Coin economics (count, revenue, credits available) |
 | `game.startup` | `car_pal`, `gearbox_mode`, `difficulty`, `traffic_difficulty` | Config snapshot panels (Operator Insights) |
 | `game.heartbeat` | `heartbeat_epoch_ms` | Aliveness check (Operator Insights), alongside any other event |
-| `game.gameover` | `completed`, `gameover_epoch_ms` | PLAYING→POST GAME boundary (Engine state, Live Engine) — fires well before `game.session.end` |
+| `game.gameover` | `completed`, `gameover_epoch_ms`, `time_remaining_seconds` (completed=1) | PLAYING→POST GAME boundary (Engine state, Live Engine) — fires well before `game.session.end` |
 
 ## The route map (`stage_id`)
 
