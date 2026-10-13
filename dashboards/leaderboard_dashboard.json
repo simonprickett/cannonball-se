@@ -1237,7 +1237,7 @@
         "spec": {
           "id": 309,
           "title": "\ud83c\udf3f Top 5: fewest off-road incidents",
-          "description": "Off-road incidents PER MINUTE DRIVEN (game.off_road count / summed stage durations), lowest first, so a long clean run beats a short one. Games driven for under 60s are excluded, as are games that scored under 1 (the car never moved); ties go to the longer game. Zero-incident games are included.",
+          "description": "Off-road incidents PER MINUTE DRIVEN (game.off_road count / summed stage durations), lowest first, so a long clean run beats a short one. Games driven for under 60s are excluded, as are games that scored under 10000 (the car never moved); ties go to the longer game. Zero-incident games are included.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -1315,7 +1315,7 @@
                       },
                       "spec": {
                         "type": "sql",
-                        "expression": "SELECT ROW_NUMBER() OVER (ORDER BY COALESCE(B.`__value__`, 0) / (C.`__value__` / 60.0) ASC, C.`__value__` DESC) AS `Rank`, A.player_initials AS Player, COALESCE(B.`__value__`, 0) / (C.`__value__` / 60.0) AS `Per minute`, COALESCE(B.`__value__`, 0) AS `Off-road`, C.`__value__` / 60.0 AS `Minutes driven` FROM A LEFT JOIN B ON A.session_label = B.session_label JOIN C ON A.session_label = C.session_label WHERE A.session_label <> '~' AND A.`__value__` >= 1 AND C.`__value__` >= 60 ORDER BY COALESCE(B.`__value__`, 0) / (C.`__value__` / 60.0) ASC, C.`__value__` DESC LIMIT 5"
+                        "expression": "SELECT ROW_NUMBER() OVER (ORDER BY COALESCE(B.`__value__`, 0) / (C.`__value__` / 60.0) ASC, C.`__value__` DESC) AS `Rank`, A.player_initials AS Player, COALESCE(B.`__value__`, 0) / (C.`__value__` / 60.0) AS `Per minute`, COALESCE(B.`__value__`, 0) AS `Off-road`, C.`__value__` / 60.0 AS `Minutes driven` FROM A LEFT JOIN B ON A.session_label = B.session_label JOIN C ON A.session_label = C.session_label WHERE A.session_label <> '~' AND A.`__value__` >= 10000 AND C.`__value__` >= 60 ORDER BY COALESCE(B.`__value__`, 0) / (C.`__value__` / 60.0) ASC, C.`__value__` DESC LIMIT 5"
                       }
                     },
                     "refId": "D",

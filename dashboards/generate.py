@@ -2889,8 +2889,9 @@ TOP_N = 5
 MIN_DRIVEN_SECONDS = 60
 # ...and must have actually driven: final score at least this. A car left sitting at the
 # start line scores 0 yet logs no off-road incidents, so it would otherwise "win". The
-# lowest genuine score seen so far is ~9,000 — raise this to be stricter.
-MIN_SCORE = 1
+# lowest genuine score seen so far is ~9,000, so 10,000 also drops very short/barely-moving
+# games — raise or lower this to taste.
+MIN_SCORE = 10000
 # Route heat map colour ramp, cold -> hot. Each step starts at that % of the busiest
 # stage/leg (so the ramp self-scales with traffic); anything never used stays grey.
 HEAT_STEPS = [(1, "#1e88e5"), (11, "#29b6f6"), (21, "#26c6da"), (31, "#26a69a"), (41, "#66bb6a"),
