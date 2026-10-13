@@ -187,7 +187,7 @@
                       },
                       "spec": {
                         "type": "sql",
-                        "expression": "SELECT b.player_initials AS Player, b.v AS `Score` FROM (SELECT A.player_initials, A.`__value__` AS v, 0 AS tb FROM A WHERE A.session_label <> '~') b ORDER BY v DESC, tb DESC LIMIT 1"
+                        "expression": "SELECT b.player_initials AS Player, b.v AS `Score`, b.session_label AS session_label FROM (SELECT A.player_initials, A.session_label, A.`__value__` AS v, 0 AS tb FROM A WHERE A.session_label <> '~') b ORDER BY v DESC, tb DESC LIMIT 1"
                       }
                     },
                     "refId": "B",
@@ -206,11 +206,10 @@
             "spec": {
               "options": {
                 "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
+                  "calcs": [],
                   "fields": "/^Player$/",
-                  "values": false
+                  "values": true,
+                  "limit": 1
                 },
                 "colorMode": "background",
                 "graphMode": "none",
@@ -225,6 +224,13 @@
                   "decimals": 0,
                   "noValue": "\u2014",
                   "mappings": [],
+                  "links": [
+                    {
+                      "title": "View this game",
+                      "url": "/d/cannonball-recent-games/?var-session=${__data.fields[\"session_label\"]}&${__url_time_range}",
+                      "targetBlank": true
+                    }
+                  ],
                   "color": {
                     "mode": "fixed",
                     "fixedColor": "#b8860b"
@@ -279,7 +285,7 @@
                       },
                       "spec": {
                         "type": "sql",
-                        "expression": "SELECT b.player_initials AS Player, b.v AS `Score` FROM (SELECT A.player_initials, A.`__value__` AS v, 0 AS tb FROM A WHERE A.session_label <> '~') b ORDER BY v DESC, tb DESC LIMIT 1"
+                        "expression": "SELECT b.player_initials AS Player, b.v AS `Score`, b.session_label AS session_label FROM (SELECT A.player_initials, A.session_label, A.`__value__` AS v, 0 AS tb FROM A WHERE A.session_label <> '~') b ORDER BY v DESC, tb DESC LIMIT 1"
                       }
                     },
                     "refId": "B",
@@ -371,7 +377,7 @@
                       },
                       "spec": {
                         "type": "sql",
-                        "expression": "SELECT r.rn AS `Rank`, r.player_initials AS Player, r.v AS `Score` FROM (SELECT b.player_initials, b.v, ROW_NUMBER() OVER (ORDER BY v DESC, tb DESC) AS rn FROM (SELECT A.player_initials, A.`__value__` AS v, 0 AS tb FROM A WHERE A.session_label <> '~') b) r WHERE r.rn BETWEEN 2 AND 10 ORDER BY r.rn"
+                        "expression": "SELECT r.rn AS `Rank`, r.player_initials AS Player, r.v AS `Score`, r.session_label AS session_label FROM (SELECT b.player_initials, b.v, b.session_label, ROW_NUMBER() OVER (ORDER BY v DESC, tb DESC) AS rn FROM (SELECT A.player_initials, A.session_label, A.`__value__` AS v, 0 AS tb FROM A WHERE A.session_label <> '~') b) r WHERE r.rn BETWEEN 2 AND 10 ORDER BY r.rn"
                       }
                     },
                     "refId": "B",
@@ -473,6 +479,36 @@
                           "mode": "fixed",
                           "fixedColor": "yellow"
                         }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Player"
+                    },
+                    "properties": [
+                      {
+                        "id": "links",
+                        "value": [
+                          {
+                            "title": "View this game",
+                            "url": "/d/cannonball-recent-games/?var-session=${__data.fields[\"session_label\"]}&${__url_time_range}",
+                            "targetBlank": true
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "session_label"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.hidden",
+                        "value": true
                       }
                     ]
                   }
@@ -635,7 +671,7 @@
                       },
                       "spec": {
                         "type": "sql",
-                        "expression": "SELECT b.player_initials AS Player, b.v AS `Streak` FROM (SELECT A.player_initials, A.`__value__` AS v, 0 AS tb FROM A WHERE A.session_label <> '~') b ORDER BY v DESC, tb DESC LIMIT 1"
+                        "expression": "SELECT b.player_initials AS Player, b.v AS `Streak`, b.session_label AS session_label FROM (SELECT A.player_initials, A.session_label, A.`__value__` AS v, 0 AS tb FROM A WHERE A.session_label <> '~') b ORDER BY v DESC, tb DESC LIMIT 1"
                       }
                     },
                     "refId": "B",
@@ -654,11 +690,10 @@
             "spec": {
               "options": {
                 "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
+                  "calcs": [],
                   "fields": "/^Player$/",
-                  "values": false
+                  "values": true,
+                  "limit": 1
                 },
                 "colorMode": "background",
                 "graphMode": "none",
@@ -673,6 +708,13 @@
                   "decimals": 0,
                   "noValue": "\u2014",
                   "mappings": [],
+                  "links": [
+                    {
+                      "title": "View this game",
+                      "url": "/d/cannonball-recent-games/?var-session=${__data.fields[\"session_label\"]}&${__url_time_range}",
+                      "targetBlank": true
+                    }
+                  ],
                   "color": {
                     "mode": "fixed",
                     "fixedColor": "#b8860b"
@@ -727,7 +769,7 @@
                       },
                       "spec": {
                         "type": "sql",
-                        "expression": "SELECT b.player_initials AS Player, b.v AS `Streak` FROM (SELECT A.player_initials, A.`__value__` AS v, 0 AS tb FROM A WHERE A.session_label <> '~') b ORDER BY v DESC, tb DESC LIMIT 1"
+                        "expression": "SELECT b.player_initials AS Player, b.v AS `Streak`, b.session_label AS session_label FROM (SELECT A.player_initials, A.session_label, A.`__value__` AS v, 0 AS tb FROM A WHERE A.session_label <> '~') b ORDER BY v DESC, tb DESC LIMIT 1"
                       }
                     },
                     "refId": "B",
@@ -819,7 +861,7 @@
                       },
                       "spec": {
                         "type": "sql",
-                        "expression": "SELECT r.rn AS `Rank`, r.player_initials AS Player, r.v AS `Streak` FROM (SELECT b.player_initials, b.v, ROW_NUMBER() OVER (ORDER BY v DESC, tb DESC) AS rn FROM (SELECT A.player_initials, A.`__value__` AS v, 0 AS tb FROM A WHERE A.session_label <> '~') b) r WHERE r.rn BETWEEN 2 AND 10 ORDER BY r.rn"
+                        "expression": "SELECT r.rn AS `Rank`, r.player_initials AS Player, r.v AS `Streak`, r.session_label AS session_label FROM (SELECT b.player_initials, b.v, b.session_label, ROW_NUMBER() OVER (ORDER BY v DESC, tb DESC) AS rn FROM (SELECT A.player_initials, A.session_label, A.`__value__` AS v, 0 AS tb FROM A WHERE A.session_label <> '~') b) r WHERE r.rn BETWEEN 2 AND 10 ORDER BY r.rn"
                       }
                     },
                     "refId": "B",
@@ -921,6 +963,36 @@
                           "mode": "fixed",
                           "fixedColor": "green"
                         }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Player"
+                    },
+                    "properties": [
+                      {
+                        "id": "links",
+                        "value": [
+                          {
+                            "title": "View this game",
+                            "url": "/d/cannonball-recent-games/?var-session=${__data.fields[\"session_label\"]}&${__url_time_range}",
+                            "targetBlank": true
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "session_label"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.hidden",
+                        "value": true
                       }
                     ]
                   }
@@ -1103,7 +1175,7 @@
                       },
                       "spec": {
                         "type": "sql",
-                        "expression": "SELECT b.player_initials AS Player, b.v AS `Overtakes` FROM (SELECT A.player_initials, COALESCE(B.`__value__`, 0) AS v, 0 AS tb FROM A LEFT JOIN B ON A.session_label = B.session_label WHERE A.session_label <> '~') b ORDER BY v DESC, tb DESC LIMIT 1"
+                        "expression": "SELECT b.player_initials AS Player, b.v AS `Overtakes`, b.session_label AS session_label FROM (SELECT A.player_initials, A.session_label, COALESCE(B.`__value__`, 0) AS v, 0 AS tb FROM A LEFT JOIN B ON A.session_label = B.session_label WHERE A.session_label <> '~') b ORDER BY v DESC, tb DESC LIMIT 1"
                       }
                     },
                     "refId": "C",
@@ -1122,11 +1194,10 @@
             "spec": {
               "options": {
                 "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
+                  "calcs": [],
                   "fields": "/^Player$/",
-                  "values": false
+                  "values": true,
+                  "limit": 1
                 },
                 "colorMode": "background",
                 "graphMode": "none",
@@ -1141,6 +1212,13 @@
                   "decimals": 0,
                   "noValue": "\u2014",
                   "mappings": [],
+                  "links": [
+                    {
+                      "title": "View this game",
+                      "url": "/d/cannonball-recent-games/?var-session=${__data.fields[\"session_label\"]}&${__url_time_range}",
+                      "targetBlank": true
+                    }
+                  ],
                   "color": {
                     "mode": "fixed",
                     "fixedColor": "#b8860b"
@@ -1215,7 +1293,7 @@
                       },
                       "spec": {
                         "type": "sql",
-                        "expression": "SELECT b.player_initials AS Player, b.v AS `Overtakes` FROM (SELECT A.player_initials, COALESCE(B.`__value__`, 0) AS v, 0 AS tb FROM A LEFT JOIN B ON A.session_label = B.session_label WHERE A.session_label <> '~') b ORDER BY v DESC, tb DESC LIMIT 1"
+                        "expression": "SELECT b.player_initials AS Player, b.v AS `Overtakes`, b.session_label AS session_label FROM (SELECT A.player_initials, A.session_label, COALESCE(B.`__value__`, 0) AS v, 0 AS tb FROM A LEFT JOIN B ON A.session_label = B.session_label WHERE A.session_label <> '~') b ORDER BY v DESC, tb DESC LIMIT 1"
                       }
                     },
                     "refId": "C",
@@ -1327,7 +1405,7 @@
                       },
                       "spec": {
                         "type": "sql",
-                        "expression": "SELECT r.rn AS `Rank`, r.player_initials AS Player, r.v AS `Overtakes` FROM (SELECT b.player_initials, b.v, ROW_NUMBER() OVER (ORDER BY v DESC, tb DESC) AS rn FROM (SELECT A.player_initials, COALESCE(B.`__value__`, 0) AS v, 0 AS tb FROM A LEFT JOIN B ON A.session_label = B.session_label WHERE A.session_label <> '~') b) r WHERE r.rn BETWEEN 2 AND 10 ORDER BY r.rn"
+                        "expression": "SELECT r.rn AS `Rank`, r.player_initials AS Player, r.v AS `Overtakes`, r.session_label AS session_label FROM (SELECT b.player_initials, b.v, b.session_label, ROW_NUMBER() OVER (ORDER BY v DESC, tb DESC) AS rn FROM (SELECT A.player_initials, A.session_label, COALESCE(B.`__value__`, 0) AS v, 0 AS tb FROM A LEFT JOIN B ON A.session_label = B.session_label WHERE A.session_label <> '~') b) r WHERE r.rn BETWEEN 2 AND 10 ORDER BY r.rn"
                       }
                     },
                     "refId": "C",
@@ -1429,6 +1507,36 @@
                           "mode": "fixed",
                           "fixedColor": "blue"
                         }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Player"
+                    },
+                    "properties": [
+                      {
+                        "id": "links",
+                        "value": [
+                          {
+                            "title": "View this game",
+                            "url": "/d/cannonball-recent-games/?var-session=${__data.fields[\"session_label\"]}&${__url_time_range}",
+                            "targetBlank": true
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "session_label"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.hidden",
+                        "value": true
                       }
                     ]
                   }
@@ -1611,7 +1719,7 @@
                       },
                       "spec": {
                         "type": "sql",
-                        "expression": "SELECT b.player_initials AS Player, b.v AS `Crashes` FROM (SELECT A.player_initials, COALESCE(B.`__value__`, 0) AS v, 0 AS tb FROM A LEFT JOIN B ON A.session_label = B.session_label WHERE A.session_label <> '~') b ORDER BY v DESC, tb DESC LIMIT 1"
+                        "expression": "SELECT b.player_initials AS Player, b.v AS `Crashes`, b.session_label AS session_label FROM (SELECT A.player_initials, A.session_label, COALESCE(B.`__value__`, 0) AS v, 0 AS tb FROM A LEFT JOIN B ON A.session_label = B.session_label WHERE A.session_label <> '~') b ORDER BY v DESC, tb DESC LIMIT 1"
                       }
                     },
                     "refId": "C",
@@ -1630,11 +1738,10 @@
             "spec": {
               "options": {
                 "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
+                  "calcs": [],
                   "fields": "/^Player$/",
-                  "values": false
+                  "values": true,
+                  "limit": 1
                 },
                 "colorMode": "background",
                 "graphMode": "none",
@@ -1649,6 +1756,13 @@
                   "decimals": 0,
                   "noValue": "\u2014",
                   "mappings": [],
+                  "links": [
+                    {
+                      "title": "View this game",
+                      "url": "/d/cannonball-recent-games/?var-session=${__data.fields[\"session_label\"]}&${__url_time_range}",
+                      "targetBlank": true
+                    }
+                  ],
                   "color": {
                     "mode": "fixed",
                     "fixedColor": "#b8860b"
@@ -1723,7 +1837,7 @@
                       },
                       "spec": {
                         "type": "sql",
-                        "expression": "SELECT b.player_initials AS Player, b.v AS `Crashes` FROM (SELECT A.player_initials, COALESCE(B.`__value__`, 0) AS v, 0 AS tb FROM A LEFT JOIN B ON A.session_label = B.session_label WHERE A.session_label <> '~') b ORDER BY v DESC, tb DESC LIMIT 1"
+                        "expression": "SELECT b.player_initials AS Player, b.v AS `Crashes`, b.session_label AS session_label FROM (SELECT A.player_initials, A.session_label, COALESCE(B.`__value__`, 0) AS v, 0 AS tb FROM A LEFT JOIN B ON A.session_label = B.session_label WHERE A.session_label <> '~') b ORDER BY v DESC, tb DESC LIMIT 1"
                       }
                     },
                     "refId": "C",
@@ -1835,7 +1949,7 @@
                       },
                       "spec": {
                         "type": "sql",
-                        "expression": "SELECT r.rn AS `Rank`, r.player_initials AS Player, r.v AS `Crashes` FROM (SELECT b.player_initials, b.v, ROW_NUMBER() OVER (ORDER BY v DESC, tb DESC) AS rn FROM (SELECT A.player_initials, COALESCE(B.`__value__`, 0) AS v, 0 AS tb FROM A LEFT JOIN B ON A.session_label = B.session_label WHERE A.session_label <> '~') b) r WHERE r.rn BETWEEN 2 AND 10 ORDER BY r.rn"
+                        "expression": "SELECT r.rn AS `Rank`, r.player_initials AS Player, r.v AS `Crashes`, r.session_label AS session_label FROM (SELECT b.player_initials, b.v, b.session_label, ROW_NUMBER() OVER (ORDER BY v DESC, tb DESC) AS rn FROM (SELECT A.player_initials, A.session_label, COALESCE(B.`__value__`, 0) AS v, 0 AS tb FROM A LEFT JOIN B ON A.session_label = B.session_label WHERE A.session_label <> '~') b) r WHERE r.rn BETWEEN 2 AND 10 ORDER BY r.rn"
                       }
                     },
                     "refId": "C",
@@ -1937,6 +2051,36 @@
                           "mode": "fixed",
                           "fixedColor": "red"
                         }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Player"
+                    },
+                    "properties": [
+                      {
+                        "id": "links",
+                        "value": [
+                          {
+                            "title": "View this game",
+                            "url": "/d/cannonball-recent-games/?var-session=${__data.fields[\"session_label\"]}&${__url_time_range}",
+                            "targetBlank": true
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "session_label"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.hidden",
+                        "value": true
                       }
                     ]
                   }
@@ -2119,7 +2263,7 @@
                       },
                       "spec": {
                         "type": "sql",
-                        "expression": "SELECT b.player_initials AS Player, b.v AS `Speed` FROM (SELECT A.player_initials, B.`__value__` AS v, 0 AS tb FROM A JOIN B ON A.session_label = B.session_label WHERE A.session_label <> '~') b ORDER BY v ASC, tb DESC LIMIT 1"
+                        "expression": "SELECT b.player_initials AS Player, b.v AS `Speed`, b.session_label AS session_label FROM (SELECT A.player_initials, A.session_label, B.`__value__` AS v, 0 AS tb FROM A JOIN B ON A.session_label = B.session_label WHERE A.session_label <> '~') b ORDER BY v ASC, tb DESC LIMIT 1"
                       }
                     },
                     "refId": "C",
@@ -2138,11 +2282,10 @@
             "spec": {
               "options": {
                 "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
+                  "calcs": [],
                   "fields": "/^Player$/",
-                  "values": false
+                  "values": true,
+                  "limit": 1
                 },
                 "colorMode": "background",
                 "graphMode": "none",
@@ -2157,6 +2300,13 @@
                   "decimals": 0,
                   "noValue": "\u2014",
                   "mappings": [],
+                  "links": [
+                    {
+                      "title": "View this game",
+                      "url": "/d/cannonball-recent-games/?var-session=${__data.fields[\"session_label\"]}&${__url_time_range}",
+                      "targetBlank": true
+                    }
+                  ],
                   "color": {
                     "mode": "fixed",
                     "fixedColor": "#b8860b"
@@ -2231,7 +2381,7 @@
                       },
                       "spec": {
                         "type": "sql",
-                        "expression": "SELECT b.player_initials AS Player, b.v AS `Speed` FROM (SELECT A.player_initials, B.`__value__` AS v, 0 AS tb FROM A JOIN B ON A.session_label = B.session_label WHERE A.session_label <> '~') b ORDER BY v ASC, tb DESC LIMIT 1"
+                        "expression": "SELECT b.player_initials AS Player, b.v AS `Speed`, b.session_label AS session_label FROM (SELECT A.player_initials, A.session_label, B.`__value__` AS v, 0 AS tb FROM A JOIN B ON A.session_label = B.session_label WHERE A.session_label <> '~') b ORDER BY v ASC, tb DESC LIMIT 1"
                       }
                     },
                     "refId": "C",
@@ -2343,7 +2493,7 @@
                       },
                       "spec": {
                         "type": "sql",
-                        "expression": "SELECT r.rn AS `Rank`, r.player_initials AS Player, r.v AS `Speed` FROM (SELECT b.player_initials, b.v, ROW_NUMBER() OVER (ORDER BY v ASC, tb DESC) AS rn FROM (SELECT A.player_initials, B.`__value__` AS v, 0 AS tb FROM A JOIN B ON A.session_label = B.session_label WHERE A.session_label <> '~') b) r WHERE r.rn BETWEEN 2 AND 10 ORDER BY r.rn"
+                        "expression": "SELECT r.rn AS `Rank`, r.player_initials AS Player, r.v AS `Speed`, r.session_label AS session_label FROM (SELECT b.player_initials, b.v, b.session_label, ROW_NUMBER() OVER (ORDER BY v ASC, tb DESC) AS rn FROM (SELECT A.player_initials, A.session_label, B.`__value__` AS v, 0 AS tb FROM A JOIN B ON A.session_label = B.session_label WHERE A.session_label <> '~') b) r WHERE r.rn BETWEEN 2 AND 10 ORDER BY r.rn"
                       }
                     },
                     "refId": "C",
@@ -2445,6 +2595,36 @@
                           "mode": "fixed",
                           "fixedColor": "orange"
                         }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Player"
+                    },
+                    "properties": [
+                      {
+                        "id": "links",
+                        "value": [
+                          {
+                            "title": "View this game",
+                            "url": "/d/cannonball-recent-games/?var-session=${__data.fields[\"session_label\"]}&${__url_time_range}",
+                            "targetBlank": true
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "session_label"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.hidden",
+                        "value": true
                       }
                     ]
                   }
@@ -2647,7 +2827,7 @@
                       },
                       "spec": {
                         "type": "sql",
-                        "expression": "SELECT b.player_initials AS Player, b.v AS `Per minute` FROM (SELECT A.player_initials, COALESCE(B.`__value__`, 0) / (C.`__value__` / 60.0) AS v, C.`__value__` AS tb, COALESCE(B.`__value__`, 0) AS offroad, C.`__value__` / 60.0 AS minutes FROM A LEFT JOIN B ON A.session_label = B.session_label JOIN C ON A.session_label = C.session_label WHERE A.session_label <> '~' AND A.`__value__` >= 10000 AND C.`__value__` >= 60) b ORDER BY v ASC, tb DESC LIMIT 1"
+                        "expression": "SELECT b.player_initials AS Player, b.v AS `Per minute`, b.session_label AS session_label FROM (SELECT A.player_initials, A.session_label, COALESCE(B.`__value__`, 0) / (C.`__value__` / 60.0) AS v, C.`__value__` AS tb, COALESCE(B.`__value__`, 0) AS offroad, C.`__value__` / 60.0 AS minutes FROM A LEFT JOIN B ON A.session_label = B.session_label JOIN C ON A.session_label = C.session_label WHERE A.session_label <> '~' AND A.`__value__` >= 10000 AND C.`__value__` >= 60) b ORDER BY v ASC, tb DESC LIMIT 1"
                       }
                     },
                     "refId": "D",
@@ -2666,11 +2846,10 @@
             "spec": {
               "options": {
                 "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
+                  "calcs": [],
                   "fields": "/^Player$/",
-                  "values": false
+                  "values": true,
+                  "limit": 1
                 },
                 "colorMode": "background",
                 "graphMode": "none",
@@ -2685,6 +2864,13 @@
                   "decimals": 0,
                   "noValue": "\u2014",
                   "mappings": [],
+                  "links": [
+                    {
+                      "title": "View this game",
+                      "url": "/d/cannonball-recent-games/?var-session=${__data.fields[\"session_label\"]}&${__url_time_range}",
+                      "targetBlank": true
+                    }
+                  ],
                   "color": {
                     "mode": "fixed",
                     "fixedColor": "#b8860b"
@@ -2779,7 +2965,7 @@
                       },
                       "spec": {
                         "type": "sql",
-                        "expression": "SELECT b.player_initials AS Player, b.v AS `Per minute` FROM (SELECT A.player_initials, COALESCE(B.`__value__`, 0) / (C.`__value__` / 60.0) AS v, C.`__value__` AS tb, COALESCE(B.`__value__`, 0) AS offroad, C.`__value__` / 60.0 AS minutes FROM A LEFT JOIN B ON A.session_label = B.session_label JOIN C ON A.session_label = C.session_label WHERE A.session_label <> '~' AND A.`__value__` >= 10000 AND C.`__value__` >= 60) b ORDER BY v ASC, tb DESC LIMIT 1"
+                        "expression": "SELECT b.player_initials AS Player, b.v AS `Per minute`, b.session_label AS session_label FROM (SELECT A.player_initials, A.session_label, COALESCE(B.`__value__`, 0) / (C.`__value__` / 60.0) AS v, C.`__value__` AS tb, COALESCE(B.`__value__`, 0) AS offroad, C.`__value__` / 60.0 AS minutes FROM A LEFT JOIN B ON A.session_label = B.session_label JOIN C ON A.session_label = C.session_label WHERE A.session_label <> '~' AND A.`__value__` >= 10000 AND C.`__value__` >= 60) b ORDER BY v ASC, tb DESC LIMIT 1"
                       }
                     },
                     "refId": "D",
@@ -2911,7 +3097,7 @@
                       },
                       "spec": {
                         "type": "sql",
-                        "expression": "SELECT r.rn AS `Rank`, r.player_initials AS Player, r.v AS `Per minute`, r.offroad AS `Off-road`, r.minutes AS `Minutes driven` FROM (SELECT b.player_initials, b.v, b.offroad, b.minutes, ROW_NUMBER() OVER (ORDER BY v ASC, tb DESC) AS rn FROM (SELECT A.player_initials, COALESCE(B.`__value__`, 0) / (C.`__value__` / 60.0) AS v, C.`__value__` AS tb, COALESCE(B.`__value__`, 0) AS offroad, C.`__value__` / 60.0 AS minutes FROM A LEFT JOIN B ON A.session_label = B.session_label JOIN C ON A.session_label = C.session_label WHERE A.session_label <> '~' AND A.`__value__` >= 10000 AND C.`__value__` >= 60) b) r WHERE r.rn BETWEEN 2 AND 10 ORDER BY r.rn"
+                        "expression": "SELECT r.rn AS `Rank`, r.player_initials AS Player, r.v AS `Per minute`, r.offroad AS `Off-road`, r.minutes AS `Minutes driven`, r.session_label AS session_label FROM (SELECT b.player_initials, b.v, b.offroad, b.minutes, b.session_label, ROW_NUMBER() OVER (ORDER BY v ASC, tb DESC) AS rn FROM (SELECT A.player_initials, A.session_label, COALESCE(B.`__value__`, 0) / (C.`__value__` / 60.0) AS v, C.`__value__` AS tb, COALESCE(B.`__value__`, 0) AS offroad, C.`__value__` / 60.0 AS minutes FROM A LEFT JOIN B ON A.session_label = B.session_label JOIN C ON A.session_label = C.session_label WHERE A.session_label <> '~' AND A.`__value__` >= 10000 AND C.`__value__` >= 60) b) r WHERE r.rn BETWEEN 2 AND 10 ORDER BY r.rn"
                       }
                     },
                     "refId": "D",
@@ -3047,6 +3233,36 @@
                         "value": 1
                       }
                     ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Player"
+                    },
+                    "properties": [
+                      {
+                        "id": "links",
+                        "value": [
+                          {
+                            "title": "View this game",
+                            "url": "/d/cannonball-recent-games/?var-session=${__data.fields[\"session_label\"]}&${__url_time_range}",
+                            "targetBlank": true
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "session_label"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.hidden",
+                        "value": true
+                      }
+                    ]
                   }
                 ]
               }
@@ -3117,7 +3333,7 @@
                       },
                       "spec": {
                         "type": "sql",
-                        "expression": "SELECT ROW_NUMBER() OVER (ORDER BY B.`__value__` DESC) AS `Rank`, A.player_initials AS Player, B.`__value__` AS `Time left` FROM A JOIN B ON A.session_label = B.session_label WHERE A.session_label <> '~' ORDER BY B.`__value__` DESC LIMIT 5"
+                        "expression": "SELECT ROW_NUMBER() OVER (ORDER BY B.`__value__` DESC) AS `Rank`, A.player_initials AS Player, B.`__value__` AS `Time left`, A.session_label AS session_label FROM A JOIN B ON A.session_label = B.session_label WHERE A.session_label <> '~' ORDER BY B.`__value__` DESC LIMIT 5"
                       }
                     },
                     "refId": "C",
@@ -3221,6 +3437,36 @@
                         }
                       }
                     ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Player"
+                    },
+                    "properties": [
+                      {
+                        "id": "links",
+                        "value": [
+                          {
+                            "title": "View this game",
+                            "url": "/d/cannonball-recent-games/?var-session=${__data.fields[\"session_label\"]}&${__url_time_range}",
+                            "targetBlank": true
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "session_label"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.hidden",
+                        "value": true
+                      }
+                    ]
                   }
                 ]
               }
@@ -3311,7 +3557,7 @@
                       },
                       "spec": {
                         "type": "sql",
-                        "expression": "SELECT CONCAT('Stage ', t.stage) AS `Stage completed`, t.player_initials AS Player, t.score AS Score FROM (SELECT u.stage, u.player_initials, u.score, ROW_NUMBER() OVER (PARTITION BY u.stage ORDER BY u.score DESC) AS rn FROM (SELECT A.stage_number AS stage, A.player_initials, A.`__value__` AS score FROM A JOIN B ON B.session_label = A.session_label WHERE A.session_label <> '~' UNION ALL SELECT '5', C.player_initials, C.`__value__` FROM C WHERE C.session_label <> '~') u) t WHERE t.rn = 1 ORDER BY t.stage ASC"
+                        "expression": "SELECT CONCAT('Stage ', t.stage) AS `Stage completed`, t.player_initials AS Player, t.score AS Score, t.session_label AS session_label FROM (SELECT u.stage, u.player_initials, u.score, u.session_label, ROW_NUMBER() OVER (PARTITION BY u.stage ORDER BY u.score DESC) AS rn FROM (SELECT A.stage_number AS stage, A.player_initials, A.session_label, A.`__value__` AS score FROM A JOIN B ON B.session_label = A.session_label WHERE A.session_label <> '~' UNION ALL SELECT '5', C.player_initials, C.session_label, C.`__value__` FROM C WHERE C.session_label <> '~') u) t WHERE t.rn = 1 ORDER BY t.stage ASC"
                       }
                     },
                     "refId": "D",
@@ -3413,6 +3659,36 @@
                           "mode": "fixed",
                           "fixedColor": "purple"
                         }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Player"
+                    },
+                    "properties": [
+                      {
+                        "id": "links",
+                        "value": [
+                          {
+                            "title": "View this game",
+                            "url": "/d/cannonball-recent-games/?var-session=${__data.fields[\"session_label\"]}&${__url_time_range}",
+                            "targetBlank": true
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "session_label"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.hidden",
+                        "value": true
                       }
                     ]
                   },

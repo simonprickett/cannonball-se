@@ -2939,6 +2939,26 @@ def _game_cols(src="A"):
     return f"{src}.player_initials AS Player"
 
 
+SESSION_LINK = {
+    "title": "View this game",
+    # Same target/variable the Recent Games picker sets; no var-gearbox (not known here). Reads the
+    # row's session_label from a hidden column/field of the same name. Opens in a new tab.
+    "url": "/d/cannonball-recent-games/?var-session=${__data.fields[\"session_label\"]}&${__url_time_range}",
+    "targetBlank": True,
+}
+
+
+def _session_link_overrides():
+    # Player cell -> that game on Recent Games (same variable the picker there sets; no var-gearbox
+    # — not known here). Reads the row's session_label from a hidden column of the same name.
+    return [
+        {"matcher": {"id": "byName", "options": "Player"},
+         "properties": [{"id": "links", "value": [SESSION_LINK]}]},
+        {"matcher": {"id": "byName", "options": "session_label"},
+         "properties": [{"id": "custom.hidden", "value": True}]},
+    ]
+
+
 def leaderboard_panel(pid, x, y, w, h, title, description, targets, value_col, unit, decimals=0,
                       color="blue", extra_cols=None):
     # A top-<n> table. `targets` = hidden Loki queries + a final SQL expr that outputs
@@ -2980,25 +3000,33 @@ def _joined_board(pid, x, y, w, h, title, desc, metric_expr, value_col, unit, or
     # A = finished games (session.end), B = the metric by session_label, inner-joined so an
     # in-progress game (no session.end yet) never ranks.
     sql = (f"SELECT ROW_NUMBER() OVER (ORDER BY B.`__value__` {order}) AS `Rank`, {_game_cols()}, "
-           f"B.`__value__` AS `{value_col}` FROM A JOIN B ON A.session_label = B.session_label "
+           f"B.`__value__` AS `{value_col}`, A.session_label AS session_label "
+           f"FROM A JOIN B ON A.session_label = B.session_label "
            f"WHERE A.session_label <> '{NO_ROW}' ORDER BY B.`__value__` {order} LIMIT {TOP_N}")
-    return leaderboard_panel(pid, x, y, w, h, title, desc,
-                             [_lb_loki("A", _GAMES_EXPR), _lb_loki("B", _pad(metric_expr)), _lb_sql("C", sql)],
-                             value_col, unit, 0, color)
+    p = leaderboard_panel(pid, x, y, w, h, title, desc,
+                          [_lb_loki("A", _GAMES_EXPR), _lb_loki("B", _pad(metric_expr)), _lb_sql("C", sql)],
+                          value_col, unit, 0, color)
+    p["fieldConfig"]["overrides"] += _session_link_overrides()
+    return p
 
 
-def _hero_stat(pid, x, y, w, h, title, targets, field, unit="none", mappings=None, decimals=0):
+def _hero_stat(pid, x, y, w, h, title, targets, field, unit="none", mappings=None, decimals=0, link=None):
     # One tile of the gold "rank 1" strip. Same gold background as the rank-1 cell / the Recent
     # Games rank tiles (_MEDAL[1]). `field` = the output column the stat displays.
+    # With a link the tile shows the frame's (single) ROW rather than a reduced value, so that
+    # ${__data.fields[...]} in the link resolves against that row.
+    reduce = ({"calcs": [], "fields": f"/^{field}$/", "values": True, "limit": 1} if link else
+              {"calcs": ["lastNotNull"], "fields": (f"/^{field}$/" if field else ""), "values": False})
     return {
         "id": pid, "type": "stat", "title": title, "description": "",
         "datasource": _LOKI, "gridPos": {"x": x, "y": y, "w": w, "h": h},
         "targets": targets,
-        "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": (f"/^{field}$/" if field else ""), "values": False},
+        "options": {"reduceOptions": reduce,
                     "colorMode": "background", "graphMode": "none", "justifyMode": "center",
                     "textMode": "value", "wideLayout": True, "showPercentChange": False},
         "fieldConfig": {"defaults": {"unit": unit, "decimals": decimals, "noValue": "—",
                                      "mappings": mappings or [],
+                                     **({"links": [link]} if link else {}),
                                      "color": {"mode": "fixed", "fixedColor": _MEDAL[1]}},
                         "overrides": []},
     }
@@ -3018,7 +3046,7 @@ def _hero_header(pid, x, y, w, h, text, gradient):
 
 
 def _hero_board(pids, x, y, w, title, desc, loki, base_sql, value_col, unit, color, table_h, head, gradient,
-                order="DESC", decimals=0, extras=()):
+                order="DESC", decimals=0, extras=(), session_link=False):
     # Rank 1 as gold stat tiles (static "1" | player | value) whose combined width equals the
     # table's, under a caption, then the table listing ranks 2..HERO_TOP_N.
     #   pids     = (rank tile, player tile, value tile, table, caption) panel ids
@@ -3027,6 +3055,8 @@ def _hero_board(pids, x, y, w, title, desc, loki, base_sql, value_col, unit, col
     #              higher wins) and one column per `extras` entry
     #   extras   = [(base column, display name, unit, decimals)] shown in the table only
     #   gradient = CSS colour stops for the caption banner
+    #   session_link = link each table row's Player cell to that game on Recent Games; base_sql must
+    #              then also provide a session_label column (kept in the frame, hidden as a column)
     p_rank, p_name, p_val, p_tbl, p_head = pids
     head_h, stat_h = 2, 4
     y_stats = y + head_h
@@ -3034,54 +3064,63 @@ def _hero_board(pids, x, y, w, title, desc, loki, base_sql, value_col, unit, col
     w3 = w - w1 - w2
     ref = chr(ord("A") + len(loki))  # refId of the visible SQL expr
     order_by = f"v {order}, tb DESC"
-    top1 = (f"SELECT b.player_initials AS Player, b.v AS `{value_col}` FROM ({base_sql}) b "
+    link_col = ", b.session_label AS session_label" if session_link else ""
+    top1 = (f"SELECT b.player_initials AS Player, b.v AS `{value_col}`{link_col} FROM ({base_sql}) b "
             f"ORDER BY {order_by} LIMIT 1")
     extra_cols = "".join(f", r.{c} AS `{name}`" for c, name, _, _ in extras)
     extra_in = "".join(f", b.{c}" for c, _, _, _ in extras)
+    if session_link:
+        extra_cols += ", r.session_label AS session_label"
+        extra_in += ", b.session_label"
     rest = (f"SELECT r.rn AS `Rank`, r.player_initials AS Player, r.v AS `{value_col}`{extra_cols} FROM "
             f"(SELECT b.player_initials, b.v{extra_in}, ROW_NUMBER() OVER (ORDER BY {order_by}) AS rn "
             f"FROM ({base_sql}) b) r WHERE r.rn BETWEEN 2 AND {HERO_TOP_N} ORDER BY r.rn")
+    table = leaderboard_panel(p_tbl, x, y_stats + stat_h, w, table_h, title, desc,
+                              loki + [_lb_sql(ref, rest)], value_col, unit, decimals, color,
+                              extra_cols=[{"name": n, "unit": u, "decimals": d} for _, n, u, d in extras])
+    if session_link:
+        table["fieldConfig"]["overrides"] += _session_link_overrides()
     return [
         _hero_header(p_head, x, y, w, head_h, head, gradient),
         _hero_stat(p_rank, x, y_stats, w1, stat_h, "Rank",
                    [{"refId": "A", "datasource": _LOKI, "editorMode": "code", "queryType": "instant",
                      "expr": "vector(1)"}], None),
-        _hero_stat(p_name, x + w1, y_stats, w2, stat_h, "Player", loki + [_lb_sql(ref, top1)], "Player"),
+        _hero_stat(p_name, x + w1, y_stats, w2, stat_h, "Player", loki + [_lb_sql(ref, top1)], "Player",
+                   link=SESSION_LINK if session_link else None),
         _hero_stat(p_val, x + w1 + w2, y_stats, w3, stat_h, value_col, loki + [_lb_sql(ref, top1)],
                    value_col, unit, decimals=decimals),
-        leaderboard_panel(p_tbl, x, y_stats + stat_h, w, table_h, title, desc,
-                          loki + [_lb_sql(ref, rest)], value_col, unit, decimals, color,
-                          extra_cols=[{"name": n, "unit": u, "decimals": d} for _, n, u, d in extras]),
+        table,
     ]
 
 
 _NOT_NO_ROW = f"A.session_label <> '{NO_ROW}'"
 
 
-def _hero_value_board(pids, x, y, title, desc, expr, value_col, unit, color, head, gradient, order="DESC"):
+def _hero_value_board(pids, x, y, title, desc, expr, value_col, unit, color, head, gradient, order="DESC",
+                      session_link=False):
     # Ranks a per-game value read straight off an event (A is labelled by game).
-    base = (f"SELECT A.player_initials, A.`__value__` AS v, 0 AS tb FROM A WHERE {_NOT_NO_ROW}")
+    base = (f"SELECT A.player_initials, A.session_label, A.`__value__` AS v, 0 AS tb FROM A WHERE {_NOT_NO_ROW}")
     return _hero_board(pids, x, y, 12, title, desc, [_lb_loki("A", _pad(expr, _GAME_LBLS))], base,
-                       value_col, unit, color, 12, head, gradient, order)
+                       value_col, unit, color, 12, head, gradient, order, session_link=session_link)
 
 
 def _hero_count_board(pids, x, y, title, desc, event, value_col, color, head, gradient):
     # Most-of-X per game: start from every finished game and LEFT JOIN the count, so the
     # ranking covers ALL games (absent != zero).
     counts = _pad(f'sum by (session_label) (count_over_time({SEL} | event="{event}" [$__range]))')
-    base = ("SELECT A.player_initials, COALESCE(B.`__value__`, 0) AS v, 0 AS tb FROM A "
+    base = ("SELECT A.player_initials, A.session_label, COALESCE(B.`__value__`, 0) AS v, 0 AS tb FROM A "
             f"LEFT JOIN B ON A.session_label = B.session_label WHERE {_NOT_NO_ROW}")
     return _hero_board(pids, x, y, 12, title, desc, [_lb_loki("A", _GAMES_EXPR), _lb_loki("B", counts)],
-                       base, value_col, "short", color, 12, head, gradient)
+                       base, value_col, "short", color, 12, head, gradient, session_link=True)
 
 
 def _hero_joined_board(pids, x, y, title, desc, metric_expr, value_col, unit, color, head, gradient, order):
     # Per-game metric off an event stream, restricted to FINISHED games (inner join on session.end).
-    base = ("SELECT A.player_initials, B.`__value__` AS v, 0 AS tb FROM A JOIN B "
+    base = ("SELECT A.player_initials, A.session_label, B.`__value__` AS v, 0 AS tb FROM A JOIN B "
             f"ON A.session_label = B.session_label WHERE {_NOT_NO_ROW}")
     return _hero_board(pids, x, y, 12, title, desc,
                        [_lb_loki("A", _GAMES_EXPR), _lb_loki("B", _pad(metric_expr))],
-                       base, value_col, unit, color, 12, head, gradient, order)
+                       base, value_col, unit, color, 12, head, gradient, order, session_link=True)
 
 
 def _hero_offroad_board(pids, x, y, head, gradient):
@@ -3090,7 +3129,7 @@ def _hero_offroad_board(pids, x, y, head, gradient):
                   f'| unwrap stage_duration_seconds [$__range]))')
     # A's value = the game's final score (also the "did it actually drive" gate).
     rate = "COALESCE(B.`__value__`, 0) / (C.`__value__` / 60.0)"
-    base = (f"SELECT A.player_initials, {rate} AS v, C.`__value__` AS tb, "
+    base = (f"SELECT A.player_initials, A.session_label, {rate} AS v, C.`__value__` AS tb, "
             f"COALESCE(B.`__value__`, 0) AS offroad, C.`__value__` / 60.0 AS minutes "
             f"FROM A LEFT JOIN B ON A.session_label = B.session_label JOIN C ON A.session_label = C.session_label "
             f"WHERE {_NOT_NO_ROW} AND A.`__value__` >= {MIN_SCORE} AND C.`__value__` >= {MIN_DRIVEN_SECONDS}")
@@ -3101,7 +3140,7 @@ def _hero_offroad_board(pids, x, y, head, gradient):
          f"excluded, as are games that scored under {MIN_SCORE} (the car never moved); ties go to the longer "
          f"game. Zero-incident games are included. Rank 1 is in the gold tiles above."),
         [_lb_loki("A", _pad(_end_expr("final_score"), _GAME_LBLS)), _lb_loki("B", offroad), _lb_loki("C", driven)],
-        base, "Per minute", "short", "green", 12, head, gradient, order="ASC", decimals=2,
+        base, "Per minute", "short", "green", 12, head, gradient, order="ASC", decimals=2, session_link=True,
         extras=[("offroad", "Off-road", "short", 0), ("minutes", "Minutes driven", "short", 1)])
 
 
@@ -3121,11 +3160,12 @@ def _stage_best_board(pid, x, y, w, h):
                     f'| completion_status="completed" | unwrap final_score [$__range]))',
                     ("session_label", "player_initials"))
     sql = (f"SELECT CONCAT('Stage ', t.stage) AS `Stage completed`, t.player_initials AS Player, "
-           f"t.score AS Score FROM (SELECT u.stage, u.player_initials, u.score, "
-           f"ROW_NUMBER() OVER (PARTITION BY u.stage ORDER BY u.score DESC) AS rn FROM ("
-           f"SELECT A.stage_number AS stage, A.player_initials, A.`__value__` AS score FROM A "
+           f"t.score AS Score, t.session_label AS session_label FROM (SELECT u.stage, u.player_initials, u.score, "
+           f"u.session_label, ROW_NUMBER() OVER (PARTITION BY u.stage ORDER BY u.score DESC) AS rn FROM ("
+           f"SELECT A.stage_number AS stage, A.player_initials, A.session_label, A.`__value__` AS score FROM A "
            f"JOIN B ON B.session_label = A.session_label WHERE A.session_label <> '{NO_ROW}' "
-           f"UNION ALL SELECT '5', C.player_initials, C.`__value__` FROM C WHERE C.session_label <> '{NO_ROW}'"
+           f"UNION ALL SELECT '5', C.player_initials, C.session_label, C.`__value__` FROM C "
+           f"WHERE C.session_label <> '{NO_ROW}'"
            f") u) t WHERE t.rn = 1 ORDER BY t.stage ASC")
     p = leaderboard_panel(
         pid, x, y, w, h, "🏁 Best score at the end of each stage",
@@ -3134,6 +3174,7 @@ def _stage_best_board(pid, x, y, w, h):
          "completed the stage count (not one that timed out on it), and only finished games."),
         [_lb_loki("A", at_end), _lb_loki("B", ended), _lb_loki("C", finished), _lb_sql("D", sql)],
         "Score", "none", 0, "purple")
+    p["fieldConfig"]["overrides"] += _session_link_overrides()
     # Stage-cell background = the per-stage colours of the "Stage reached" gauge on the
     # individual game dashboard (live board panel 14): red, orange, yellow, green, blue.
     p["fieldConfig"]["overrides"].append(
@@ -3237,12 +3278,13 @@ def build_leaderboard_dashboard():
                            "Highest final score per finished game, across all hosts in the time range. Rank 1 is in "
                            "the gold tiles above; this table lists the rest.",
                            _end_expr("final_score"), "Score", "none", "yellow", "🏆 Top scorer",
-                           ("#311b92", "#5e35b1", "#9575cd")),  # purples
+                           ("#311b92", "#5e35b1", "#9575cd"),  # purples
+                           session_link=True),
         *_hero_value_board((322, 323, 324, 302, 325), 12, 0, f"🧼 Top {HERO_TOP_N}: longest clean driving streak",
                            "Longest stretch without a crash or off-road incident in a single game (wall-clock "
                            "seconds). Rank 1 is in the gold tiles above; this table lists the rest.",
                            _end_expr("longest_clean_seconds"), "Streak", "suffix: s", "green", "🧼 Cleanest Driver",
-                           ("#1b5e20", "#388e3c", "#66bb6a")),  # greens
+                           ("#1b5e20", "#388e3c", "#66bb6a"), session_link=True),  # greens
         *_hero_count_board((331, 332, 333, 306, 334), 0, 0, f"🚗 Top {HERO_TOP_N}: most vehicles overtaken",
                            "Traffic overtakes (game.vehicle_overtake) in a single game. Rank 1 is in the gold tiles above.",
                            "game.vehicle_overtake", "Overtakes", "blue", "🚗 Best Overtaking",
