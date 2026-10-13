@@ -153,9 +153,11 @@ game_session (root span)
 | Event | Severity | Key Attributes |
 |-------|----------|----------------|
 | `game.session.start` | INFO | `game_mode`, `player_initials`, `music_selection` |
-| `game.session.end` | INFO | `completion_status`, `final_score`, `final_stage` |
-| `game.stage.start` | INFO | `stage_number`, `score_start`, `speed_kph` |
-| `game.stage.end` | INFO | `stage_number`, `score_end`, `time_remaining_seconds` |
+| `game.session.end` | INFO | `completion_status`, `final_score`, `final_stage`, `longest_clean_seconds`, `end_epoch_ms`, `completion_code`, `screenshot_jpg` |
+| `game.stage.start` | INFO | `stage_number`, `stage_id` (which of the 15 course sections), `score_start`, `speed_kph` |
+| `game.stage.end` | INFO | `stage_number`, `score_end`, `time_remaining_seconds`, `stage_duration_seconds`, `screenshot_jpg` |
+| `game.gameover` | INFO | `completed` (1 = reached the goal, 0 = clock ran out), `gameover_epoch_ms`, `time_remaining_seconds` (goal-line time left; `completed`=1 only) |
+| `game.map_screen` | INFO | `screenshot_jpg` |
 | `game.post_game.start` | INFO | — |
 | `game.post_game.end` | INFO | — |
 | `game.coin_inserted` | INFO | `credits` |
@@ -164,8 +166,13 @@ game_session (root span)
 | `game.crash` | WARN | `crash_type` (bump/spin/flip), `speed_kph`, `score`, `stage_number` |
 | `game.off_road` | WARN | `speed_kph`, `score`, `stage_number` |
 | `game.vehicle_overtake` | INFO | `vehicle`, `color`, `vehicle_type`, `palette`, `speed_kph`, `score`, `stage_number` |
+| `game.gear_shift` | INFO | `direction` (up/down), `speed_kph`, `score`, `stage_number` |
+| `game.startup` | INFO | `gearbox_mode`, `difficulty`, `traffic_difficulty`, `car_pal` (once, at process start) |
+| `game.heartbeat` | INFO | `heartbeat_epoch_ms` (about every 10s during quiet stretches, so a dashboard can tell "idle" from "frozen") |
 
-All logs also carry `trace_id` (which doubles as a session ID), `span_id`, `service.name`, and `host.name` as resource attributes.
+All logs also carry `trace_id` (which doubles as a session ID), `span_id`, `service.name` and `host.name` as resource attributes. In-game logs additionally carry `player_initials` and `session_label` (a readable, time-sortable `YYYY-MM-DD HH:MM:SS.mmm INITIALS` label that identifies one game).
+
+The log *body* is just the event name. Every attribute above arrives as OTel **structured metadata**, so in LogQL filter on it directly (`| event="game.crash"`, `| unwrap final_score`) and **do not add `| json`**. See [`ADD_LOGS.md`](ADD_LOGS.md) for the full event catalogue.
 
 **Example LogQL queries (Grafana → Loki):**
 
@@ -174,16 +181,19 @@ All logs also carry `trace_id` (which doubles as a session ID), `span_id`, `serv
 {service_name="cannonball-se"}
 
 # Crashes only
-{service_name="cannonball-se"} | json | event="game.crash"
+{service_name="cannonball-se"} | event="game.crash"
 
 # High-speed crashes
-{service_name="cannonball-se"} | json | event="game.crash" | speed_kph > 150
+{service_name="cannonball-se"} | event="game.crash" | speed_kph > 150
 
 # All events for a specific player
-{service_name="cannonball-se"} | json | player_initials="AAA"
+{service_name="cannonball-se"} | player_initials="AAA"
 
-# All events in one game session (click trace_id in a table panel to get the value)
-{service_name="cannonball-se"} | json | trace_id="<trace_id>"
+# All events in one game session (use a session_label from the Recent Games dashboard)
+{service_name="cannonball-se"} | session_label="2026-10-13 13:30:30.910 HKL"
+
+# Highest final score per game today
+max by (session_label) (max_over_time({service_name="cannonball-se"} | event="game.session.end" | unwrap final_score [$__range]))
 ```
 
 **Coin insert events** are also recorded as standalone trace spans (not attached to game sessions) for backwards compatibility.
@@ -249,6 +259,19 @@ CannonBall-SE works directly with Grafana Cloud's OTLP gateway. Configure `confi
 ```
 
 Traces are routed to **Tempo** and logs to **Loki** automatically via the same gateway and credentials. No separate log endpoint configuration is needed.
+
+### Grafana dashboards
+
+The [`dashboards/`](dashboards) folder holds four Grafana dashboards built on the Loki logs (Recent Games also has a panel linking out to the game's Tempo trace). They are generated from `dashboards/generate.py` and deployed with `dashboards/push.sh` (needs the Grafana Cloud CLI, `gcx`, logged in to your stack). Details, conventions and caveats are in [`dashboards/DASHBOARDS.md`](dashboards/DASHBOARDS.md).
+
+| Dashboard | What it shows |
+|-----------|---------------|
+| **Now Playing** | Hands-off view that follows the current or most recent game. |
+| **Recent Games** | Pick any game from today (or a wider range) and see its route, stage-by-stage score and time, crashes, overtakes and ranking against the other games in the range. |
+| **Operator Insights** | Cabinet health for one host: attract/playing state, coins and revenue, utilisation, usage by hour, latest screenshot. |
+| **Leaderboard** | Rankings across all games and hosts in the range: top scores, longest clean streak, finish-line time left, overtakes, crashes, slowest crash, fewest off-road incidents, best score at the end of each stage, and a route heat map. Player names link through to that game on Recent Games. |
+
+Required panel plugins: `grafana-graphviz-panel` and `marcusolsson-dynamictext-panel`.
 
 ---
 ## Board Selection & Performance Notes

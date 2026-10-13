@@ -3,13 +3,16 @@
 Single source of truth for the Cannonball-SE game dashboards.
 
 The LIVE board (live_game_dashboard.json) is authored/refined by hand (or exported
-from Grafana). This script derives the PICKER board (last_game_dashboard.json) from
+from Grafana). This script derives the PICKER board (recent_games_dashboard.json) from
 it so the two never drift: same panels, layout, viz, DOT, screenshots — only the
 query scoping and variables differ.
 
 The OPERATOR board (operator_dashboard.json, "Cannonball-SE — Operator Insights")
-is built independently, straight from Python (build_operator_dashboard()) — there's
-no hand-authored v1 source behind it the way LIVE/PICKER share one.
+and the LEADERBOARD (leaderboard_dashboard.json, "Cannonball-SE — Leaderboard") are
+built independently, straight from Python (build_operator_dashboard() /
+build_leaderboard_dashboard()) — there's no hand-authored v1 source behind them the
+way LIVE/PICKER share one. Leaderboard tuning constants (TOP_N, HERO_TOP_N, MIN_SCORE,
+...) live at the top of its section.
 
 Usage:  python3 dashboards/generate.py
 """
