@@ -118,9 +118,9 @@ void OName::flash_entry(uint32_t adr)
 void OName::do_input(uint32_t adr)
 {
     // Read Steering Left / Right & Denote Letter To Be Highlighted
-    const static uint8_t ENTRIES = 28; // 28 Possible entries we can select from
-    const static uint8_t DELETE = 26;
-    const static uint8_t END = 27;
+    // Selectable entries: 0-25 = A-Z, 26 = '.', 27 = delete ('<-'), 28 = end ('ED')
+    const static uint8_t DELETE = 27;
+    const static uint8_t END = 28;
 
     int16_t position = read_controls() + letter_selected;
 
