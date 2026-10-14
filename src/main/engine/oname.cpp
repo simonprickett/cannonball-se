@@ -69,6 +69,15 @@ const std::string& OName::get_initials() const
     return player_initials;
 }
 
+// The font's full stop tile is 0x5B, which is '[' in ASCII. Convert it for telemetry/logging.
+std::string OName::get_display_initials() const
+{
+    std::string out = player_initials;
+    for (char& c : out)
+        if (c == 0x5B) c = '.';
+    return out;
+}
+
 bool OName::is_complete() const
 {
     return complete;

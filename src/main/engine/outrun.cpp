@@ -498,14 +498,14 @@ void Outrun::main_switch()
                 // Start game session telemetry
                 std::string mode = (cannonball_mode == MODE_TTRIAL) ? "time_trial" : 
                                    (cannonball_mode == MODE_CONT) ? "continuous" : "original";
-                TelemetryManager::instance().start_game_session(mode, omusic.get_music_selected(), oname.get_initials());
+                TelemetryManager::instance().start_game_session(mode, omusic.get_music_selected(), oname.get_display_initials());
                 // Capture the start-line frame: car sat at the lights, countdown just hit GO.
                 std::string start_screenshot_b64 = video.capture_screenshot_base64();
                 TelemetryManager::instance().log_game_event("game.session.start",
                     TelemetryManager::SEV_INFO,
                     {
                         {"game_mode", mode},
-                        {"player_initials", oname.get_initials()},
+                        {"player_initials", oname.get_display_initials()},
                         {"gearbox_mode", (config.controls.gear == config.controls.GEAR_AUTO) ? "automatic" : "manual"},
                         {"screenshot_jpg", start_screenshot_b64}
                     },
@@ -745,6 +745,8 @@ void Outrun::main_switch()
                     initials += (char)ohiscore.scores[pos].initial1;
                     initials += (char)ohiscore.scores[pos].initial2;
                     initials += (char)ohiscore.scores[pos].initial3;
+                    for (char& c : initials)
+                        if (c == 0x5B) c = '.'; // full stop tile
                     
                     TelemetryManager::instance().add_event("high_score", {
                         {"position", std::to_string(pos + 1)},

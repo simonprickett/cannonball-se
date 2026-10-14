@@ -21,6 +21,7 @@ public:
     void disable();                         // Clean up
     void tick();                            // Main update loop
     const std::string& get_initials() const; // Return entered initials
+    std::string get_display_initials() const; // Initials as readable text ('.' tile 0x5B -> '.')
     bool is_complete() const;               // Check if entry is done
 
 private:
