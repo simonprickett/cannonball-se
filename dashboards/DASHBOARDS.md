@@ -136,6 +136,11 @@ full-resolution frames.
   and server-capped on Grafana Cloud ([tempo#6996](https://github.com/grafana/tempo/issues/6996)),
   silently dropping older games, and the board went blank whenever Tempo was down. The Loki table
   honours the full time range and has no such cap, so Tempo was dropped entirely.)
+- **Empty-day behaviour.** A Grafana SQL expression errors when an input query returns no rows, so
+  every SQL-backed Operator panel pads its Loki queries with an inert row (`_pad()`, label `~`, heartbeat
+  `or vector(0)`) that the SQL filters out. With no games yet: Average game duration and Music plays show
+  "No data"; Utilization shows 0% and Time in each state 100% attract when the cabinet is heartbeating
+  (accurate: on but unplayed), and "No data" when there's no heartbeat to anchor "time on".
 - **Walk-away games (Operator Insights)** = finished games with a final score under `WALKAWAY_MAX_SCORE`
   (1,000), i.e. the car barely/never moved. It is deliberately NOT a duration test: every game runs the
   full clock (~112s start to end), so duration can't separate a walk-away from a normal game.

@@ -1430,16 +1430,16 @@ def _lifecycle_pie_panel(pid, x, y, w, h):
         "targets": [
             {"refId": "A", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
              "editorMode": "code", "queryType": "instant",
-             "expr": f'max by (session_label) (max_over_time({HOST_SCOPED} | event="game.session.start" | unwrap start_epoch_ms [$__range]))'},
+             "expr": _pad(f'max by (session_label) (max_over_time({HOST_SCOPED} | event="game.session.start" | unwrap start_epoch_ms [$__range]))')},
             {"refId": "B", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
              "editorMode": "code", "queryType": "instant",
-             "expr": f'max by (session_label) (max_over_time({HOST_SCOPED} | event="game.session.end" | unwrap end_epoch_ms [$__range]))'},
+             "expr": _pad(f'max by (session_label) (max_over_time({HOST_SCOPED} | event="game.session.end" | unwrap end_epoch_ms [$__range]))')},
             {"refId": "C", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
              "editorMode": "code", "queryType": "instant",
-             "expr": f'max by (session_label) (max_over_time({HOST_SCOPED} | event="game.gameover" | unwrap gameover_epoch_ms [$__range]))'},
+             "expr": _pad(f'max by (session_label) (max_over_time({HOST_SCOPED} | event="game.gameover" | unwrap gameover_epoch_ms [$__range]))')},
             {"refId": "D", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
              "editorMode": "code", "queryType": "instant",
-             "expr": f'min(min_over_time({HOST_SCOPED} | event="game.heartbeat" | unwrap heartbeat_epoch_ms [$__range]))'},
+             "expr": _pad(f'min(min_over_time({HOST_SCOPED} | event="game.heartbeat" | unwrap heartbeat_epoch_ms [$__range]))', ())},
             {"refId": "E", "datasource": {"type": "__expr__", "uid": "__expr__"}, "type": "sql",
              "expression": (
                  "SELECT "
@@ -1447,10 +1447,11 @@ def _lifecycle_pie_panel(pid, x, y, w, h):
                  "playing / total_on * 100.0 AS `Playing`, "
                  "postgame / total_on * 100.0 AS `Post game` "
                  "FROM (SELECT "
-                 "$__to - (SELECT `__value__` FROM D) AS total_on, "
+                 "CASE WHEN (SELECT `__value__` FROM D) > 0 THEN $__to - (SELECT `__value__` FROM D) END AS total_on, "
                  "COALESCE(SUM(CASE WHEN c.`__value__` IS NOT NULL THEN c.`__value__` ELSE COALESCE(b.`__value__`, $__to) END - a.`__value__`), 0) AS playing, "
                  "COALESCE(SUM(COALESCE(b.`__value__`, $__to) - CASE WHEN c.`__value__` IS NOT NULL THEN c.`__value__` ELSE COALESCE(b.`__value__`, $__to) END), 0) AS postgame "
-                 "FROM A a LEFT JOIN B b ON a.session_label = b.session_label LEFT JOIN C c ON a.session_label = c.session_label) q"
+                 "FROM A a LEFT JOIN B b ON a.session_label = b.session_label LEFT JOIN C c ON a.session_label = c.session_label "
+                 "WHERE a.session_label <> '~') q"
              )},
         ],
         "options": {
@@ -1666,13 +1667,14 @@ def _avg_duration_panel(pid, x, y, w, h):
         "targets": [
             {"refId": "A", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
              "editorMode": "code", "queryType": "instant",
-             "expr": f'max by (session_label) (max_over_time({HOST_SCOPED} | event="game.session.start" | unwrap start_epoch_ms [$__range]))'},
+             "expr": _pad(f'max by (session_label) (max_over_time({HOST_SCOPED} | event="game.session.start" | unwrap start_epoch_ms [$__range]))')},
             {"refId": "B", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
              "editorMode": "code", "queryType": "instant",
-             "expr": f'max by (session_label) (max_over_time({HOST_SCOPED} | event="game.session.end" | unwrap end_epoch_ms [$__range]))'},
+             "expr": _pad(f'max by (session_label) (max_over_time({HOST_SCOPED} | event="game.session.end" | unwrap end_epoch_ms [$__range]))')},
             {"refId": "C", "datasource": {"type": "__expr__", "uid": "__expr__"}, "type": "sql",
              "expression": ("SELECT AVG((b.`__value__` - a.`__value__`)/1000.0) AS avg_duration_seconds "
-                            "FROM A a JOIN B b ON a.session_label = b.session_label")},
+                            "FROM A a JOIN B b ON a.session_label = b.session_label "
+                            "WHERE a.session_label <> '~'")},
         ],
         "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False},
                     "colorMode": "background", "graphMode": "none", "justifyMode": "auto",
@@ -1726,17 +1728,19 @@ def _utilization_panel(pid, x, y, w, h):
         "targets": [
             {"refId": "A", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
              "editorMode": "code", "queryType": "instant",
-             "expr": f'max by (session_label) (max_over_time({HOST_SCOPED} | event="game.session.start" | unwrap start_epoch_ms [$__range]))'},
+             "expr": _pad(f'max by (session_label) (max_over_time({HOST_SCOPED} | event="game.session.start" | unwrap start_epoch_ms [$__range]))')},
             {"refId": "B", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
              "editorMode": "code", "queryType": "instant",
-             "expr": f'max by (session_label) (max_over_time({HOST_SCOPED} | event="game.session.end" | unwrap end_epoch_ms [$__range]))'},
+             "expr": _pad(f'max by (session_label) (max_over_time({HOST_SCOPED} | event="game.session.end" | unwrap end_epoch_ms [$__range]))')},
             {"refId": "D", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
              "editorMode": "code", "queryType": "instant",
-             "expr": f'min(min_over_time({HOST_SCOPED} | event="game.heartbeat" | unwrap heartbeat_epoch_ms [$__range]))'},
+             "expr": _pad(f'min(min_over_time({HOST_SCOPED} | event="game.heartbeat" | unwrap heartbeat_epoch_ms [$__range]))', ())},
             {"refId": "E", "datasource": {"type": "__expr__", "uid": "__expr__"}, "type": "sql",
-             "expression": ("SELECT COALESCE(SUM(b.`__value__` - a.`__value__`), 0) "
-                            "/ ($__to - (SELECT `__value__` FROM D)) * 100.0 AS utilization_pct "
-                            "FROM A a JOIN B b ON a.session_label = b.session_label")},
+             "expression": ("SELECT CASE WHEN (SELECT `__value__` FROM D) > 0 THEN "
+                            "COALESCE(SUM(b.`__value__` - a.`__value__`), 0) "
+                            "/ ($__to - (SELECT `__value__` FROM D)) * 100.0 END AS utilization_pct "
+                            "FROM A a JOIN B b ON a.session_label = b.session_label "
+                            "WHERE a.session_label <> '~'")},
         ],
         # Same circle/LED-segment gauge style as the Top speed/Avg speed gauges
         # (speed_gauge_panel): segmentCount 63 (dashed-arc "LED" look),
@@ -1781,17 +1785,19 @@ def _utilization_bargauge_panel(pid, x, y, w, h):
         "targets": [
             {"refId": "A", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
              "editorMode": "code", "queryType": "instant",
-             "expr": f'max by (session_label) (max_over_time({HOST_SCOPED} | event="game.session.start" | unwrap start_epoch_ms [$__range]))'},
+             "expr": _pad(f'max by (session_label) (max_over_time({HOST_SCOPED} | event="game.session.start" | unwrap start_epoch_ms [$__range]))')},
             {"refId": "B", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
              "editorMode": "code", "queryType": "instant",
-             "expr": f'max by (session_label) (max_over_time({HOST_SCOPED} | event="game.session.end" | unwrap end_epoch_ms [$__range]))'},
+             "expr": _pad(f'max by (session_label) (max_over_time({HOST_SCOPED} | event="game.session.end" | unwrap end_epoch_ms [$__range]))')},
             {"refId": "D", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
              "editorMode": "code", "queryType": "instant",
-             "expr": f'min(min_over_time({HOST_SCOPED} | event="game.heartbeat" | unwrap heartbeat_epoch_ms [$__range]))'},
+             "expr": _pad(f'min(min_over_time({HOST_SCOPED} | event="game.heartbeat" | unwrap heartbeat_epoch_ms [$__range]))', ())},
             {"refId": "E", "datasource": {"type": "__expr__", "uid": "__expr__"}, "type": "sql",
-             "expression": ("SELECT COALESCE(SUM(b.`__value__` - a.`__value__`), 0) "
-                            "/ ($__to - (SELECT `__value__` FROM D)) * 100.0 AS utilization_pct "
-                            "FROM A a JOIN B b ON a.session_label = b.session_label")},
+             "expression": ("SELECT CASE WHEN (SELECT `__value__` FROM D) > 0 THEN "
+                            "COALESCE(SUM(b.`__value__` - a.`__value__`), 0) "
+                            "/ ($__to - (SELECT `__value__` FROM D)) * 100.0 END AS utilization_pct "
+                            "FROM A a JOIN B b ON a.session_label = b.session_label "
+                            "WHERE a.session_label <> '~'")},
         ],
         # "lcd" displayMode = the segmented retro-LCD look; vertical since
         # this is a single narrow column next to the stat stack.
@@ -2016,13 +2022,15 @@ def _music_plays_panel(pid, x, y, w, h):
         "targets": [
             {"refId": "A", "hide": True, "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
              "editorMode": "code", "queryType": "instant",
-             "expr": f'sum by (music_selection) (count_over_time({HOST_SCOPED} | event="game.session.start" [$__range]))'},
+             "expr": _pad(f'sum by (music_selection) (count_over_time({HOST_SCOPED} | event="game.session.start" [$__range]))',
+                          ("music_selection",))},
             {"refId": "B", "datasource": {"type": "__expr__", "uid": "__expr__"}, "type": "sql",
              "expression": ("SELECT t.label AS track, COALESCE(SUM(a.cnt), 0) AS plays "
                             "FROM (SELECT '0' AS v, 'Magical Sound Shower' AS label UNION ALL SELECT '1','Passing Breeze' "
                             "UNION ALL SELECT '2','Splash Wave' UNION ALL SELECT '3','Custom') t "
                             "LEFT JOIN (SELECT CASE WHEN CAST(music_selection AS SIGNED) >= 3 THEN '3' "
-                            "ELSE music_selection END AS v, `__value__` AS cnt FROM A) a ON a.v = t.v "
+                            "ELSE music_selection END AS v, `__value__` AS cnt FROM A WHERE music_selection <> '~') a ON a.v = t.v "
+                            "WHERE (SELECT COUNT(*) FROM A WHERE music_selection <> '~') > 0 "
                             "GROUP BY t.label, t.v ORDER BY t.v")},
         ],
         "options": {"displayMode": "lcd", "orientation": "horizontal", "valueMode": "color",
