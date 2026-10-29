@@ -273,6 +273,8 @@ The [`dashboards/`](dashboards) folder holds four Grafana dashboards built on th
 
 Required panel plugins: `grafana-graphviz-panel` and `marcusolsson-dynamictext-panel`.
 
+**Requires Grafana 13.3 or later.** The rank tiles use the `ordinal` unit (1st, 2nd, 3rd…), which was introduced in Grafana 13.3.
+
 ---
 ## Board Selection & Performance Notes
 

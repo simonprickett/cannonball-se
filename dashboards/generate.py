@@ -730,12 +730,6 @@ def score_progression_panel(y):
     }
 
 
-def _ordinal(n):
-    # 1->1st, 2->2nd, 3->3rd, 4->4th … with the 11th/12th/13th exceptions.
-    suffix = "th" if 10 <= n % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
-    return f"{n}{suffix}"
-
-
 _MEDAL = {1: "#b8860b", 2: "#808891", 3: "#a05a2c"}  # deep gold / silver / bronze (readable w/ white text)
 
 
@@ -762,13 +756,11 @@ def rank_panel(pid, x, y, title, all_games_expr, selected_expr, description):
         "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "/^game_rank$/", "values": False},
                     "colorMode": "background", "graphMode": "none", "justifyMode": "auto",
                     "textMode": "auto", "wideLayout": True, "showPercentChange": False},
-        "fieldConfig": {"defaults": {"unit": "short",
-                                     # 1..100 -> ordinals; podium (1/2/3) gold/silver/bronze background,
-                                     # everything else the same dark-blue as the Player tile.
+        "fieldConfig": {"defaults": {"unit": "ordinal",  # Grafana 13.3+ built-in: 1 -> 1st, 22 -> 22nd, 111 -> 111th
+                                     # podium (1/2/3) gold/silver/bronze background (colour only, text
+                                     # comes from the unit); everything else the same dark-blue as the Player tile.
                                      "mappings": [{"type": "value", "options": {
-                                         str(n): {"text": _ordinal(n), "index": n - 1,
-                                                  **({"color": _MEDAL[n]} if n in _MEDAL else {})}
-                                         for n in range(1, 101)}}],
+                                         str(n): {"color": c, "index": n - 1} for n, c in _MEDAL.items()}}],
                                      "color": {"mode": "fixed", "fixedColor": "dark-blue"}},
                         "overrides": []},
     }
