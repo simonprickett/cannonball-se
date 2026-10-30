@@ -126,3 +126,114 @@ attributes, structured metadata) and hits query limits, so the replayed data wou
 
 - Update the dashboards' bar charts to use the new bar chart PR so the series name is shown when
   there is only one metric. Noted only; no dashboard changes made yet.
+
+## Idea: fan select events out to MQTT or Redis (not planned yet, no implementation)
+
+Goal: have Alloy emit chosen game events (e.g. crashes, overtakes, game start/end) to an MQTT broker or
+Redis, without changing the C++ code. Separate from the capture/replay work, but it would reuse the same
+fan-out in the Alloy pipeline.
+
+What the Alloy docs list (checked against the `otelcol` component index, not against the installed
+v1.21.3 build): the `otelcol.exporter.*` set includes `kafka`, `googlecloudpubsub`, `awss3`, `syslog`,
+`file`, `loki`, `otlp`, `otlphttp` and others, but **no native MQTT or Redis exporter**. So there are
+two routes:
+
+1. **Native message bus.** Select events in Alloy and publish to **Kafka** (or Pub/Sub) with the existing
+   exporter. Only useful if Kafka is acceptable as the broker, or a Kafka-to-MQTT/Redis bridge is wanted.
+2. **Small bridge (most likely).** Alloy sends the selected events over OTLP/HTTP to a local process
+   (a ~30-line script, or Node-RED / Redpanda Connect / similar) that publishes them to MQTT or Redis.
+   Same shape as the capture-sink fallback in Part 1.
+
+Selecting events in Alloy, either way:
+- Filter with `otelcol.processor.filter` (OTTL conditions on the log's `event` attribute, e.g. keep only
+  `game.crash` and `game.vehicle_overtake`), or
+- Split into per-event pipelines with `otelcol.connector.routing`, so the Grafana Cloud pipeline still gets
+  everything while the broker pipeline gets only the selected events.
+
+Things to decide or check before doing it:
+- Which events, and the payload shape the consumer wants (OTLP JSON vs a flat JSON message). A bridge can
+  flatten it; Alloy cannot.
+- Whether MQTT/Redis components exist in Alloy's newer builds (re-check the component list for v1.21.3).
+- Delivery: a slow or down broker must not back-pressure the Cloud pipeline. Use a separate batch
+  processor and queue for the broker branch.
+- Where the broker lives (on the Pi or elsewhere on the network) and how it authenticates.
+
+### If we write a bridge (Python, using only what Alloy provides natively)
+
+Alloy has no MQTT or Redis exporter, and the Pub/Sub exporter is a community component that needs a
+Google Cloud project, so the working assumption is a small **Python bridge** fed over OTLP/HTTP. Not built
+yet, and the Alloy argument names below are from memory, so check them against the reference page for the
+installed Alloy version.
+
+Protocol, Alloy -> bridge:
+- `otelcol.exporter.otlphttp "bridge"` does `POST /v1/logs` to a local port (e.g. `http://127.0.0.1:9000/v1/logs`).
+- Ask for JSON, uncompressed, so the bridge needs no protobuf or gzip handling: `encoding = "json"` on the
+  exporter and `compression = "none"` in its `client` block. (Default is protobuf + gzip.)
+- The bridge replies `200` with `{}`. `429`/`5xx` make Alloy retry from its queue; a `400` is treated as
+  permanent and the batch is dropped.
+
+Body shape (standard OTLP/JSON):
+```
+resourceLogs[] -> resource.attributes[] (service.name, host.name)
+  scopeLogs[] -> logRecords[]: timeUnixNano, severityText, body, attributes[]  (event = "game.crash" ...)
+```
+- Attributes are a list of `{key, value:{stringValue|intValue|doubleValue...}}`, not a flat object. Flatten them.
+- int64 values arrive as JSON strings.
+
+Bridge job: for each log record, read `event`, flatten attributes to a plain JSON message, publish it:
+- MQTT: topic like `cannonball/<host>/<event>` (e.g. `paho-mqtt`).
+- Redis: `PUBLISH`, or `XADD` to a stream if history is wanted (e.g. `redis-py`).
+
+Pipeline, as a branch beside the existing Cloud branch:
+```
+otelcol.receiver.otlp -> otelcol.processor.filter -> otelcol.processor.batch (own, short timeout)
+                      -> otelcol.exporter.otlphttp "bridge"
+```
+The bridge branch gets its own batch processor and sending queue so a stalled bridge cannot hold up Cloud.
+
+Python notes:
+- Stdlib `http.server` (or `ThreadingHTTPServer`) is enough for the receiving side; only the MQTT/Redis client is a dependency.
+- Run it as a systemd unit on the Pi, `After=` the broker and before/alongside Alloy, restarting on failure.
+- Keep it stateless and idempotent where possible; log and skip bad records rather than returning a non-2xx that would trigger retries of a poisoned batch.
+
+Synergy: the same receiving code could double as the **capture sink** for the replay plan (it sees exactly
+the logs we would want to record), if we do not use `otelcol.exporter.file`.
+
+Alternatives considered: `otelcol.exporter.syslog` (simpler to parse, but flat and untyped) and
+`otelcol.exporter.file` plus a tailing bridge (no network protocol, but not immediate and needs rotation handling).
+
+### Filtering events for the bridge (noted only, not implemented)
+
+Only a subset of game events should reach the bridge. Do this in Alloy, in the bridge branch only, with
+`otelcol.processor.filter`.
+
+**The filter processor drops records that match its condition**, so to keep a few events the condition is the
+inverse:
+
+```alloy
+otelcol.processor.filter "bridge_events" {
+  error_mode = "ignore"
+  logs {
+    log_record = [
+      `attributes["event"] != "game.crash" and attributes["event"] != "game.vehicle_overtake"`,
+    ]
+  }
+  output {
+    logs = [otelcol.processor.batch.bridge.input]
+  }
+}
+```
+
+This keeps only `game.crash` and `game.vehicle_overtake` for the bridge. Everything else is dropped from that
+branch only.
+
+- **Cloud branch unaffected (to confirm).** The receiver feeds both branches and the collector gives each its own
+  copy when one of them modifies the data, so the Cloud branch should still get everything. Confirm on the Pi that
+  the Cloud log counts do not drop.
+- **Is `event` an attribute?** Judging by the Loki labels it looks like a log record attribute, which is what the
+  condition assumes. Not checked against the raw OTLP. The first capture will settle it.
+- **Longer keep-lists.** Use OTTL `IsMatch`, e.g. `IsMatch(attributes["event"], "^game\\.(crash|vehicle_overtake|session\\.end)$")`,
+  instead of chained `and` conditions.
+- **Routing instead.** `otelcol.connector.routing` is only worth it if different events go to different
+  destinations. For a single bridge, the filter is simpler, and the bridge can pick the MQTT topic from `event`.
+- **To decide:** which events make up the subset. `game.heartbeat` should probably stay out.
