@@ -75,6 +75,25 @@ static std::string base64_encode(const std::string& input) {
     return result;
 }
 
+// Normalise the configured OTLP base URL (e.g. http://host:4318/v1): drop any trailing
+// slashes so "/v1/" and "/v1" behave the same. For backward compatibility with configs
+// written when the full traces URL was expected, a trailing "/traces" is also dropped.
+static std::string normalise_otlp_base(std::string url) {
+    auto trim_slashes = [&url]() {
+        while (!url.empty() && url.back() == '/') {
+            url.pop_back();
+        }
+    };
+    trim_slashes();
+    static const std::string legacy_suffix = "/traces";
+    if (url.size() >= legacy_suffix.size() &&
+        url.compare(url.size() - legacy_suffix.size(), legacy_suffix.size(), legacy_suffix) == 0) {
+        url.erase(url.size() - legacy_suffix.size());
+        trim_slashes();
+    }
+    return url;
+}
+
 TelemetryManager& TelemetryManager::instance() {
     static TelemetryManager instance;
     return instance;
@@ -93,10 +112,16 @@ void TelemetryManager::init(const std::string& otlp_endpoint, const std::string&
         return;
     }
 
+    // otlp_endpoint is the OTLP base URL ending /v1; signal paths are appended here.
+    const std::string otlp_base = normalise_otlp_base(otlp_endpoint);
+    const std::string traces_endpoint = otlp_base + "/traces";
+    const std::string logs_endpoint = otlp_base + "/logs";
+
     try {
         if (debug) {
             std::cout << "\n=== Telemetry Initialization ===" << std::endl;
             std::cout << "Endpoint: " << otlp_endpoint << std::endl;
+            std::cout << "Traces endpoint: " << traces_endpoint << std::endl;
         }
 
         // Get hostname for resource attributes
@@ -118,7 +143,7 @@ void TelemetryManager::init(const std::string& otlp_endpoint, const std::string&
 
         // Configure OTLP HTTP exporter
         opentelemetry::exporter::otlp::OtlpHttpExporterOptions exporter_opts;
-        exporter_opts.url = otlp_endpoint;
+        exporter_opts.url = traces_endpoint;
 
         // Add authentication header if token is configured
         if (!auth_token.empty() && !instance_id.empty()) {
@@ -159,13 +184,6 @@ void TelemetryManager::init(const std::string& otlp_endpoint, const std::string&
         impl_->tracer = impl_->provider->GetTracer("cannonball-se", "1.0.0");
 
         // Initialize logs provider
-        // Derive logs endpoint by replacing /v1/traces with /v1/logs
-        std::string logs_endpoint = otlp_endpoint;
-        size_t pos = logs_endpoint.find("/v1/traces");
-        if (pos != std::string::npos) {
-            logs_endpoint.replace(pos, 10, "/v1/logs");
-        }
-
         opentelemetry::exporter::otlp::OtlpHttpLogRecordExporterOptions log_exporter_opts;
         log_exporter_opts.url = logs_endpoint;
 
@@ -202,7 +220,7 @@ void TelemetryManager::init(const std::string& otlp_endpoint, const std::string&
             std::cout << "Telemetry initialization: SUCCESS" << std::endl;
             std::cout << "================================\n" << std::endl;
         } else {
-            std::cout << "Telemetry initialized: " << otlp_endpoint << std::endl;
+            std::cout << "Telemetry initialized: " << otlp_base << std::endl;
         }
 
     } catch (const std::exception& e) {

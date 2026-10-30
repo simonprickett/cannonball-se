@@ -236,9 +236,10 @@
     -->
     <telemetry>
         <!-- OTLP HTTP Endpoint - REQUIRED, application will fail to start if not configured -->
-        <!-- Example: http://localhost:4318/v1/traces for local OTLP collector -->
-        <!-- For Grafana Cloud: https://otlp-gateway-prod-<region>.grafana.net/otlp/v1/traces -->
-        <otlp_endpoint>https://YOUR GRAFANA CLOUD HOSTNAME HERE/otlp/v1/traces</otlp_endpoint>
+        <!-- Base URL ending /v1 - the game appends /traces and /logs itself -->
+        <!-- Example: http://localhost:4318/v1 for local OTLP collector -->
+        <!-- For Grafana Cloud: https://otlp-gateway-prod-<region>.grafana.net/otlp/v1 -->
+        <otlp_endpoint>https://YOUR GRAFANA CLOUD HOSTNAME HERE/otlp/v1</otlp_endpoint>
         <!-- Grafana Cloud Instance ID - REQUIRED for Grafana Cloud -->
         <!-- Found in Grafana Cloud portal, typically a numeric value -->
         <instance_id>YOUR GRAFANA INSTANCE ID HERE</instance_id>
@@ -249,8 +250,9 @@
         <auth_token>glc_YOUR TOKEN HERE</auth_token>
         <!-- Batch export intervals in milliseconds. OPTIONAL - 0 or omitted uses the SDK defaults -->
         <!-- (traces 5000, logs 1000). Lower = fresher data in Grafana but more frequent, smaller requests. -->
+        <!-- Logs are set to 250 here (tested on a Pi 4 with no visible impact) so dashboards update quickly. -->
         <trace_export_interval_ms>0</trace_export_interval_ms>
-        <log_export_interval_ms>0</log_export_interval_ms>
+        <log_export_interval_ms>250</log_export_interval_ms>
         <!-- Debug Logging - Set to 1 to enable verbose telemetry logging -->
         <debug>1</debug>
     </telemetry>

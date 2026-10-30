@@ -30,8 +30,8 @@ attributes, structured metadata) and hits query limits, so the replayed data wou
 ## Part 1: Capture (Alloy)
 
 - Point the game's `otlp_endpoint` in `config.xml` at the local Alloy
-  (`http://localhost:4318/v1/traces`). This is config only. The game derives its logs URL from
-  the traces URL, so the receiver must accept both paths.
+  (`http://localhost:4318/v1`). This is config only. The game appends `/traces` and `/logs`, so
+  the receiver must accept both paths.
 - `otelcol.receiver.otlp` fans **logs only** out to:
   - `otelcol.exporter.otlphttp` (Grafana Cloud, current behaviour)
   - `otelcol.exporter.file` (capture)

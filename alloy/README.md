@@ -93,14 +93,14 @@ In the game's `config.xml`, change the `<telemetry>` block:
 
 ```xml
 <telemetry>
-    <otlp_endpoint>http://127.0.0.1:4318/v1/traces</otlp_endpoint>
+    <otlp_endpoint>http://127.0.0.1:4318/v1</otlp_endpoint>
     <instance_id></instance_id>
     <auth_token></auth_token>
     ...
 </telemetry>
 ```
 
-- The game derives its logs URL from the traces URL, so one endpoint covers both signals.
+- The game appends `/traces` and `/logs` to this base URL, so one endpoint covers both signals.
 - Leave `instance_id` and `auth_token` empty. With no token the game sends no `Authorization` header, and
   Alloy adds the credentials. Sending them to Alloy is harmless, but there is no need.
 - Restart the game.

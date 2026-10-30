@@ -123,22 +123,24 @@ Edit `config.xml` and set the OTLP endpoint:
 
 ```xml
 <telemetry>
-  <otlp_endpoint>http://localhost:4318/v1/traces</otlp_endpoint>
+  <otlp_endpoint>http://localhost:4318/v1</otlp_endpoint>
 </telemetry>
 ```
 
 **The game will exit with an error if `otlp_endpoint` is not configured.**
 
-The logs endpoint is derived automatically by replacing `/v1/traces` with `/v1/logs` in the configured URL, so no additional configuration is needed.
+`otlp_endpoint` is the OTLP base URL ending `/v1` (a trailing `/` is fine). The game appends `/traces` and `/logs` itself, so no additional configuration is needed. Older configs ending `/v1/traces` still work.
 
 Optionally, tune how often the game flushes batched telemetry to the endpoint (milliseconds; `0` or omitted keeps the SDK default):
 
 ```xml
 <telemetry>
-  <trace_export_interval_ms>5000</trace_export_interval_ms>  <!-- SDK default 5000 -->
-  <log_export_interval_ms>1000</log_export_interval_ms>      <!-- SDK default 1000 -->
+  <trace_export_interval_ms>0</trace_export_interval_ms>     <!-- 0 = SDK default (5000) -->
+  <log_export_interval_ms>250</log_export_interval_ms>       <!-- 0 = SDK default (1000) -->
 </telemetry>
 ```
+
+The shipped `config.xml` sets logs to **250 ms** so dashboards update quickly (tested on a Raspberry Pi 4 with no visible impact) and leaves traces at the SDK default. Lower values mean fresher data but more frequent, smaller requests.
 
 ### Signals
 
@@ -250,7 +252,7 @@ services:
 
 Then configure `config.xml` with:
 ```xml
-<otlp_endpoint>http://<jaeger-host>:4318/v1/traces</otlp_endpoint>
+<otlp_endpoint>http://<jaeger-host>:4318/v1</otlp_endpoint>
 ```
 
 View traces at `http://<jaeger-host>:16686`
@@ -261,7 +263,7 @@ CannonBall-SE works directly with Grafana Cloud's OTLP gateway. Configure `confi
 
 ```xml
 <telemetry>
-  <otlp_endpoint>https://otlp-gateway-prod-<region>.grafana.net/otlp/v1/traces</otlp_endpoint>
+  <otlp_endpoint>https://otlp-gateway-prod-<region>.grafana.net/otlp/v1</otlp_endpoint>
   <instance_id>your-instance-id</instance_id>
   <auth_token>your-grafana-cloud-token</auth_token>
 </telemetry>

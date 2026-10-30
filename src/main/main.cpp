@@ -767,7 +767,7 @@ int main(int argc, char* argv[]) {
         // Validate telemetry configuration
         if (config.telemetry.otlp_endpoint.empty()) {
             std::cerr << "Error: telemetry.otlp_endpoint is not configured in config.xml" << std::endl;
-            std::cerr << "Please add <telemetry><otlp_endpoint>http://your-collector:4318/v1/traces</otlp_endpoint></telemetry>" << std::endl;
+            std::cerr << "Please add <telemetry><otlp_endpoint>http://your-collector:4318/v1</otlp_endpoint></telemetry>" << std::endl;
             quit_func(1);
             return 1;
         }
