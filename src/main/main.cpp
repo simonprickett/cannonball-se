@@ -773,7 +773,8 @@ int main(int argc, char* argv[]) {
         }
 
         // Initialize telemetry
-        TelemetryManager::instance().init(config.telemetry.otlp_endpoint, config.telemetry.instance_id, config.telemetry.auth_token, config.telemetry.debug);
+        TelemetryManager::instance().init(config.telemetry.otlp_endpoint, config.telemetry.instance_id, config.telemetry.auth_token, config.telemetry.debug,
+                                        config.telemetry.trace_export_interval_ms, config.telemetry.log_export_interval_ms);
 
         // One-time startup marker, carrying config dashboards have no other visibility
         // into: car colour, gearbox mode, and the time/traffic DIP-switch difficulties.

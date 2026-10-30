@@ -376,6 +376,8 @@ void Config::load()
     telemetry.otlp_endpoint = cfg.get_string("telemetry.otlp_endpoint", "");
     telemetry.instance_id = cfg.get_string("telemetry.instance_id", "");
     telemetry.auth_token = cfg.get_string("telemetry.auth_token", "");
+    telemetry.trace_export_interval_ms = cfg.get_int("telemetry.trace_export_interval_ms", 0);
+    telemetry.log_export_interval_ms = cfg.get_int("telemetry.log_export_interval_ms", 0);
     telemetry.debug = cfg.get_int("telemetry.debug", 0) != 0;
 }
 

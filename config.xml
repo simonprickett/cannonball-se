@@ -247,6 +247,10 @@
         <!-- Will be combined with instance_id as "Authorization: Basic base64(instance_id:token)" -->
         <!-- Leave empty to disable authentication -->
         <auth_token>glc_YOUR TOKEN HERE</auth_token>
+        <!-- Batch export intervals in milliseconds. OPTIONAL - 0 or omitted uses the SDK defaults -->
+        <!-- (traces 5000, logs 1000). Lower = fresher data in Grafana but more frequent, smaller requests. -->
+        <trace_export_interval_ms>0</trace_export_interval_ms>
+        <log_export_interval_ms>0</log_export_interval_ms>
         <!-- Debug Logging - Set to 1 to enable verbose telemetry logging -->
         <debug>1</debug>
     </telemetry>

@@ -22,7 +22,8 @@ public:
     static TelemetryManager& instance();
     
     // Initialize telemetry with OTLP endpoint, instance ID, and optional auth token
-    void init(const std::string& otlp_endpoint, const std::string& instance_id = "", const std::string& auth_token = "", bool debug = false);
+    void init(const std::string& otlp_endpoint, const std::string& instance_id = "", const std::string& auth_token = "", bool debug = false,
+              int trace_export_interval_ms = 0, int log_export_interval_ms = 0);
     
     // Graceful shutdown - flushes pending spans
     void shutdown();

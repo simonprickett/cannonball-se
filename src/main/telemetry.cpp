@@ -86,7 +86,8 @@ TelemetryManager::~TelemetryManager() {
     cleanup();
 }
 
-void TelemetryManager::init(const std::string& otlp_endpoint, const std::string& instance_id, const std::string& auth_token, bool debug) {
+void TelemetryManager::init(const std::string& otlp_endpoint, const std::string& instance_id, const std::string& auth_token, bool debug,
+                            int trace_export_interval_ms, int log_export_interval_ms) {
     if (initialized_) {
         std::cerr << "TelemetryManager: Already initialized" << std::endl;
         return;
@@ -137,9 +138,14 @@ void TelemetryManager::init(const std::string& otlp_endpoint, const std::string&
         std::unique_ptr<opentelemetry::sdk::trace::SpanExporter> exporter(
             new opentelemetry::exporter::otlp::OtlpHttpExporter(exporter_opts));
 
-        // Create batch span processor (uses background thread, default 5s interval, 512 batch size)
+        // Create batch span processor (uses background thread, default 5s interval, 512 batch size).
+        // The interval is overridable via config.xml (telemetry.trace_export_interval_ms).
+        opentelemetry::sdk::trace::BatchSpanProcessorOptions span_batch_opts;
+        if (trace_export_interval_ms > 0) {
+            span_batch_opts.schedule_delay_millis = std::chrono::milliseconds(trace_export_interval_ms);
+        }
         auto processor = std::make_unique<opentelemetry::sdk::trace::BatchSpanProcessor>(
-            std::move(exporter), opentelemetry::sdk::trace::BatchSpanProcessorOptions());
+            std::move(exporter), span_batch_opts);
 
         // Create tracer provider using nostd::shared_ptr
         impl_->provider = opentelemetry::nostd::shared_ptr<opentelemetry::sdk::trace::TracerProvider>(
@@ -171,8 +177,13 @@ void TelemetryManager::init(const std::string& otlp_endpoint, const std::string&
 
         std::unique_ptr<opentelemetry::sdk::logs::LogRecordExporter> log_exporter(
             new opentelemetry::exporter::otlp::OtlpHttpLogRecordExporter(log_exporter_opts));
+        // Default log interval is 1s; overridable via config.xml (telemetry.log_export_interval_ms).
+        opentelemetry::sdk::logs::BatchLogRecordProcessorOptions log_batch_opts;
+        if (log_export_interval_ms > 0) {
+            log_batch_opts.schedule_delay_millis = std::chrono::milliseconds(log_export_interval_ms);
+        }
         auto log_processor = std::make_unique<opentelemetry::sdk::logs::BatchLogRecordProcessor>(
-            std::move(log_exporter));
+            std::move(log_exporter), log_batch_opts);
 
         impl_->log_provider = opentelemetry::nostd::shared_ptr<opentelemetry::sdk::logs::LoggerProvider>(
             new opentelemetry::sdk::logs::LoggerProvider(std::move(log_processor), resource_ptr));
@@ -186,6 +197,8 @@ void TelemetryManager::init(const std::string& otlp_endpoint, const std::string&
 
         if (debug) {
             std::cout << "Logs endpoint: " << logs_endpoint << std::endl;
+            std::cout << "Export intervals: traces=" << span_batch_opts.schedule_delay_millis.count()
+                      << "ms, logs=" << log_batch_opts.schedule_delay_millis.count() << "ms" << std::endl;
             std::cout << "Telemetry initialization: SUCCESS" << std::endl;
             std::cout << "================================\n" << std::endl;
         } else {

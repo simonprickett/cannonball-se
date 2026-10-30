@@ -13,3 +13,6 @@ roms/mpr-*
 roms/epr-*
 .claude/
 __pycache__/
+
+# Alloy: only the example env file belongs in the repo; the real one lives at /etc/default/alloy on the Pi
+alloy/*.env

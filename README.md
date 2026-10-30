@@ -131,6 +131,15 @@ Edit `config.xml` and set the OTLP endpoint:
 
 The logs endpoint is derived automatically by replacing `/v1/traces` with `/v1/logs` in the configured URL, so no additional configuration is needed.
 
+Optionally, tune how often the game flushes batched telemetry to the endpoint (milliseconds; `0` or omitted keeps the SDK default):
+
+```xml
+<telemetry>
+  <trace_export_interval_ms>5000</trace_export_interval_ms>  <!-- SDK default 5000 -->
+  <log_export_interval_ms>1000</log_export_interval_ms>      <!-- SDK default 1000 -->
+</telemetry>
+```
+
 ### Signals
 
 CannonBall-SE emits two complementary OpenTelemetry signals:

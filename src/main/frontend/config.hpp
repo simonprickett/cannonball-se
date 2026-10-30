@@ -256,6 +256,9 @@ public:
         std::string otlp_endpoint;
         std::string instance_id;
         std::string auth_token;
+        // Batch export intervals in ms; 0 = use the OpenTelemetry SDK default
+        int trace_export_interval_ms;
+        int log_export_interval_ms;
         bool debug;
     };
     telemetry_settings_t telemetry;
