@@ -73,7 +73,18 @@ GCLOUD_INSTANCE_ID="<instance id>"
 GCLOUD_TOKEN="glc_<token>"
 ```
 
-- `GCLOUD_OTLP_ENDPOINT` is the base URL with no `/v1/traces` on the end.
+- `GCLOUD_OTLP_ENDPOINT` is the base URL and stops at `/otlp`, with **no `/v1`** on the end.
+
+> **The two endpoint settings differ on purpose.** Alloy's OTLP HTTP exporter appends `/v1/traces` and
+> `/v1/logs` itself, so its endpoint ends `/otlp`. The game's `config.xml` `<otlp_endpoint>` ends `/v1`
+> (the game appends `/traces` and `/logs`). Copying the game's URL into Alloy sends requests to
+> `…/otlp/v1/v1/traces` and fails with a 404.
+>
+> | Setting | Example |
+> |---------|---------|
+> | `/etc/default/alloy` `GCLOUD_OTLP_ENDPOINT` (Alloy → Cloud) | `https://otlp-gateway-prod-<region>.grafana.net/otlp` |
+> | game `config.xml` `<otlp_endpoint>` pointed straight at Cloud | `https://otlp-gateway-prod-<region>.grafana.net/otlp/v1` |
+> | game `config.xml` `<otlp_endpoint>` pointed at Alloy | `http://127.0.0.1:4318/v1` |
 - Restrict the file, since it holds the token: `sudo chmod 640 /etc/default/alloy` and
   `sudo chown root:alloy /etc/default/alloy`.
 
@@ -116,7 +127,7 @@ In the game's `config.xml`, change the `<telemetry>` block:
    appear exactly as before.
 3. If nothing arrives:
    - `journalctl -u alloy -f` for export errors. A 401 means a wrong instance ID or token, a 404 usually means the wrong region or a
-     `/v1/...` suffix left in `GCLOUD_OTLP_ENDPOINT`.
+     `/v1` (or `/v1/...`) suffix wrongly left on `GCLOUD_OTLP_ENDPOINT`.
    - Run the game with `<debug>1</debug>` and check its console output for export errors to `127.0.0.1:4318`.
 
 ## 5. Check performance impact
@@ -139,6 +150,50 @@ vcgencmd measure_temp
 
 Because Alloy is a local hop on the loopback interface and only handles a few events per second, it should add very little CPU and memory.
 Record what you actually see.
+
+## Starting and stopping Alloy
+
+Alloy runs as the systemd service `alloy`.
+
+| Task | Command |
+|------|---------|
+| Start now | `sudo systemctl start alloy` |
+| Stop now | `sudo systemctl stop alloy` |
+| Restart (needed after editing `/etc/alloy/config.alloy` or `/etc/default/alloy`) | `sudo systemctl restart alloy` |
+| Start automatically at every boot | `sudo systemctl enable alloy` |
+| Stop starting at boot | `sudo systemctl disable alloy` |
+| Enable at boot **and** start now | `sudo systemctl enable --now alloy` |
+| Is it running? | `systemctl is-active alloy` (`active`) |
+| Will it start at boot? | `systemctl is-enabled alloy` (`enabled`) |
+| Full status | `systemctl status alloy --no-pager` |
+| Logs | `journalctl -u alloy -n 50 --no-pager` (add `-f` to follow, `-b` for this boot only) |
+
+Alloy reads `/etc/alloy/config.alloy` and `/etc/default/alloy` only when it starts, so always restart it
+after changing either file.
+
+## Starting at boot
+
+The `alloy` package installs a systemd service. `sudo systemctl enable --now alloy` (step 2) makes it
+start at every boot as well as now. Check with:
+
+```bash
+systemctl is-enabled alloy     # should print "enabled"
+systemctl is-active alloy      # "active" once running
+```
+
+If it prints `disabled`, run `sudo systemctl enable alloy`.
+
+Startup order matters a little. If the game starts before Alloy is listening on `127.0.0.1:4318`, its first
+export attempts fail and those batches may be lost (the game does not queue them for long). Alloy starts
+quickly and the game takes a while to reach a game session, so this is unlikely to matter in practice, but
+if you see missing events right after a reboot, check `journalctl -u alloy -b` and when the game launched
+relative to it. To make the order explicit, start the game's service `After=alloy.service`.
+
+## Status
+
+Verified on a Pi 4 (Raspberry Pi OS, 64-bit) with Alloy v1.21.3: logs and traces flow game -> Alloy -> Grafana Cloud
+with accepted == sent counts and no failures, and the game appears correctly in the Recent Games dashboard. The
+performance comparison (section 5) has not been recorded yet.
 
 ## Rolling back
 

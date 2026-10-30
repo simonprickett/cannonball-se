@@ -129,7 +129,7 @@ Edit `config.xml` and set the OTLP endpoint:
 
 **The game will exit with an error if `otlp_endpoint` is not configured.**
 
-`otlp_endpoint` is the OTLP base URL ending `/v1` (a trailing `/` is fine). The game appends `/traces` and `/logs` itself, so no additional configuration is needed. Older configs ending `/v1/traces` still work.
+`otlp_endpoint` is the OTLP base URL ending `/v1` (a trailing `/` is fine). The game appends `/traces` and `/logs` itself, so no additional configuration is needed. Older configs ending `/v1/traces` still work. If you put Grafana Alloy in between, note that Alloy's own endpoint setting is different (it ends `/otlp`, with no `/v1`) - see [`alloy/README.md`](alloy/README.md).
 
 Optionally, tune how often the game flushes batched telemetry to the endpoint (milliseconds; `0` or omitted keeps the SDK default):
 

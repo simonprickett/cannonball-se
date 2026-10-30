@@ -237,6 +237,7 @@
     <telemetry>
         <!-- OTLP HTTP Endpoint - REQUIRED, application will fail to start if not configured -->
         <!-- Base URL ending /v1 - the game appends /traces and /logs itself -->
+        <!-- (Alloy's own endpoint setting is different: it ends /otlp with no /v1 - see alloy/README.md) -->
         <!-- Example: http://localhost:4318/v1 for local OTLP collector -->
         <!-- For Grafana Cloud: https://otlp-gateway-prod-<region>.grafana.net/otlp/v1 -->
         <otlp_endpoint>https://YOUR GRAFANA CLOUD HOSTNAME HERE/otlp/v1</otlp_endpoint>

@@ -1,6 +1,21 @@
 # Log capture and replay plan
 
-Status: **plan only, nothing implemented yet.**
+Status: **Phase 1 done (Alloy pass-through); capture and replay not started.** Paused here on 2026-10-30.
+
+### Progress
+
+- [x] Alloy v1.21.3 (linux/arm64) installed on the Pi 4 (`redpi4`) from Grafana's apt repo. Install and
+      config steps are in [`alloy/README.md`](alloy/README.md).
+- [x] Pass-through pipeline (`alloy/config.alloy`): game -> Alloy (`127.0.0.1:4318`) -> Grafana Cloud, **traces and logs**.
+- [x] Verified end to end with a real game: Alloy counters showed accepted == sent for logs (89) and spans (7)
+      with no send failures; the game showed correctly in Recent Games, and its trace was present in Tempo.
+- [x] Game export intervals made configurable in `config.xml` (`trace_export_interval_ms`, `log_export_interval_ms`).
+      Logs now ship at 250 ms by default (tested with no visible impact on a Pi 4); traces keep the SDK default of 5000 ms.
+- [x] Game's `otlp_endpoint` now ends `/v1` (the code appends `/traces` and `/logs`). Alloy's own endpoint
+      ends `/otlp` with no `/v1`. The difference is documented in `alloy/README.md`.
+- [ ] Still to do for Phase 1: the performance comparison (Alloy CPU/memory, `vcgencmd get_throttled`,
+      temperature, with and without Alloy), and a look at Now Playing during a live game.
+- [ ] Capture sink, replay script, rolling-date job, play dashboard variant (everything below).
 
 ## Goal
 
@@ -91,7 +106,8 @@ attributes, structured metadata) and hits query limits, so the replayed data wou
 
 ## Suggested order
 
-1. Check Alloy version and exporter availability, read the reference page.
+1. ~~Install Alloy and verify the pass-through.~~ Done. Next: check the installed Alloy (v1.21.3) includes
+   `otelcol.exporter.file`, and read the reference page for that version.
 2. Add the file sink to an Alloy config, run on the Pi for about an hour, inspect the output.
 3. Write the replay script against the real capture; test against a non-play stack first.
 4. Record a full representative day. Review it for sensitive content and size, then store it
@@ -105,3 +121,8 @@ attributes, structured metadata) and hits query limits, so the replayed data wou
 - Where does the static capture live, and who can access it?
 - How are `session_label` and the picker affected by shifted timestamps?
 - Is Alloy also going to run the Pi system-data pipeline? If so, keep it in the same config.
+
+## Dashboard follow-ups (not part of the replay work itself)
+
+- Update the dashboards' bar charts to use the new bar chart PR so the series name is shown when
+  there is only one metric. Noted only; no dashboard changes made yet.

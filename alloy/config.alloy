@@ -40,7 +40,8 @@ otelcol.auth.basic "grafana_cloud" {
 otelcol.exporter.otlphttp "grafana_cloud" {
   client {
     // Base URL only, e.g. https://otlp-gateway-prod-eu-west-2.grafana.net/otlp
-    // The exporter appends /v1/traces and /v1/logs itself.
+    // The exporter appends /v1/traces and /v1/logs itself, so do NOT end this with /v1
+    // (unlike the game's config.xml <otlp_endpoint>, which does end /v1).
     endpoint = sys.env("GCLOUD_OTLP_ENDPOINT")
     auth     = otelcol.auth.basic.grafana_cloud.handler
   }
