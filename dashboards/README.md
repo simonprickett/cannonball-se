@@ -1,5 +1,10 @@
 # Cannonball-SE Grafana Dashboards
 
+<figure>
+  <img src="cannonball_dashboard_manchester.jpg" alt="Recent Games Dashboard at Grafana and Friends Manchester October 2026">
+  <figcaption><em>Recent Games Dashboard at Grafana and Friends Manchester October 2026</em></figcaption>
+</figure>
+
 Importable Grafana 13.3+ dashboards built on the structured logs described in
 [`../ADD_LOGS.md`](../ADD_LOGS.md). Panels query **Loki** with LogQL — including the Recent Games
 game picker (Loki only, no Tempo). On import you're prompted for the Loki data source.

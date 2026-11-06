@@ -262,7 +262,7 @@ Traces are routed to **Tempo** and logs to **Loki** automatically via the same g
 
 ### Grafana dashboards
 
-The [`dashboards/`](dashboards) folder holds four Grafana dashboards built on the Loki logs (Recent Games also has a panel linking out to the game's Tempo trace). They are generated from `dashboards/generate.py` and deployed with `dashboards/push.sh` (needs the Grafana Cloud CLI, `gcx`, logged in to your stack). Details, conventions and caveats are in [`dashboards/DASHBOARDS.md`](dashboards/DASHBOARDS.md).
+The [`dashboards/`](dashboards) folder holds four Grafana dashboards built on the Loki logs (Recent Games also has a panel linking out to the game's Tempo trace). They are generated from `dashboards/generate.py` and deployed with `dashboards/push.sh` (needs the Grafana Cloud CLI, `gcx`, logged in to your stack). Details, conventions and caveats are in [`dashboards/README.md`](dashboards/README.md).
 
 | Dashboard | What it shows |
 |-----------|---------------|
