@@ -15,6 +15,34 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python print_receipt.py fixtures/high_score.json --sink file:out/x.raw
 ```
 
+## Previewing in the emulator
+
+[escpresso](https://github.com/jflaflamme/escpresso) is a virtual ESC/POS printer with a GUI preview. It listens on
+TCP port 9100, which is this tool's default sink.
+
+```
+# One-off install (needs Rust: https://rustup.rs or `brew install rust`)
+cargo install escpresso
+
+# Start it; a window opens and it listens on localhost:9100. Choose 58 mm paper in its UI.
+escpresso
+```
+
+Then, in another terminal, from this folder:
+
+```
+.venv/bin/python print_receipt.py fixtures/high_score.json       # initials, timed out
+.venv/bin/python print_receipt.py fixtures/no_initials.json      # PLAYER shows ---
+.venv/bin/python print_receipt.py fixtures/continuous_long.json  # 9-digit score, stage 15
+.venv/bin/python print_receipt.py fixtures/completed.json --logo assets/logo.png --qr --base-url https://play.example.org
+```
+
+The last one prints the logo and a QR (the example URL scans but goes nowhere).
+
+The emulator is more permissive than the CSN-A2. It renders commands the printer lacks (for example native QR, `GS ( k`),
+and it prints instantly, whereas the real printer takes seconds for the logo and QR at 9600 baud. Stick to the commands
+in the printer datasheet and treat the preview as a layout check, not proof the printer will accept every byte.
+
 ## Configuration
 
 Environment variables (see `receipts.env.example`; the real `receipts.env` is git-ignored):
