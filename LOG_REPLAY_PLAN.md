@@ -6,15 +6,26 @@ The MQTT bridge and receipt printer idea was planned on 2026-11-06 (last section
 ### Resume here (2026-11-06)
 
 Planning for the **game-end receipt printer** is complete enough to start building. Summary of what is decided:
-Alloy bridge branch (game.session.end + game.high_score only, screenshot stripped) -> Python bridge (pairs the two events,
-drops zero-score games) -> Mosquitto on the Pi (host/port/credentials configurable) -> Python printer subscriber on the
+Alloy bridge branch (game.session.end only, screenshot stripped; updated 2026-11-21, see "Which events") -> Python bridge
+(stateless: flattens, drops zero-score games) -> Mosquitto on the Pi (host/port/credentials configurable) -> Python printer subscriber on the
 Pi -> CSN-A2 on the GPIO UART (9600 8N1, 58 mm, 5 V 2 A, Pi TX to printer RX only). Receipt for every non-zero game,
 32 columns, no high-score line, QR later once data is on Grafana Play with anonymous access.
 
-State of the hardware: **printer parts are on order, so no printer testing has been possible yet.** Nothing in this plan
-has been run on the Pi. The Alloy performance comparison and `otelcol.exporter.file` check from Phase 1 are still open too.
+**Update 2026-11-21: receipt design done on the Mac, in [`receipts/`](receipts/README.md).** Built with python-escpos and
+checked in the escpresso emulator: 32-column layout, optional logo (`RECEIPT_LOGO_PATH`) and optional QR
+(`RECEIPT_QR_ENABLED`, bitmap via `GS v 0`), fixtures, a CLI with `tcp:`, `file:` and `serial:` sinks, and env-var
+config. The bridge, subscriber, Mosquitto and the Alloy branch are NOT written. `session_label` must be added to the
+`game_end` message (the QR link needs it). The Pi has no printer test yet and `receipts/` has no Pi setup doc yet.
 
-First actions when we resume: (1) check `otelcol.exporter.file` exists in Alloy v1.21.3 and capture a few real games to
+**NEXT STEP: print dummy receipts from the Pi on the real printer** (fixtures through `--sink serial:/dev/serial0`).
+Check: UART enabled and console off, `dialout` group, wiring (Pi TX to printer RX only), `ESC t` accepted, QR and logo
+print time at 9600 baud, whether `ESC a` centres rasters, how dark the dithered logo prints, density (`DC2 #`), timezone.
+Then write a Pi setup doc into `receipts/`.
+
+Older state: the printer parts were on order on 2026-11-06. The Alloy performance comparison and
+`otelcol.exporter.file` check from Phase 1 are still open too.
+
+First actions when we resume (original list; the printer test above now comes first): (1) check `otelcol.exporter.file` exists in Alloy v1.21.3 and capture a few real games to
 settle the open decisions below, (2) write the bridge, (3) add the Alloy branch, (4) printer subscriber and hardware test.
 See "Suggested order" at the end. The MQTT and receipt sections start at "Idea: fan select events out to MQTT or Redis".
 
@@ -307,37 +318,39 @@ If the broker moves off the Pi, only the MQTT host and credentials change.
 
 "Minimal game-end events" means the bridge branch keeps only:
 
-- **`game.session.end`**: the final event of a game and the receipt trigger. Carries `final_score`,
-  `final_stage`, `end_epoch_ms`, `completion_status`, `completion_code` and `longest_clean_seconds`.
-- **`game.high_score`**: carries `initials`, `position` and `score`. Needed only because initials live here. The bridge uses `initials` and ignores `position` and `score`.
+- **`game.session.end`** (only this one, updated 2026-11-21): the final event of a game and the receipt trigger.
+  Carries `final_score`, `final_stage` (1-based), `end_epoch_ms`, `completion_status` (`completed` or `timeout`),
+  `completion_code` (1 or 2), `longest_clean_seconds`, and, as log attributes stamped on every in-session record,
+  `player_initials`, `session_label` and `trace_id`.
 
-Not sent for now: `game.gameover` (fires at the end of play, before the post-game screens, so it is not
+Not sent for now: `game.high_score` (superseded: initials are on `session.end`, see below), `game.gameover` (fires at the end of play, before the post-game screens, so it is not
 the last event), `crash`, `overtake`, `heartbeat` and the rest.
 
 Filter, using the keep-list form noted above:
-`IsMatch(attributes["event"], "^game\\.(session\\.end|high_score)$")` (inverted, since the filter drops matches).
+`IsMatch(attributes["event"], "^game\\.session\\.end$")` (inverted, since the filter drops matches).
 
 ### Things found in the code that shape the receipt
 
 These are read from `src/main/engine/outrun.cpp`, not run on the Pi.
 
-1. **Initials exist only for high-score entries.** They are logged on `game.high_score`, not on
-   `game.session.end`. In OutRun only players who make the table enter initials. A player who does not
-   make it has no initials anywhere in telemetry. The receipt must handle "no initials" (print `---`, or the
-   time and score only).
-2. **Ordering.** `game.high_score` is logged when the entry timer expires, and `game.session.end` follows in
-   the same post-game flow. So when both exist, the high-score event arrives first. The bridge has to pair them
-   by game, either by holding a high-score event briefly and attaching it to the session.end that follows, or by
-   publishing both and letting the printer subscriber pair them. Holding it in the bridge keeps the printer simple,
-   and gives the printer a single "receipt" message per game. A short in-memory map keyed by game ID is enough.
+1. **CORRECTED 2026-11-21: initials are on `game.session.end`.** Players enter initials before the game starts
+   (`outrun.cpp:501`, `start_game_session(..., oname.get_display_initials())`). `log_game_event` stamps them on
+   every in-session record as `player_initials` (`telemetry.cpp:584`), and `session.end` is logged before
+   `end_game_session()` clears them. The earlier note (initials only on `game.high_score`) was wrong. Still
+   handle a missing or empty `player_initials` by printing `---`; confirm on the first capture.
+2. **Ordering: no longer matters.** The receipt is driven by `game.session.end` alone, so there is nothing to pair
+   and the bridge is stateless. (`game.high_score` still precedes `session.end` in the game, but is not used.)
 3. **`screenshot_jpg` is on `game.session.end`.** It is a large base64 attribute. It must not go to MQTT. Strip
    it in Alloy (`otelcol.processor.transform` / `delete_key` on the bridge branch only) so it never reaches the
    bridge, rather than relying on the bridge to drop it.
-4. **No `game ID` field is logged.** Records carry `trace_id` and `span_id` (the code comments say per-session
-   dashboard queries rely on them). The likely game ID is the trace ID, which is 32 hex characters, so
-   the receipt would show a short prefix. Not confirmed against the raw OTLP. The first capture will settle it.
-5. **Stage and score.** `final_stage` and `final_score` are on `session.end`. Stage name (as opposed to number)
-   would need a mapping in the printer subscriber.
+4. **No separate `game ID` field is logged.** Game ID = `trace_id` (32 lowercase hex). `session.end` is logged
+   before the post-game span ends (`outrun.cpp:802`), so it carries the session's trace ID. The receipt shows the
+   first 8 characters. Confirm against the raw OTLP on the first capture.
+5. **Stage and score.** `final_stage` and `final_score` are on `session.end`. `final_stage` is `cur_stage + 1`, so
+   **1-based**. Original mode has 5 stages on a route; continuous mode (`MODE_CONT`) can go up to 15, so print the
+   number without "of N". No stage names exist in the code; a name mapping would live in the printer subscriber.
+6. **Completion.** `completion_status` is `"completed"` or `"timeout"`; `completion_code` is 1 or 2.
+   RESULT line: `COMPLETED` / `TIME UP`.
 
 ### Planned MQTT message
 
@@ -347,10 +360,10 @@ Published by the bridge, one per game, to `cannonball/<host>/game_end`, non-reta
 {
   "game_id": "<trace id>",
   "host": "redpi4",
-  "initials": "ABC",          // null when the player did not make the table
+  "initials": "ABC",          // from player_initials; null/absent if missing (print ---)
   "score": 123456,
-  "stage": 4,
-  "completion_status": "...",
+  "stage": 4,                 // final_stage, 1-based
+  "completion_status": "completed" | "timeout",
   "ended_at": "2026-11-06T14:03:21Z"
 }
 ```
@@ -471,11 +484,8 @@ peak-current figure if it is in a graphic) was not read. The items marked "not f
 
 ### Decisions made (2026-11-06, third pass)
 
-- **Pairing happens in the bridge.** It holds a `game.high_score` in memory keyed by game ID and merges it into
-  the `game.session.end` that follows, publishing one `game_end` message per game. Pending high scores expire after
-  a short timeout (about 60 s) if no `session.end` arrives. A bridge restart loses pending ones, which is acceptable.
-  If `session.end` ever arrives first (order unconfirmed, see above), hold it a couple of seconds before
-  publishing with null initials.
+- **SUPERSEDED 2026-11-21: no pairing.** (Originally the bridge paired `game.high_score` with `session.end`.) Initials
+  are on `session.end` as `player_initials`, so the bridge publishes one `game_end` per `session.end`, statelessly.
 - **Zero-score games get no receipt.** The bridge drops a `session.end` whose `final_score` is 0 (and discards any
   pending high score for that game) and publishes nothing.
 
@@ -498,7 +508,10 @@ design are between the bridge and its subscribers:
   ignore a `ended_at` older than that. A persistent session with a fixed client ID and QoS 1 lets a briefly restarted
   subscriber catch what it missed, and the expiry stops it printing a backlog. Needs MQTT 5, which Mosquitto and
   `paho-mqtt` 2.x support. Fall back to the `ended_at` check alone if that proves awkward.
-- **Duplicates:** QoS 1 can redeliver, so the subscriber remembers the last few printed `game_id`s and skips repeats.
+- **Duplicates (decided 2026-11-21):** dedupe in the **printer subscriber only**; the bridge stays stateless. It keeps
+  a bounded in-memory set of the last ~50 printed `game_id`s (`trace_id`) and skips repeats. This catches both Alloy
+  retries (bridge publishes twice) and QoS 1 redelivery. The cache is lost on restart; the stale `ended_at` check
+  covers that case.
 - **Access control (when it leaves localhost):** broker password file and ACLs. The bridge can write `cannonball/#`,
   the printer subscriber can read `cannonball/+/game_end` and write its own status topic.
 
@@ -506,8 +519,8 @@ design are between the bridge and its subscribers:
 
 - Confirm the Cloud branch counts do not drop once the filter is added.
 - Confirm that `event` is a log record attribute in the raw OTLP, and what the game ID should be.
-- Receipt content to check in the code: is `final_stage` 0-based and how many stages are there; the real `completion_status`
-  and `completion_code` values for the RESULT line; whether a logo is wanted.
+- ~~Receipt content to check in the code~~ (resolved 2026-11-21: `final_stage` 1-based, up to 15 in continuous mode;
+  `completion_status` is `completed`/`timeout`). Still open: whether a logo is wanted.
 - The Pi's timezone, since the receipt prints local time.
 - Printer details not found in the datasheet text: peak current (check the 2 A supply is enough) and receive buffer size.
 - QR link format. Depends on the play stack's dashboard variable names and anonymous access (see the QR section).
