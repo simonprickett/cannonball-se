@@ -52,6 +52,7 @@ Environment variables (see `receipts.env.example`; the real `receipts.env` is gi
 | `RECEIPT_QR_ENABLED` | `false` | Print a QR linking to the game's dashboard page |
 | `RECEIPT_QR_MODE` | `auto` | `auto`: native QR if the link fits `RECEIPT_QR_NATIVE_MAX_CHARS`, else bitmap. `native` / `bitmap` force one. Native is fast (a few hundred bytes); bitmap is ~10 s at 9600 baud |
 | `RECEIPT_QR_NATIVE_MAX_CHARS` | `29` | Longest link sent to the printer's native QR. A real CSN-A2 printed 29 characters but not 147; the true cutoff is untested |
+| `RECEIPT_QR_BOX_WIDTH`, `RECEIPT_QR_BOX_HEIGHT` | `3`, `3` | Bitmap QR module size in dots. If the printed QR is taller than wide, lower the height or raise the width (e.g. 4 and 3) until it's square |
 | `RECEIPT_DASHBOARD_BASE_URL` | unset | Public Grafana base URL; the QR is skipped (with a warning) if unset |
 | `RECEIPT_DASHBOARD_PATH` | `/d/cannonball-recent-games/recent-games` | Dashboard uid and slug |
 | `RECEIPT_QR_WINDOW_MINUTES` | `15` | Link time range starts this long before the game ended |

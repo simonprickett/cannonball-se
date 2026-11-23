@@ -74,12 +74,17 @@ def native_qr_size(url: str, max_dots: int = DOTS - 12) -> int:
     return max(1, min(8, max_dots // qr.modules_count))
 
 
-def qr_image(url: str, box: int = 4) -> Image.Image:
-    """QR centred on a full-width white canvas, so alignment does not depend on ESC a affecting rasters."""
-    qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M, box_size=box, border=2)
+def qr_image(url: str, box_w: int = 3, box_h: int = 3) -> Image.Image:
+    """QR centred on a full-width white canvas, so alignment does not depend on ESC a affecting rasters.
+
+    Each QR module is a box_w x box_h block of dots. If the printer stretches vertically, use a smaller
+    box_h than box_w (e.g. 4 x 3) so the printed code comes out square without blurring module edges.
+    """
+    qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M, box_size=1, border=2)
     qr.add_data(url)
     qr.make(fit=True)
-    code = qr.make_image(fill_color="black", back_color="white").convert("1")
+    modules = qr.make_image(fill_color="black", back_color="white").convert("1")
+    code = modules.resize((modules.width * box_w, modules.height * box_h), Image.NEAREST)
     canvas = Image.new("1", (DOTS, code.height), 1)
     canvas.paste(code, ((DOTS - code.width) // 2, 0))
     return canvas
@@ -147,7 +152,7 @@ def render(p, msg: dict, cfg: ReceiptConfig | None = None) -> None:
         if cfg.qr_mode == "native" or (cfg.qr_mode == "auto" and len(qr_url) <= cfg.qr_native_max_chars):
             p.qr(qr_url, ec=QR_ECLEVEL_M, size=native_qr_size(qr_url), model=QR_MODEL_2, native=True)
         else:
-            p.image(qr_image(qr_url), impl="bitImageRaster")  # GS v 0 raster
+            p.image(qr_image(qr_url, cfg.qr_box_width, cfg.qr_box_height), impl="bitImageRaster")  # GS v 0 raster
         p.text("Scan for your game\n")
         p.text(RULE_LIGHT + "\n")
 

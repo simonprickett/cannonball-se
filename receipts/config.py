@@ -16,6 +16,10 @@ class ReceiptConfig:
     # Longest link (characters) the printer's native QR accepts. The CSN-A2 printed 29 but not 147; the real
     # cutoff is untested, so this is the largest length verified. Raise it once the cutoff is known.
     qr_native_max_chars: int = 29
+    # Bitmap QR module size in dots. Square (3x3) by default; if the printer stretches the image vertically,
+    # make the height smaller than the width (e.g. 4 and 3) so the printed code is square.
+    qr_box_width: int = 3
+    qr_box_height: int = 3
     # Public Grafana base URL, e.g. https://play.grafana.org (no trailing slash). QR needs it.
     dashboard_base_url: str = ""
     dashboard_path: str = "/d/cannonball-recent-games/recent-games"
@@ -33,6 +37,8 @@ class ReceiptConfig:
             qr_enabled=_flag("RECEIPT_QR_ENABLED"),
             qr_mode=os.environ.get("RECEIPT_QR_MODE", cls.qr_mode).strip().lower(),
             qr_native_max_chars=int(os.environ.get("RECEIPT_QR_NATIVE_MAX_CHARS", cls.qr_native_max_chars)),
+            qr_box_width=int(os.environ.get("RECEIPT_QR_BOX_WIDTH", cls.qr_box_width)),
+            qr_box_height=int(os.environ.get("RECEIPT_QR_BOX_HEIGHT", cls.qr_box_height)),
             dashboard_base_url=os.environ.get("RECEIPT_DASHBOARD_BASE_URL", "").rstrip("/"),
             dashboard_path=os.environ.get("RECEIPT_DASHBOARD_PATH", cls.dashboard_path),
             qr_window_minutes=int(os.environ.get("RECEIPT_QR_WINDOW_MINUTES", cls.qr_window_minutes)),
