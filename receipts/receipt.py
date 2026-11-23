@@ -3,8 +3,9 @@
 render() takes any python-escpos printer object, so the same code drives the escpresso
 emulator (Network), the Pi's UART (Serial) and tests (Dummy).
 
-Only commands the CSN-A2 datasheet lists are used. In particular the QR code is a raster
-bitmap (native=False -> GS v 0), because the printer has no native QR command (GS ( k).
+QR codes: "native" uses the printer's own QR command (GS ( k), confirmed working on a real CSN-A2
+(2026-11-23) and tiny on the wire; "bitmap" sends a raster image (GS v 0) and works on printers without it,
+but takes about 10 s at 9600 baud. Selected by RECEIPT_QR_MODE.
 """
 from __future__ import annotations  # lets `X | None` hints work on Python < 3.10 (older Pi OS)
 
@@ -14,6 +15,7 @@ from datetime import datetime, timedelta
 from urllib.parse import quote
 
 import qrcode
+from escpos.constants import QR_ECLEVEL_M, QR_MODEL_2
 from PIL import Image, ImageOps
 
 from config import ReceiptConfig
@@ -57,6 +59,18 @@ def build_url(msg: dict, cfg: ReceiptConfig) -> str | None:
     end_ms = int((ended + timedelta(minutes=5)).timestamp() * 1000)
     return (f"{cfg.dashboard_base_url}{cfg.dashboard_path}"
             f"?var-session={quote(label)}&from={start_ms}&to={end_ms}")
+
+
+def native_qr_size(url: str, max_dots: int = DOTS - 12) -> int:
+    """Largest module size (dots, 1-8) at which the printer's own QR fits the paper.
+
+    The printer picks the QR version itself, so assume byte mode (the largest case) and
+    error level M, and count modules with the qrcode library.
+    """
+    qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M, border=0)
+    qr.add_data(qrcode.util.QRData(url, mode=qrcode.util.MODE_8BIT_BYTE))
+    qr.make(fit=True)
+    return max(1, min(8, max_dots // qr.modules_count))
 
 
 def qr_image(url: str, box: int = 4) -> Image.Image:
@@ -128,8 +142,11 @@ def render(p, msg: dict, cfg: ReceiptConfig | None = None) -> None:
     p.text(RULE_LIGHT + "\n")
 
     if qr_url:
-        p.image(qr_image(qr_url), impl="bitImageRaster")  # GS v 0 raster, never GS ( k
         p.set(align="center")
+        if cfg.qr_mode == "native":
+            p.qr(qr_url, ec=QR_ECLEVEL_M, size=native_qr_size(qr_url), model=QR_MODEL_2, native=True)
+        else:
+            p.image(qr_image(qr_url), impl="bitImageRaster")  # GS v 0 raster
         p.text("Scan for your game\n")
         p.text(RULE_LIGHT + "\n")
 

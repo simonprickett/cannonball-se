@@ -39,9 +39,9 @@ Then, in another terminal, from this folder:
 
 The last one prints the logo and a QR (the example URL scans but goes nowhere).
 
-The emulator is more permissive than the CSN-A2. It renders commands the printer lacks (for example native QR, `GS ( k`),
-and it prints instantly, whereas the real printer takes seconds for the logo and QR at 9600 baud. Stick to the commands
-in the printer datasheet and treat the preview as a layout check, not proof the printer will accept every byte.
+The emulator is more permissive than a real printer. It may render commands a printer lacks, and it prints instantly,
+whereas the real printer takes seconds for the logo at 9600 baud. Treat the preview as a layout check, not proof the
+printer will accept every byte. (Native QR, `GS ( k`, was confirmed on a real CSN-A2 on 2026-11-23, despite the datasheet.)
 
 ## Configuration
 
@@ -50,6 +50,7 @@ Environment variables (see `receipts.env.example`; the real `receipts.env` is gi
 | Variable | Default | Meaning |
 |---|---|---|
 | `RECEIPT_QR_ENABLED` | `false` | Print a QR linking to the game's dashboard page |
+| `RECEIPT_QR_MODE` | `native` | `native` uses the printer's own QR command (fast, confirmed on a real CSN-A2); `bitmap` sends a raster image (~10 s at 9600 baud) |
 | `RECEIPT_DASHBOARD_BASE_URL` | unset | Public Grafana base URL; the QR is skipped (with a warning) if unset |
 | `RECEIPT_DASHBOARD_PATH` | `/d/cannonball-recent-games/recent-games` | Dashboard uid and slug |
 | `RECEIPT_QR_WINDOW_MINUTES` | `15` | Link time range starts this long before the game ended |
@@ -57,5 +58,5 @@ Environment variables (see `receipts.env.example`; the real `receipts.env` is gi
 | `RECEIPT_LOGO_WIDTH` | `320` | Logo width in dots (max 384). Taller logos print slower: ~1 s per 1 KB at 9600 baud |
 | `RECEIPT_FEED_LINES` | `8` | Blank lines fed after the last line (`ESC d n`) so the receipt clears the tear bar |
 
-`--qr/--no-qr`, `--logo` and `--base-url` on the CLI override the environment. The QR is a raster bitmap (`GS v 0`);
-the CSN-A2 has no native QR command.
+`--qr/--no-qr`, `--logo` and `--base-url` on the CLI override the environment. The native QR module size is chosen
+from the link length so the code always fits the 384-dot paper.
