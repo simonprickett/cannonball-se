@@ -16,9 +16,9 @@ class ReceiptConfig:
     # Longest link (characters) the printer's native QR accepts. The CSN-A2 printed 29 but not 147; the real
     # cutoff is untested, so this is the largest length verified. Raise it once the cutoff is known.
     qr_native_max_chars: int = 29
-    # Bitmap QR module size in dots. Square (3x3) by default; if the printer stretches the image vertically,
-    # make the height smaller than the width (e.g. 4 and 3) so the printed code is square.
-    qr_box_width: int = 3
+    # Bitmap QR module size in dots. The CSN-A2 prints rows about 1.2x taller than columns are wide (measured:
+    # a 3x3 code came out 20 x 24 mm), so 4 wide x 3 tall prints nearly square (about 26 x 24 mm).
+    qr_box_width: int = 4
     qr_box_height: int = 3
     # Public Grafana base URL, e.g. https://play.grafana.org (no trailing slash). QR needs it.
     dashboard_base_url: str = ""
