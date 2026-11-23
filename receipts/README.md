@@ -55,6 +55,7 @@ Environment variables (see `receipts.env.example`; the real `receipts.env` is gi
 | `RECEIPT_QR_WINDOW_MINUTES` | `15` | Link time range starts this long before the game ended |
 | `RECEIPT_LOGO_PATH` | unset | Logo image (PNG best) printed instead of the title text; falls back to text if unreadable |
 | `RECEIPT_LOGO_WIDTH` | `320` | Logo width in dots (max 384). Taller logos print slower: ~1 s per 1 KB at 9600 baud |
+| `RECEIPT_FEED_LINES` | `8` | Blank lines fed after the last line (`ESC d n`) so the receipt clears the tear bar |
 
 `--qr/--no-qr`, `--logo` and `--base-url` on the CLI override the environment. The QR is a raster bitmap (`GS v 0`);
 the CSN-A2 has no native QR command.

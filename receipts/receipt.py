@@ -6,6 +6,8 @@ emulator (Network), the Pi's UART (Serial) and tests (Dummy).
 Only commands the CSN-A2 datasheet lists are used. In particular the QR code is a raster
 bitmap (native=False -> GS v 0), because the printer has no native QR command (GS ( k).
 """
+from __future__ import annotations  # lets `X | None` hints work on Python < 3.10 (older Pi OS)
+
 import functools
 import logging
 from datetime import datetime, timedelta
@@ -95,6 +97,13 @@ def render(p, msg: dict, cfg: ReceiptConfig | None = None) -> None:
     initials = (msg.get("initials") or "").strip() or "---"
     result = RESULTS.get(msg.get("completion_status"), str(msg.get("completion_status", "")).upper())
 
+    # Tell python-escpos the paper width. This silences its "media.width.pixel ... not set" print()
+    # and makes it reject any image wider than the paper.
+    try:
+        p.profile.profile_data["media"]["width"]["pixels"] = DOTS
+    except (AttributeError, KeyError, TypeError):
+        pass
+
     p._raw(b"\x1b@")  # ESC @ initialise
     p.set(align="center", bold=True)
     p.text(RULE_HEAVY + "\n")
@@ -126,4 +135,5 @@ def render(p, msg: dict, cfg: ReceiptConfig | None = None) -> None:
 
     p.set(align="center")
     p.text("Thanks for playing!\n")
-    p.text("\n\n\n\n")  # no cutter: feed past the tear bar
+    # No cutter: ESC d n feeds n lines so the receipt clears the tear bar.
+    p._raw(b"\x1bd" + bytes([max(0, min(cfg.feed_lines, 255))]))

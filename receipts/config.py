@@ -19,6 +19,8 @@ class ReceiptConfig:
     # Optional logo image (any format Pillow reads) printed instead of the CANNONBALL title text.
     logo_path: str = ""
     logo_width: int = 320  # dots, max 384
+    # Blank lines fed after the last line so the receipt clears the tear bar (no cutter).
+    feed_lines: int = 8
 
     @classmethod
     def from_env(cls) -> "ReceiptConfig":
@@ -29,4 +31,5 @@ class ReceiptConfig:
             qr_window_minutes=int(os.environ.get("RECEIPT_QR_WINDOW_MINUTES", cls.qr_window_minutes)),
             logo_path=os.environ.get("RECEIPT_LOGO_PATH", ""),
             logo_width=int(os.environ.get("RECEIPT_LOGO_WIDTH", cls.logo_width)),
+            feed_lines=int(os.environ.get("RECEIPT_FEED_LINES", cls.feed_lines)),
         )
