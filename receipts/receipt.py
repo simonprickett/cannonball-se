@@ -3,9 +3,10 @@
 render() takes any python-escpos printer object, so the same code drives the escpresso
 emulator (Network), the Pi's UART (Serial) and tests (Dummy).
 
-QR codes: "native" uses the printer's own QR command (GS ( k), confirmed working on a real CSN-A2
-(2026-11-23) and tiny on the wire; "bitmap" sends a raster image (GS v 0) and works on printers without it,
-but takes about 10 s at 9600 baud. Selected by RECEIPT_QR_MODE.
+QR codes: "native" uses the printer's own QR command (GS ( k), confirmed on a real CSN-A2 (2026-11-23) for
+short links (29 chars worked, 147 did not) and tiny on the wire; "bitmap" sends a raster image (GS v 0) and
+works for any length, but takes about 10 s at 9600 baud. RECEIPT_QR_MODE=auto (default) picks native when the
+link fits RECEIPT_QR_NATIVE_MAX_CHARS, otherwise bitmap.
 """
 from __future__ import annotations  # lets `X | None` hints work on Python < 3.10 (older Pi OS)
 
@@ -143,7 +144,7 @@ def render(p, msg: dict, cfg: ReceiptConfig | None = None) -> None:
 
     if qr_url:
         p.set(align="center")
-        if cfg.qr_mode == "native":
+        if cfg.qr_mode == "native" or (cfg.qr_mode == "auto" and len(qr_url) <= cfg.qr_native_max_chars):
             p.qr(qr_url, ec=QR_ECLEVEL_M, size=native_qr_size(qr_url), model=QR_MODEL_2, native=True)
         else:
             p.image(qr_image(qr_url), impl="bitImageRaster")  # GS v 0 raster
