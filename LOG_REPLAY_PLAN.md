@@ -17,10 +17,19 @@ checked in the escpresso emulator: 32-column layout, optional logo (`RECEIPT_LOG
 config. The bridge, subscriber, Mosquitto and the Alloy branch are NOT written. `session_label` must be added to the
 `game_end` message (the QR link needs it). The Pi has no printer test yet and `receipts/` has no Pi setup doc yet.
 
-**NEXT STEP: print dummy receipts from the Pi on the real printer** (fixtures through `--sink serial:/dev/serial0`).
-Check: UART enabled and console off, `dialout` group, wiring (Pi TX to printer RX only), `ESC t` accepted, QR and logo
-print time at 9600 baud, whether `ESC a` centres rasters, how dark the dithered logo prints, density (`DC2 #`), timezone.
-Then write a Pi setup doc into `receipts/`.
+**Update 2026-11-23: the receipt renderer works on a real CSN-A2** (proven on a throwaway Pi A+; text, logo, native and
+bitmap QR). Pi setup is documented in [`receipts/PI_SETUP.md`](receipts/PI_SETUP.md) (Pi 4 steps untested).
+Findings are in memory and that doc: rows print about 1.2x tall (QR modules 4x3), native QR works only for short data
+(29 chars ok, 147 not; `auto` mode falls back to bitmap), `ESC d 8` feed, printer TX wire cut.
+
+**NOT built yet (the whole pipeline between the game and the printer):** the Alloy bridge branch, the Python bridge,
+Mosquitto, the printer subscriber (dedupe + stale check + `render()` to the serial port), and systemd units. Today
+`receipts/` takes a fixture file and prints it. `session_label` must also be added to the `game_end` message.
+
+**NEXT STEPS:** (1) set up the printer on the Pi 4 following `receipts/PI_SETUP.md`; (2) capture a real game's raw OTLP
+(Alloy `otelcol.exporter.debug` or the file exporter) to confirm `event`, `trace_id`, `player_initials`, `session_label`
+and the attribute shapes; (3) write the bridge and subscriber and test them locally with fixtures POSTed as OTLP JSON;
+(4) add the Alloy branch; (5) real games to real receipts. The log capture/replay idea is parked while receipts come first.
 
 Older state: the printer parts were on order on 2026-11-06. The Alloy performance comparison and
 `otelcol.exporter.file` check from Phase 1 are still open too.
@@ -361,6 +370,7 @@ Published by the bridge, one per game, to `cannonball/<host>/game_end`, non-reta
   "game_id": "<trace id>",
   "host": "redpi4",
   "initials": "ABC",          // from player_initials; null/absent if missing (print ---)
+  "session_label": "2026-11-06 14:00:02.411 ABC",   // needed for the QR link (var-session)
   "score": 123456,
   "stage": 4,                 // final_stage, 1-based
   "completion_status": "completed" | "timeout",

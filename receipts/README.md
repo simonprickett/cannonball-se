@@ -5,7 +5,8 @@ Game-end thermal receipts for CannonBall-SE (CSN-A2, 58 mm, 384 dots, ESC/POS).
 Planning background: the "Game-end receipts via MQTT" section at the end of
 [`../LOG_REPLAY_PLAN.md`](../LOG_REPLAY_PLAN.md).
 
-This folder starts with receipt design on the Mac, using a printer simulator, before anything goes to the Pi.
+Receipt rendering for a CSN-A2 thermal printer: designed on the Mac with a simulator, then proven on a real printer.
+To set up a Raspberry Pi with the printer, see [`PI_SETUP.md`](PI_SETUP.md).
 
 ## Running
 
